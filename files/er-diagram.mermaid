@@ -1,0 +1,275 @@
+%% Pet Food ERP — Entity Relationship Diagram
+%% Renders as a picture. Pairs with schema.sql and data-model.md.
+%% Only key fields are shown per entity to keep the diagram readable;
+%% see schema.sql for the complete column list.
+erDiagram
+
+    %% ----- Master data -----
+    UOM {
+        bigint id PK
+        text code
+        text uom_type
+    }
+    ITEM_CATEGORY {
+        bigint id PK
+        text code
+        bigint parent_id FK
+    }
+    ITEM {
+        bigint id PK
+        text sku
+        text item_type
+        bigint base_uom_id FK
+        bigint category_id FK
+        boolean is_lot_controlled
+        integer shelf_life_days
+        text costing_method
+    }
+    UOM_CONVERSION {
+        bigint id PK
+        bigint item_id FK
+        bigint from_uom_id FK
+        bigint to_uom_id FK
+        numeric factor
+    }
+    WAREHOUSE {
+        bigint id PK
+        text code
+    }
+    LOCATION {
+        bigint id PK
+        bigint warehouse_id FK
+        text code
+        text location_type
+    }
+    SUPPLIER {
+        bigint id PK
+        text code
+        text name
+    }
+    CUSTOMER {
+        bigint id PK
+        text code
+        text name
+    }
+
+    %% ----- Inventory & lots -----
+    LOT {
+        bigint id PK
+        text lot_number
+        bigint item_id FK
+        date expiry_date
+        text source_type
+        text status
+    }
+    INVENTORY_TRANSACTION {
+        bigint id PK
+        bigint item_id FK
+        bigint lot_id FK
+        bigint location_id FK
+        numeric quantity
+        text transaction_type
+        numeric unit_cost
+    }
+    INVENTORY_BALANCE {
+        bigint item_id PK
+        bigint lot_id PK
+        bigint location_id PK
+        numeric quantity_on_hand
+        numeric quantity_allocated
+    }
+
+    %% ----- Formulas -----
+    FORMULA {
+        bigint id PK
+        text code
+        bigint output_item_id FK
+    }
+    FORMULA_VERSION {
+        bigint id PK
+        bigint formula_id FK
+        integer version_no
+        numeric base_output_quantity
+        text status
+    }
+    FORMULA_LINE {
+        bigint id PK
+        bigint formula_version_id FK
+        bigint ingredient_item_id FK
+        numeric quantity
+        numeric scrap_percent
+    }
+
+    %% ----- Procurement -----
+    PURCHASE_ORDER {
+        bigint id PK
+        text po_number
+        bigint supplier_id FK
+        text status
+    }
+    PURCHASE_ORDER_LINE {
+        bigint id PK
+        bigint po_id FK
+        bigint item_id FK
+        numeric quantity
+        numeric received_quantity
+    }
+    GOODS_RECEIPT {
+        bigint id PK
+        text grn_number
+        bigint po_id FK
+        bigint warehouse_id FK
+        text status
+    }
+    GOODS_RECEIPT_LINE {
+        bigint id PK
+        bigint grn_id FK
+        bigint po_line_id FK
+        bigint item_id FK
+        bigint lot_id FK
+        numeric quantity
+    }
+
+    %% ----- Production -----
+    PRODUCTION_ORDER {
+        bigint id PK
+        text mo_number
+        bigint formula_version_id FK
+        bigint output_item_id FK
+        text status
+    }
+    PRODUCTION_CONSUMPTION {
+        bigint id PK
+        bigint production_order_id FK
+        bigint item_id FK
+        bigint lot_id FK
+        numeric actual_quantity
+    }
+    PRODUCTION_OUTPUT {
+        bigint id PK
+        bigint production_order_id FK
+        bigint item_id FK
+        bigint lot_id FK
+        numeric quantity
+        text output_type
+    }
+
+    %% ----- Sales & shipping -----
+    SALES_ORDER {
+        bigint id PK
+        text so_number
+        bigint customer_id FK
+        text status
+    }
+    SALES_ORDER_LINE {
+        bigint id PK
+        bigint so_id FK
+        bigint item_id FK
+        numeric quantity
+        numeric shipped_quantity
+    }
+    SHIPMENT {
+        bigint id PK
+        text shipment_number
+        bigint so_id FK
+        bigint customer_id FK
+        text status
+    }
+    SHIPMENT_LINE {
+        bigint id PK
+        bigint shipment_id FK
+        bigint item_id FK
+        bigint lot_id FK
+        numeric quantity
+    }
+
+    %% ----- Quality -----
+    COA {
+        bigint id PK
+        text coa_number
+        bigint lot_id FK
+        text result
+    }
+
+    %% ----- Finance (Phase 2) -----
+    GL_ACCOUNT {
+        bigint id PK
+        text account_code
+        text account_type
+    }
+    JOURNAL_ENTRY {
+        bigint id PK
+        text entry_number
+        text source_type
+        text status
+    }
+    JOURNAL_ENTRY_LINE {
+        bigint id PK
+        bigint journal_entry_id FK
+        bigint gl_account_id FK
+        numeric debit
+        numeric credit
+    }
+    AP_INVOICE {
+        bigint id PK
+        bigint supplier_id FK
+        bigint po_id FK
+        numeric amount
+    }
+    AR_INVOICE {
+        bigint id PK
+        bigint customer_id FK
+        bigint so_id FK
+        numeric amount
+    }
+
+    %% ===== Relationships =====
+    UOM            ||--o{ ITEM                  : "base unit of"
+    ITEM_CATEGORY  ||--o{ ITEM                  : categorizes
+    ITEM_CATEGORY  ||--o{ ITEM_CATEGORY         : "parent of"
+    ITEM           ||--o{ UOM_CONVERSION        : "converts"
+    WAREHOUSE      ||--o{ LOCATION              : contains
+
+    ITEM           ||--o{ LOT                   : "tracked as"
+    ITEM           ||--o{ INVENTORY_TRANSACTION : "moved as"
+    LOT            ||--o{ INVENTORY_TRANSACTION : "moves"
+    LOCATION       ||--o{ INVENTORY_TRANSACTION : "at"
+    ITEM           ||--o{ INVENTORY_BALANCE     : "held as"
+    LOT            ||--o{ INVENTORY_BALANCE     : "held as"
+    LOCATION       ||--o{ INVENTORY_BALANCE     : "holds"
+
+    ITEM           ||--o{ FORMULA               : "produced by"
+    FORMULA        ||--o{ FORMULA_VERSION       : versioned
+    FORMULA_VERSION||--o{ FORMULA_LINE          : contains
+    ITEM           ||--o{ FORMULA_LINE          : "ingredient in"
+
+    SUPPLIER       ||--o{ PURCHASE_ORDER        : receives
+    PURCHASE_ORDER ||--o{ PURCHASE_ORDER_LINE   : "has"
+    ITEM           ||--o{ PURCHASE_ORDER_LINE   : ordered
+    PURCHASE_ORDER ||--o{ GOODS_RECEIPT         : "fulfilled by"
+    WAREHOUSE      ||--o{ GOODS_RECEIPT         : "received at"
+    GOODS_RECEIPT  ||--o{ GOODS_RECEIPT_LINE    : "has"
+    PURCHASE_ORDER_LINE ||--o{ GOODS_RECEIPT_LINE : "received as"
+    LOT            ||--o{ GOODS_RECEIPT_LINE    : "created in"
+
+    FORMULA_VERSION    ||--o{ PRODUCTION_ORDER       : "built from"
+    PRODUCTION_ORDER   ||--o{ PRODUCTION_CONSUMPTION : consumes
+    PRODUCTION_ORDER   ||--o{ PRODUCTION_OUTPUT      : produces
+    LOT                ||--o{ PRODUCTION_CONSUMPTION : "consumed in"
+    LOT                ||--o{ PRODUCTION_OUTPUT      : "created in"
+
+    CUSTOMER       ||--o{ SALES_ORDER           : places
+    SALES_ORDER    ||--o{ SALES_ORDER_LINE      : "has"
+    ITEM           ||--o{ SALES_ORDER_LINE      : ordered
+    SALES_ORDER    ||--o{ SHIPMENT              : "fulfilled by"
+    CUSTOMER       ||--o{ SHIPMENT              : "ships to"
+    SHIPMENT       ||--o{ SHIPMENT_LINE         : "has"
+    SALES_ORDER_LINE ||--o{ SHIPMENT_LINE       : "shipped as"
+    LOT            ||--o{ SHIPMENT_LINE         : "shipped as"
+
+    LOT            ||--o{ COA                   : "tested by"
+
+    JOURNAL_ENTRY  ||--o{ JOURNAL_ENTRY_LINE    : "has"
+    GL_ACCOUNT     ||--o{ JOURNAL_ENTRY_LINE    : "posted to"
+    SUPPLIER       ||--o{ AP_INVOICE            : "billed by"
+    CUSTOMER       ||--o{ AR_INVOICE            : "billed"
