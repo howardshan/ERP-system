@@ -122,15 +122,7 @@ export const api = {
     }),
 
   dashboard: () =>
-    request<{
-      pending_count: number;
-      longest_wait_minutes: number | null;
-      hold_count: number;
-      today_passed: number;
-      today_failed: number;
-      pass_rate: number | null;
-      holds: SubLot[];
-    }>('/dashboard/summary'),
+    request<DashboardSummary>('/dashboard/summary'),
 
   disposition: (body: { drying_sub_lot_id: string; type: string; remark?: string }) =>
     request<{ new_status: string }>('/dispositions', {
@@ -177,6 +169,29 @@ export type ProductInput = {
     lower_limit: number;
     upper_limit: number;
   };
+};
+
+export type TodayInspectionItem = {
+  sub_lot_id: string;
+  sub_lot_code: string;
+  sku_name?: string | null;
+  aw: number | null;
+  result: string;
+  submitted_at: string;
+  status: string;
+};
+
+export type DashboardSummary = {
+  pending_count: number;
+  longest_wait_minutes: number | null;
+  hold_count: number;
+  today_passed: number;
+  today_failed: number;
+  pass_rate: number | null;
+  pending_items: SubLot[];
+  holds: SubLot[];
+  today_passed_items: TodayInspectionItem[];
+  today_failed_items: TodayInspectionItem[];
 };
 
 export type SubLot = {

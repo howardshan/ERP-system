@@ -147,6 +147,16 @@ class DispositionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TodayInspectionItem(BaseModel):
+    sub_lot_id: UUID
+    sub_lot_code: str
+    sku_name: str | None
+    aw: float | None
+    result: str
+    submitted_at: datetime
+    status: str
+
+
 class DashboardSummary(BaseModel):
     pending_count: int
     longest_wait_minutes: float | None
@@ -154,7 +164,10 @@ class DashboardSummary(BaseModel):
     today_passed: int
     today_failed: int
     pass_rate: float | None
+    pending_items: list[DryingSubLotOut]
     holds: list[DryingSubLotOut]
+    today_passed_items: list[TodayInspectionItem]
+    today_failed_items: list[TodayInspectionItem]
 
 
 class TraceSubLot(BaseModel):

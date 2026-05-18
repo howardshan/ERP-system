@@ -15,7 +15,7 @@ const QC_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { to: '/admin', label: '管理看板' },
   { to: '/admin/products', label: '产品管理' },
-  { to: '/admin/holds', label: 'Hold 处置' },
+  { to: '/admin/trace', label: '批次追溯' },
 ];
 
 export function AppShell({

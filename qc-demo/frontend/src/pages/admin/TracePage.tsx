@@ -44,8 +44,8 @@ export function TracePage() {
         {detail.events.length === 0 && <p className="text-slate-500">暂无事件</p>}
       </ul>
 
-      <Link to="/admin" className="inline-block mt-6 text-blue-600 min-h-[44px] flex items-center">
-        返回看板
+      <Link to="/admin/trace" className="inline-block mt-6 text-blue-600 min-h-[44px] flex items-center">
+        返回批次列表
       </Link>
     </AppShell>
   );
