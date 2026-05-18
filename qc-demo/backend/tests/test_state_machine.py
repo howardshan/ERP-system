@@ -4,6 +4,15 @@ from app.services.inspection_judge import judge_aw
 from app.services.state_machine import can_transition, next_status
 
 
+def test_register_in_creates_drying():
+    assert can_transition(None, "register_in")
+    assert next_status(None, "register_in") == "drying"
+
+
+def test_drying_to_pending():
+    assert next_status("drying", "register_out") == "pending"
+
+
 def test_register_out_creates_pending():
     assert can_transition(None, "register_out")
     assert next_status(None, "register_out") == "pending"

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ProductionLot } from '../../api/client';
-import { Layout } from '../../components/Layout';
+import { AppShell } from '../../components/AppShell';
 
 export function LotsList() {
   const [lots, setLots] = useState<ProductionLot[]>([]);
@@ -44,9 +44,8 @@ export function LotsList() {
   };
 
   return (
-    <Layout nav={[{ to: '/qc', label: '首页' }, { to: '/qc/pending', label: '待检' }]}>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">生产批</h1>
+    <AppShell variant="qc" title="生产批">
+      <div className="flex justify-end mb-4">
         <button
           type="button"
           onClick={() => setShowForm(!showForm)}
@@ -100,6 +99,6 @@ export function LotsList() {
           </li>
         ))}
       </ul>
-    </Layout>
+    </AppShell>
   );
 }

@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { HoldsPage } from './pages/admin/HoldsPage';
 import { TracePage } from './pages/admin/TracePage';
+import { ProductManagement } from './pages/admin/ProductManagement';
 import { QcHome } from './pages/qc/QcHome';
 import { LotsList } from './pages/qc/LotsList';
 import { LotDetail } from './pages/qc/LotDetail';
@@ -69,6 +70,14 @@ export default function App() {
         element={
           <RequireAuth roles={['manager']}>
             <AdminDashboard />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/products"
+        element={
+          <RequireAuth roles={['manager']}>
+            <ProductManagement />
           </RequireAuth>
         }
       />

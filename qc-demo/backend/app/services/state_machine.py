@@ -1,13 +1,13 @@
-"""Drying sub-lot status transitions (Demo plan §8.2)."""
+"""Drying sub-lot status transitions."""
 
 from typing import Final
 
 VALID_STATUSES: Final[frozenset[str]] = frozenset(
-    {"pending", "inspecting", "passed", "hold", "disposing", "closed"}
+    {"drying", "pending", "inspecting", "passed", "hold", "disposing", "closed"}
 )
 
-# (current_status, event) -> next_status
 TRANSITIONS: Final[dict[tuple[str, str], str]] = {
+    ("drying", "register_out"): "pending",
     ("pending", "start_inspection"): "inspecting",
     ("inspecting", "submit_pass"): "passed",
     ("inspecting", "submit_fail"): "hold",
@@ -15,8 +15,7 @@ TRANSITIONS: Final[dict[tuple[str, str], str]] = {
     ("disposing", "complete_disposition"): "closed",
 }
 
-# Allow creating sub-lot directly as pending from registration
-CREATE_EVENTS: Final[frozenset[str]] = frozenset({"register_out"})
+CREATE_EVENTS: Final[frozenset[str]] = frozenset({"register_in", "register_out"})
 
 
 def can_transition(current: str | None, event: str) -> bool:
@@ -28,8 +27,11 @@ def can_transition(current: str | None, event: str) -> bool:
 
 
 def next_status(current: str | None, event: str) -> str:
-    if current is None and event == "register_out":
-        return "pending"
+    if current is None:
+        if event == "register_in":
+            return "drying"
+        if event == "register_out":
+            return "pending"
     key = (current, event)
     if key not in TRANSITIONS:
         raise ValueError(f"Invalid transition: {current!r} + {event!r}")

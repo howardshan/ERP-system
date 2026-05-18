@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import { Layout } from '../../components/Layout';
+import { AppShell } from '../../components/AppShell';
 import { StatusBadge } from '../../components/StatusBadge';
+import { formatDateTime } from '../../lib/utils';
 
 export function TracePage() {
   const { lotId } = useParams<{ lotId: string }>();
@@ -12,19 +13,23 @@ export function TracePage() {
     if (lotId) api.productionLotDetail(lotId).then(setDetail);
   }, [lotId]);
 
-  if (!detail) return <Layout>加载中…</Layout>;
+  if (!detail) return <AppShell variant="admin">加载中…</AppShell>;
 
   return (
-    <Layout nav={[{ to: '/admin', label: '看板' }]}>
-      <h1 className="text-2xl font-bold mb-2">追溯 · {detail.lot.lot_number}</h1>
+    <AppShell variant="admin" title={`追溯 · ${detail.lot.lot_number}`}>
       <p className="text-slate-600 mb-4">{detail.lot.sku_name}</p>
 
       <h2 className="font-semibold mb-2">烘干子批</h2>
       <ul className="space-y-2 mb-6">
         {detail.sub_lots.map((s) => (
-          <li key={s.id} className="bg-white border rounded-xl p-3 flex justify-between">
-            <span>{s.sub_lot_code}</span>
-            <StatusBadge status={s.status} />
+          <li key={s.id} className="bg-white border rounded-xl p-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="font-medium">{s.sub_lot_code}</span>
+              <StatusBadge status={s.status} />
+            </div>
+            <p className="text-sm text-slate-600">
+              进房 {formatDateTime(s.in_time)} · 出房 {formatDateTime(s.out_time)}
+            </p>
           </li>
         ))}
       </ul>
@@ -42,6 +47,6 @@ export function TracePage() {
       <Link to="/admin" className="inline-block mt-6 text-blue-600 min-h-[44px] flex items-center">
         返回看板
       </Link>
-    </Layout>
+    </AppShell>
   );
 }

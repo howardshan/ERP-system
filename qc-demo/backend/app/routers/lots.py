@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -9,20 +10,19 @@ from app.db import get_db
 from app.helpers import lot_to_out, sub_lot_to_out
 from app.models import (
     AppUser,
-    Disposition,
     DryingSubLot,
-    InspectionRecord,
     ProductionLot,
     QualityEvent,
 )
 from app.schemas import (
-    DryingSubLotCreate,
+    DryingSubLotCheckIn,
+    DryingSubLotCheckOut,
     DryingSubLotOut,
     ProductionLotCreate,
     ProductionLotDetail,
     ProductionLotOut,
 )
-from app.services.state_machine import can_transition, next_status
+from app.services.state_machine import next_status
 
 router = APIRouter(tags=["lots"])
 
@@ -113,9 +113,9 @@ def list_sub_lots(
     return [sub_lot_to_out(s, db) for s in subs]
 
 
-@router.post("/drying-sub-lots", response_model=DryingSubLotOut)
-def create_sub_lot(
-    body: DryingSubLotCreate,
+@router.post("/drying-sub-lots/check-in", response_model=DryingSubLotOut)
+def check_in_sub_lot(
+    body: DryingSubLotCheckIn,
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[AppUser, Depends(require_role("qc", "manager"))],
 ):
@@ -132,13 +132,14 @@ def create_sub_lot(
     if db.query(DryingSubLot).filter(DryingSubLot.sub_lot_code == code).first():
         raise HTTPException(status_code=400, detail="Sub-lot code already exists")
 
-    status = "pending" if body.register_pending else "pending"
+    in_time = body.in_time or datetime.now(timezone.utc)
+    status = next_status(None, "register_in")
     sub = DryingSubLot(
         production_lot_id=body.production_lot_id,
         sub_lot_code=code,
         location_id=body.location_id,
-        in_time=body.in_time,
-        out_time=body.out_time,
+        in_time=in_time,
+        out_time=None,
         status=status,
     )
     db.add(sub)
@@ -146,13 +147,42 @@ def create_sub_lot(
     db.add(
         QualityEvent(
             drying_sub_lot_id=sub.id,
-            event_type="sub_lot_registered",
-            payload={"sub_lot_code": code, "status": status},
+            event_type="check_in",
+            payload={"sub_lot_code": code, "in_time": in_time.isoformat()},
             actor_id=user.id,
         )
     )
     db.commit()
-    db.refresh(sub)
+    sub = db.query(DryingSubLot).options(joinedload(DryingSubLot.location)).get(sub.id)
+    return sub_lot_to_out(sub, db)
+
+
+@router.post("/drying-sub-lots/{sub_lot_id}/check-out", response_model=DryingSubLotOut)
+def check_out_sub_lot(
+    sub_lot_id: UUID,
+    body: DryingSubLotCheckOut,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[AppUser, Depends(require_role("qc", "manager"))],
+):
+    sub = db.query(DryingSubLot).filter(DryingSubLot.id == sub_lot_id).with_for_update().first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Sub-lot not found")
+    if sub.status != "drying":
+        raise HTTPException(status_code=400, detail=f"子批状态为 {sub.status}，无法出房登记")
+
+    out_time = body.out_time or datetime.now(timezone.utc)
+    sub.out_time = out_time
+    sub.status = next_status("drying", "register_out")
+    sub.updated_at = datetime.now(timezone.utc)
+    db.add(
+        QualityEvent(
+            drying_sub_lot_id=sub.id,
+            event_type="check_out",
+            payload={"out_time": out_time.isoformat(), "status": sub.status},
+            actor_id=user.id,
+        )
+    )
+    db.commit()
     sub = db.query(DryingSubLot).options(joinedload(DryingSubLot.location)).get(sub.id)
     return sub_lot_to_out(sub, db)
 

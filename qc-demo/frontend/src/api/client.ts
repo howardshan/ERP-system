@@ -67,7 +67,14 @@ export const api = {
 
   seed: () => request<{ ok: boolean }>('/demo/seed', { method: 'POST' }),
 
-  skus: () => request<Array<{ id: string; code: string; name: string }>>('/master/skus'),
+  skus: () => request<Product[]>(`/products`),
+  products: () => request<Product[]>(`/products`),
+  getProduct: (id: string) => request<Product>(`/products/${id}`),
+  createProduct: (body: ProductInput) =>
+    request<Product>(`/products`, { method: 'POST', body: JSON.stringify(body) }),
+  updateProduct: (id: string, body: Partial<ProductInput>) =>
+    request<Product>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteProduct: (id: string) => request<{ ok: boolean }>(`/products/${id}`, { method: 'DELETE' }),
   locations: () =>
     request<Array<{ id: string; code: string; display_name: string }>>('/master/locations'),
 
@@ -88,14 +95,19 @@ export const api = {
     }>(`/production-lots/${id}`),
 
   pending: () => request<SubLot[]>('/pending-inspections'),
-  createSubLot: (body: {
+  checkInSubLot: (body: {
     production_lot_id: string;
     location_id?: string;
     in_time?: string;
-    out_time?: string;
     sub_lot_code?: string;
   }) =>
-    request<SubLot>('/drying-sub-lots', { method: 'POST', body: JSON.stringify(body) }),
+    request<SubLot>('/drying-sub-lots/check-in', { method: 'POST', body: JSON.stringify(body) }),
+
+  checkOutSubLot: (subLotId: string, out_time?: string) =>
+    request<SubLot>(`/drying-sub-lots/${subLotId}/check-out`, {
+      method: 'POST',
+      body: JSON.stringify({ out_time: out_time ?? null }),
+    }),
 
   inspectionTemplate: (subLotId: string) =>
     request<{
@@ -136,6 +148,35 @@ export type ProductionLot = {
   sku_code?: string;
   sku_name?: string;
   created_at: string;
+};
+
+export type InspectionTemplate = {
+  id?: string;
+  sku_id?: string;
+  item_name: string;
+  unit?: string | null;
+  lower_limit: number;
+  upper_limit: number;
+};
+
+export type Product = {
+  id: string;
+  code: string;
+  name: string;
+  standard_drying_minutes: number | null;
+  templates: InspectionTemplate[];
+};
+
+export type ProductInput = {
+  code: string;
+  name: string;
+  standard_drying_minutes?: number | null;
+  template: {
+    item_name: string;
+    unit?: string | null;
+    lower_limit: number;
+    upper_limit: number;
+  };
 };
 
 export type SubLot = {

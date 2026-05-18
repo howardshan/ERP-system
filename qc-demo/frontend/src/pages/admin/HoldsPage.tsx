@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, SubLot } from '../../api/client';
-import { Layout } from '../../components/Layout';
+import { AppShell } from '../../components/AppShell';
 import { StatusBadge } from '../../components/StatusBadge';
 
 const DISP_TYPES = [
@@ -45,8 +45,7 @@ export function HoldsPage() {
   };
 
   return (
-    <Layout nav={[{ to: '/admin', label: '看板' }]}>
-      <h1 className="text-2xl font-bold mb-4">Hold 处置</h1>
+    <AppShell variant="admin" title="Hold 处置">
       {msg && <p className="text-emerald-700 bg-emerald-50 p-3 rounded-lg mb-4">{msg}</p>}
       {error && <p className="text-red-600 mb-4">{error}</p>}
 
@@ -90,6 +89,6 @@ export function HoldsPage() {
           </button>
         </div>
       )}
-    </Layout>
+    </AppShell>
   );
 }
