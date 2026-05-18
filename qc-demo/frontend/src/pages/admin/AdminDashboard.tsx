@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
-import { Layout } from '../../components/Layout';
+import { AppShell } from '../../components/AppShell';
 import { usePolling } from '../../hooks/usePolling';
 
 export function AdminDashboard() {
@@ -23,8 +23,7 @@ export function AdminDashboard() {
   usePolling(load, 4000);
 
   return (
-    <Layout nav={[{ to: '/admin/holds', label: 'Hold 处置' }]}>
-      <h1 className="text-2xl font-bold mb-4">管理看板</h1>
+    <AppShell variant="admin" title="管理看板">
       <p className="text-xs text-slate-500 mb-4">每 4 秒自动刷新</p>
       {error && <p className="text-red-600">{error}</p>}
       {data && (
@@ -71,7 +70,7 @@ export function AdminDashboard() {
           </ul>
         </>
       )}
-    </Layout>
+    </AppShell>
   );
 }
 

@@ -14,7 +14,13 @@
 
 [`supabase/migrations/20260518000001_qc_initial.sql`](supabase/migrations/20260518000001_qc_initial.sql)
 
+再执行第二份迁移（产品 SOP 烘干时长、`drying` 子批状态）：
+
+[`supabase/migrations/20260519000002_sku_drying_status.sql`](supabase/migrations/20260519000002_sku_drying_status.sql)
+
 或使用 Supabase CLI：`supabase db push`（需先 `supabase link`）。
+
+> 若已执行过初始迁移，仅需补跑 `20260519000002`，然后 **重新 `POST /demo/seed`** 以写入参考烘干时长等演示数据。
 
 ## 2. 环境变量
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
-import { Layout } from '../../components/Layout';
+import { AppShell } from '../../components/AppShell';
 import { NumericKeypad } from '../../components/NumericKeypad';
 import { StatusBadge } from '../../components/StatusBadge';
 
@@ -44,18 +44,15 @@ export function InspectPage() {
   };
 
   return (
-    <Layout nav={[{ to: '/qc/pending', label: '待检队列' }]}>
-      <div className="sticky top-0 bg-slate-100/95 backdrop-blur py-2 mb-4 border-b z-10">
-        <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold truncate">{subCode || '检验录入'}</h1>
-          {status && <StatusBadge status={status} />}
-        </div>
-        {limits && (
-          <p className="text-sm text-slate-600 mt-1">
-            水活 Aw 合格范围：[{limits[0]}, {limits[1]}]
-          </p>
-        )}
+    <AppShell variant="qc" title={subCode || '检验录入'}>
+      <div className="flex justify-end -mt-2 mb-2">
+        {status && <StatusBadge status={status} />}
       </div>
+      {limits && (
+        <p className="text-sm text-slate-600 mb-4">
+          水活 Aw 合格范围：[{limits[0]}, {limits[1]}]
+        </p>
+      )}
 
       {result ? (
         <div
@@ -90,6 +87,6 @@ export function InspectPage() {
           </button>
         </>
       )}
-    </Layout>
+    </AppShell>
   );
 }

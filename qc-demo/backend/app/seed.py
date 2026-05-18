@@ -28,8 +28,8 @@ LOCATIONS = [
 ]
 
 SKUS = [
-    ("SKU-CHICKEN", "鸡肉条（烘干后）", 0.65, 0.75),
-    ("SKU-COWHID", "牛皮卷（烘干后）", 0.55, 0.68),
+    ("SKU-CHICKEN", "鸡肉条（烘干后）", 0.65, 0.75, 240),
+    ("SKU-COWHID", "牛皮卷（烘干后）", 0.55, 0.68, 360),
 ]
 
 
@@ -75,8 +75,8 @@ def run_seed(db: Session) -> dict[str, int]:
 
     skus = []
     templates = []
-    for code, name, lo, hi in SKUS:
-        sku = ProductSku(code=code, name=name)
+    for code, name, lo, hi, dry_mins in SKUS:
+        sku = ProductSku(code=code, name=name, standard_drying_minutes=dry_mins)
         db.add(sku)
         db.flush()
         skus.append(sku)

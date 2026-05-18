@@ -1,20 +1,15 @@
 import { Link } from 'react-router-dom';
-import { Layout } from '../../components/Layout';
+import { AppShell } from '../../components/AppShell';
 
 const links = [
-  { to: '/qc/lots', label: '生产批管理', desc: '查看或新建生产批、登记烘干子批' },
+  { to: '/qc/lots', label: '生产批管理', desc: '登记生产批、烘干子批进/出房时间' },
   { to: '/qc/pending', label: '待检队列', desc: '出房待检子批，按等待时间排序' },
 ];
 
 export function QcHome() {
   return (
-    <Layout
-      nav={[
-        { to: '/qc/lots', label: '生产批' },
-        { to: '/qc/pending', label: '待检' },
-      ]}
-    >
-      <h1 className="text-2xl font-bold mb-6">QC 工作台</h1>
+    <AppShell variant="qc" title="QC 工作台">
+      <p className="text-slate-600 mb-6">请选择下方入口开始现场作业。</p>
       <div className="grid gap-4 sm:grid-cols-2">
         {links.map((l) => (
           <Link
@@ -27,6 +22,6 @@ export function QcHome() {
           </Link>
         ))}
       </div>
-    </Layout>
+    </AppShell>
   );
 }

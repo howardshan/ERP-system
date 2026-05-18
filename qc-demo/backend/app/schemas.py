@@ -17,12 +17,35 @@ class TokenResponse(BaseModel):
     display_name: str | None = None
 
 
+class InspectionTemplateInput(BaseModel):
+    item_name: str = "水活 Aw"
+    unit: str | None = None
+    lower_limit: float
+    upper_limit: float
+
+
 class SkuOut(BaseModel):
     id: UUID
     code: str
     name: str
+    standard_drying_minutes: int | None = None
+    templates: list["TemplateOut"] = []
 
     model_config = {"from_attributes": True}
+
+
+class SkuCreate(BaseModel):
+    code: str
+    name: str
+    standard_drying_minutes: int | None = Field(None, ge=1, le=24 * 60)
+    template: InspectionTemplateInput
+
+
+class SkuUpdate(BaseModel):
+    code: str | None = None
+    name: str | None = None
+    standard_drying_minutes: int | None = Field(None, ge=1, le=24 * 60)
+    template: InspectionTemplateInput | None = None
 
 
 class TemplateOut(BaseModel):
@@ -64,13 +87,15 @@ class ProductionLotOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class DryingSubLotCreate(BaseModel):
+class DryingSubLotCheckIn(BaseModel):
     production_lot_id: UUID
     sub_lot_code: str | None = None
     location_id: UUID | None = None
     in_time: datetime | None = None
+
+
+class DryingSubLotCheckOut(BaseModel):
     out_time: datetime | None = None
-    register_pending: bool = True
 
 
 class DryingSubLotOut(BaseModel):

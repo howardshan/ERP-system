@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, SubLot } from '../../api/client';
-import { Layout } from '../../components/Layout';
+import { AppShell } from '../../components/AppShell';
 import { StatusBadge } from '../../components/StatusBadge';
-import { cn } from '../../lib/utils';
+import { cn, formatDateTime } from '../../lib/utils';
 
 export function PendingQueue() {
   const [items, setItems] = useState<SubLot[]>([]);
@@ -18,8 +18,8 @@ export function PendingQueue() {
   }, []);
 
   return (
-    <Layout nav={[{ to: '/qc', label: '首页' }, { to: '/qc/lots', label: '生产批' }]}>
-      <h1 className="text-2xl font-bold mb-4">待检队列</h1>
+    <AppShell variant="qc" title="待检队列">
+      <p className="text-sm text-slate-500 mb-4">按出房时间排序，每 5 秒自动刷新</p>
       {error && <p className="text-red-600">{error}</p>}
       <ul className="space-y-3">
         {items.map((s) => (
@@ -34,18 +34,23 @@ export function PendingQueue() {
               <div className="flex justify-between items-start gap-2">
                 <div>
                   <div className="font-semibold text-lg">{s.sub_lot_code}</div>
-                  <p className="text-sm text-slate-600">{s.sku_name} · {s.location_name}</p>
+                  <p className="text-sm text-slate-600">
+                    {s.sku_name} · {s.location_name}
+                  </p>
                 </div>
                 <StatusBadge status={s.status} />
               </div>
-              {s.wait_minutes != null && (
-                <p className="text-sm mt-2 text-amber-800">已等待 {s.wait_minutes} 分钟</p>
-              )}
+              <div className="text-sm mt-2 text-slate-600 space-y-0.5">
+                <p>出房：{formatDateTime(s.out_time)}</p>
+                {s.wait_minutes != null && (
+                  <p className="text-amber-800 font-medium">已等待 {s.wait_minutes} 分钟</p>
+                )}
+              </div>
             </Link>
           </li>
         ))}
         {items.length === 0 && <p className="text-slate-500">暂无待检子批</p>}
       </ul>
-    </Layout>
+    </AppShell>
   );
 }
