@@ -1,0 +1,6 @@
+{
+  "name": "Industrial ERP Financials",
+  "description": "Professional accounting module for pet food manufacturing, featuring hierarchical CoA, balanced journal entries, and AP/AR management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
