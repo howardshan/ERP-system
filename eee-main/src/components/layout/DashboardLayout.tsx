@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { getPendingApprovals } from '../../services/api';
 
 interface DashboardLayoutProps {
   children: (activeScreen: string, setActiveScreen: (s: string) => void) => React.ReactNode;
@@ -8,10 +9,21 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [activeScreen, setActiveScreen] = useState('dashboard');
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    getPendingApprovals()
+      .then(entries => setPendingCount(entries.length))
+      .catch(() => {});
+  }, [activeScreen]); // refresh badge whenever user navigates
 
   return (
     <div className="min-h-screen bg-[#f8f9ff]">
-      <Sidebar activeScreen={activeScreen} setActiveScreen={setActiveScreen} />
+      <Sidebar
+        activeScreen={activeScreen}
+        setActiveScreen={setActiveScreen}
+        pendingApprovalCount={pendingCount}
+      />
       <div className="ml-64 flex flex-col min-h-screen">
         <TopBar />
         <main className="flex-1 p-8">
