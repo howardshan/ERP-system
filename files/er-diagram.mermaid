@@ -1,275 +1,423 @@
 %% Pet Food ERP — Entity Relationship Diagram
-%% Renders as a picture. Pairs with schema.sql and data-model.md.
-%% Only key fields are shown per entity to keep the diagram readable;
-%% see schema.sql for the complete column list.
+%% Auto-updated to reflect actual built schema (migrations 000000 + 000001).
+%% Only key fields shown per entity; see supabase/migrations/ for full DDL.
+%% Views (account_balance) and RPC functions are NOT entities — see workflow.md.
 erDiagram
 
-    %% ----- Master data -----
+    %% ===== MODULE 1 — REFERENCE & MASTER DATA =====
+
     UOM {
         bigint id PK
-        text code
-        text uom_type
+        text   code
+        text   uom_type
     }
     ITEM_CATEGORY {
-        bigint id PK
-        text code
+        bigint id        PK
+        text   code
         bigint parent_id FK
     }
     ITEM {
-        bigint id PK
-        text sku
-        text item_type
-        bigint base_uom_id FK
-        bigint category_id FK
+        bigint  id                   PK
+        text    sku
+        text    item_type
+        bigint  base_uom_id          FK
+        bigint  category_id          FK
         boolean is_lot_controlled
         integer shelf_life_days
-        text costing_method
+        text    costing_method
+        text    status
     }
     UOM_CONVERSION {
-        bigint id PK
-        bigint item_id FK
-        bigint from_uom_id FK
-        bigint to_uom_id FK
+        bigint  id          PK
+        bigint  item_id     FK
+        bigint  from_uom_id FK
+        bigint  to_uom_id   FK
         numeric factor
     }
     WAREHOUSE {
-        bigint id PK
-        text code
+        bigint  id        PK
+        text    code
+        boolean is_active
     }
     LOCATION {
-        bigint id PK
-        bigint warehouse_id FK
-        text code
-        text location_type
+        bigint  id            PK
+        bigint  warehouse_id  FK
+        text    code
+        text    location_type
     }
     SUPPLIER {
-        bigint id PK
-        text code
-        text name
+        bigint  id            PK
+        text    code
+        text    name
+        text    payment_terms
     }
     CUSTOMER {
-        bigint id PK
-        text code
-        text name
+        bigint  id            PK
+        text    code
+        text    name
+        numeric credit_limit
     }
 
-    %% ----- Inventory & lots -----
+    %% ===== MODULE 2 — INVENTORY & LOTS =====
+
     LOT {
-        bigint id PK
-        text lot_number
-        bigint item_id FK
-        date expiry_date
-        text source_type
-        text status
+        bigint  id                  PK
+        text    lot_number
+        bigint  item_id             FK
+        date    manufacture_date
+        date    expiry_date
+        text    source_type
+        text    source_doc_type
+        bigint  source_doc_id
+        text    status
     }
     INVENTORY_TRANSACTION {
-        bigint id PK
-        bigint item_id FK
-        bigint lot_id FK
-        bigint location_id FK
-        numeric quantity
-        text transaction_type
-        numeric unit_cost
+        bigint      id               PK
+        timestamptz transaction_date
+        bigint      item_id          FK
+        bigint      lot_id           FK
+        bigint      location_id      FK
+        numeric     quantity
+        text        transaction_type
+        numeric     unit_cost
+        text        reference_type
+        bigint      reference_id
     }
     INVENTORY_BALANCE {
-        bigint item_id PK
-        bigint lot_id PK
-        bigint location_id PK
+        bigint  item_id            PK "composite PK"
+        bigint  lot_id             PK "composite PK"
+        bigint  location_id        PK "composite PK"
         numeric quantity_on_hand
         numeric quantity_allocated
     }
 
-    %% ----- Formulas -----
+    %% ===== MODULE 3 — FORMULAS =====
+
     FORMULA {
-        bigint id PK
-        text code
+        bigint id             PK
+        text   code
         bigint output_item_id FK
     }
     FORMULA_VERSION {
-        bigint id PK
-        bigint formula_id FK
+        bigint  id                   PK
+        bigint  formula_id           FK
         integer version_no
         numeric base_output_quantity
-        text status
+        bigint  base_output_uom_id   FK
+        text    status
     }
     FORMULA_LINE {
-        bigint id PK
-        bigint formula_version_id FK
-        bigint ingredient_item_id FK
+        bigint  id                  PK
+        bigint  formula_version_id  FK
+        integer line_no
+        bigint  ingredient_item_id  FK
         numeric quantity
+        bigint  uom_id              FK
         numeric scrap_percent
     }
 
-    %% ----- Procurement -----
+    %% ===== MODULE 4 — PROCUREMENT =====
+
     PURCHASE_ORDER {
-        bigint id PK
-        text po_number
+        bigint id          PK
+        text   po_number
         bigint supplier_id FK
-        text status
+        date   order_date
+        text   status
+        text   currency
     }
     PURCHASE_ORDER_LINE {
-        bigint id PK
-        bigint po_id FK
-        bigint item_id FK
+        bigint  id                PK
+        bigint  po_id             FK
+        bigint  item_id           FK
         numeric quantity
+        bigint  uom_id            FK
+        numeric unit_price
         numeric received_quantity
     }
     GOODS_RECEIPT {
-        bigint id PK
-        text grn_number
-        bigint po_id FK
+        bigint id           PK
+        text   grn_number
+        bigint po_id        FK
+        bigint supplier_id  FK
         bigint warehouse_id FK
-        text status
+        text   status
     }
     GOODS_RECEIPT_LINE {
-        bigint id PK
-        bigint grn_id FK
-        bigint po_line_id FK
-        bigint item_id FK
-        bigint lot_id FK
+        bigint  id          PK
+        bigint  grn_id      FK
+        bigint  po_line_id  FK
+        bigint  item_id     FK
+        bigint  lot_id      FK
+        bigint  location_id FK
         numeric quantity
+        numeric unit_cost
     }
 
-    %% ----- Production -----
+    %% ===== MODULE 5 — PRODUCTION =====
+
     PRODUCTION_ORDER {
-        bigint id PK
-        text mo_number
-        bigint formula_version_id FK
-        bigint output_item_id FK
-        text status
+        bigint  id                  PK
+        text    mo_number
+        bigint  formula_version_id  FK
+        bigint  output_item_id      FK
+        numeric planned_quantity
+        bigint  warehouse_id        FK
+        text    status
     }
     PRODUCTION_CONSUMPTION {
-        bigint id PK
-        bigint production_order_id FK
-        bigint item_id FK
-        bigint lot_id FK
+        bigint  id                  PK
+        bigint  production_order_id FK
+        bigint  item_id             FK
+        bigint  lot_id              FK
+        bigint  location_id         FK
+        numeric planned_quantity
         numeric actual_quantity
     }
     PRODUCTION_OUTPUT {
-        bigint id PK
-        bigint production_order_id FK
-        bigint item_id FK
-        bigint lot_id FK
+        bigint  id                  PK
+        bigint  production_order_id FK
+        bigint  item_id             FK
+        bigint  lot_id              FK
         numeric quantity
-        text output_type
+        bigint  location_id         FK
+        text    output_type
+        date    output_date
     }
 
-    %% ----- Sales & shipping -----
+    %% ===== MODULE 6 — SALES & SHIPPING =====
+
     SALES_ORDER {
-        bigint id PK
-        text so_number
-        bigint customer_id FK
-        text status
+        bigint id             PK
+        text   so_number
+        bigint customer_id    FK
+        date   order_date
+        text   status
+        text   currency
     }
     SALES_ORDER_LINE {
-        bigint id PK
-        bigint so_id FK
-        bigint item_id FK
+        bigint  id               PK
+        bigint  so_id            FK
+        bigint  item_id          FK
         numeric quantity
+        numeric unit_price
         numeric shipped_quantity
     }
     SHIPMENT {
-        bigint id PK
-        text shipment_number
-        bigint so_id FK
-        bigint customer_id FK
-        text status
+        bigint id              PK
+        text   shipment_number
+        bigint so_id           FK
+        bigint customer_id     FK
+        date   ship_date
+        bigint warehouse_id    FK
+        text   status
     }
     SHIPMENT_LINE {
-        bigint id PK
-        bigint shipment_id FK
-        bigint item_id FK
-        bigint lot_id FK
+        bigint  id          PK
+        bigint  shipment_id FK
+        bigint  so_line_id  FK
+        bigint  item_id     FK
+        bigint  lot_id      FK
         numeric quantity
+        bigint  location_id FK
     }
 
-    %% ----- Quality -----
+    %% ===== MODULE 7 — QUALITY =====
+
     COA {
-        bigint id PK
-        text coa_number
-        bigint lot_id FK
-        text result
+        bigint id           PK
+        text   coa_number
+        bigint lot_id       FK
+        date   test_date
+        text   result
+        text   document_ref
     }
 
-    %% ----- Finance (Phase 2) -----
+    %% ===== MODULE 8 — FINANCE =====
+    %% (financial-core.md version — more complete than schema.sql placeholder)
+
+    DEPARTMENT {
+        bigint  id        PK
+        text    code
+        text    name
+        boolean is_active
+    }
+    COST_CENTER {
+        bigint  id        PK
+        text    code
+        text    name
+        boolean is_active
+    }
     GL_ACCOUNT {
-        bigint id PK
-        text account_code
-        text account_type
+        bigint  id           PK
+        text    account_code
+        text    name
+        text    account_type
+        bigint  parent_id    FK "self-ref"
+        boolean is_postable
+        boolean is_active
+    }
+    ACCOUNT_SEGMENT {
+        bigint  id         PK
+        integer segment_no
+        text    name
+        integer length
+    }
+    ACCOUNTING_PERIOD {
+        bigint  id          PK
+        text    name
+        date    start_date
+        date    end_date
+        integer fiscal_year
+        text    status
+    }
+    PERIOD_STATUS_HISTORY {
+        bigint      id                   PK
+        bigint      accounting_period_id FK
+        text        from_status
+        text        to_status
+        text        reason
+        timestamptz changed_at
     }
     JOURNAL_ENTRY {
-        bigint id PK
-        text entry_number
-        text source_type
-        text status
+        bigint      id                   PK
+        text        entry_number
+        date        entry_date
+        bigint      accounting_period_id FK
+        text        description
+        text        journal_type
+        text        source_type
+        text        status
+        bigint      reversed_by_entry_id FK "self-ref"
+        timestamptz posted_at
     }
     JOURNAL_ENTRY_LINE {
-        bigint id PK
-        bigint journal_entry_id FK
-        bigint gl_account_id FK
+        bigint  id               PK
+        bigint  journal_entry_id FK
+        integer line_no
+        bigint  gl_account_id    FK
+        text    description
         numeric debit
         numeric credit
+        bigint  department_id    FK "nullable EP-2"
+        bigint  cost_center_id   FK "nullable EP-2"
     }
     AP_INVOICE {
-        bigint id PK
-        bigint supplier_id FK
-        bigint po_id FK
+        bigint  id             PK
+        text    invoice_number
+        bigint  supplier_id    FK
+        date    invoice_date
+        date    due_date
         numeric amount
+        numeric amount_paid
+        text    status
     }
     AR_INVOICE {
-        bigint id PK
-        bigint customer_id FK
-        bigint so_id FK
+        bigint  id              PK
+        text    invoice_number
+        bigint  customer_id     FK
+        date    invoice_date
+        date    due_date
+        numeric amount
+        numeric amount_received
+        text    status
+    }
+    PAYMENT {
+        bigint  id             PK
+        text    payment_number
+        text    direction
+        text    party_type
+        bigint  party_id
+        date    payment_date
         numeric amount
     }
+    PAYMENT_APPLICATION {
+        bigint  id             PK
+        bigint  payment_id     FK
+        text    invoice_type
+        bigint  invoice_id
+        numeric amount_applied
+    }
 
-    %% ===== Relationships =====
+    %% ===== RELATIONSHIPS =====
+
+    %% -- Master data --
     UOM            ||--o{ ITEM                  : "base unit of"
+    UOM            ||--o{ UOM_CONVERSION        : "from"
+    UOM            ||--o{ UOM_CONVERSION        : "to"
+    UOM            ||--o{ FORMULA_VERSION       : "base output UOM"
+    UOM            ||--o{ FORMULA_LINE          : "line UOM"
     ITEM_CATEGORY  ||--o{ ITEM                  : categorizes
     ITEM_CATEGORY  ||--o{ ITEM_CATEGORY         : "parent of"
-    ITEM           ||--o{ UOM_CONVERSION        : "converts"
+    ITEM           ||--o{ UOM_CONVERSION        : "item-specific rule"
     WAREHOUSE      ||--o{ LOCATION              : contains
 
+    %% -- Inventory & lots --
     ITEM           ||--o{ LOT                   : "tracked as"
-    ITEM           ||--o{ INVENTORY_TRANSACTION : "moved as"
-    LOT            ||--o{ INVENTORY_TRANSACTION : "moves"
+    ITEM           ||--o{ INVENTORY_TRANSACTION : moved
+    LOT            ||--o{ INVENTORY_TRANSACTION : moves
     LOCATION       ||--o{ INVENTORY_TRANSACTION : "at"
-    ITEM           ||--o{ INVENTORY_BALANCE     : "held as"
-    LOT            ||--o{ INVENTORY_BALANCE     : "held as"
-    LOCATION       ||--o{ INVENTORY_BALANCE     : "holds"
+    ITEM           ||--o{ INVENTORY_BALANCE     : holds
+    LOT            ||--o{ INVENTORY_BALANCE     : holds
+    LOCATION       ||--o{ INVENTORY_BALANCE     : holds
 
+    %% -- Formulas --
     ITEM           ||--o{ FORMULA               : "produced by"
     FORMULA        ||--o{ FORMULA_VERSION       : versioned
     FORMULA_VERSION||--o{ FORMULA_LINE          : contains
     ITEM           ||--o{ FORMULA_LINE          : "ingredient in"
 
-    SUPPLIER       ||--o{ PURCHASE_ORDER        : receives
-    PURCHASE_ORDER ||--o{ PURCHASE_ORDER_LINE   : "has"
-    ITEM           ||--o{ PURCHASE_ORDER_LINE   : ordered
-    PURCHASE_ORDER ||--o{ GOODS_RECEIPT         : "fulfilled by"
-    WAREHOUSE      ||--o{ GOODS_RECEIPT         : "received at"
-    GOODS_RECEIPT  ||--o{ GOODS_RECEIPT_LINE    : "has"
-    PURCHASE_ORDER_LINE ||--o{ GOODS_RECEIPT_LINE : "received as"
-    LOT            ||--o{ GOODS_RECEIPT_LINE    : "created in"
+    %% -- Procurement --
+    SUPPLIER            ||--o{ PURCHASE_ORDER        : receives
+    PURCHASE_ORDER      ||--o{ PURCHASE_ORDER_LINE   : has
+    ITEM                ||--o{ PURCHASE_ORDER_LINE   : ordered
+    PURCHASE_ORDER      ||--o{ GOODS_RECEIPT         : "fulfilled by"
+    SUPPLIER            ||--o{ GOODS_RECEIPT         : "received from"
+    WAREHOUSE           ||--o{ GOODS_RECEIPT         : "received at"
+    GOODS_RECEIPT       ||--o{ GOODS_RECEIPT_LINE    : has
+    PURCHASE_ORDER_LINE ||--o{ GOODS_RECEIPT_LINE    : "received as"
+    ITEM                ||--o{ GOODS_RECEIPT_LINE    : received
+    LOT                 ||--o{ GOODS_RECEIPT_LINE    : "born at"
+    LOCATION            ||--o{ GOODS_RECEIPT_LINE    : "placed in"
 
+    %% -- Production --
     FORMULA_VERSION    ||--o{ PRODUCTION_ORDER       : "built from"
+    ITEM               ||--o{ PRODUCTION_ORDER       : produces
+    WAREHOUSE          ||--o{ PRODUCTION_ORDER       : "runs at"
     PRODUCTION_ORDER   ||--o{ PRODUCTION_CONSUMPTION : consumes
     PRODUCTION_ORDER   ||--o{ PRODUCTION_OUTPUT      : produces
+    ITEM               ||--o{ PRODUCTION_CONSUMPTION : consumed
     LOT                ||--o{ PRODUCTION_CONSUMPTION : "consumed in"
-    LOT                ||--o{ PRODUCTION_OUTPUT      : "created in"
+    LOCATION           ||--o{ PRODUCTION_CONSUMPTION : "from location"
+    ITEM               ||--o{ PRODUCTION_OUTPUT      : "output item"
+    LOT                ||--o{ PRODUCTION_OUTPUT      : "born at"
+    LOCATION           ||--o{ PRODUCTION_OUTPUT      : "placed in"
 
+    %% -- Sales & shipping --
     CUSTOMER       ||--o{ SALES_ORDER           : places
-    SALES_ORDER    ||--o{ SALES_ORDER_LINE      : "has"
+    SALES_ORDER    ||--o{ SALES_ORDER_LINE      : has
     ITEM           ||--o{ SALES_ORDER_LINE      : ordered
     SALES_ORDER    ||--o{ SHIPMENT              : "fulfilled by"
     CUSTOMER       ||--o{ SHIPMENT              : "ships to"
-    SHIPMENT       ||--o{ SHIPMENT_LINE         : "has"
+    WAREHOUSE      ||--o{ SHIPMENT              : "ships from"
+    SHIPMENT       ||--o{ SHIPMENT_LINE         : has
     SALES_ORDER_LINE ||--o{ SHIPMENT_LINE       : "shipped as"
+    ITEM           ||--o{ SHIPMENT_LINE         : shipped
     LOT            ||--o{ SHIPMENT_LINE         : "shipped as"
+    LOCATION       ||--o{ SHIPMENT_LINE         : "from location"
 
+    %% -- Quality --
     LOT            ||--o{ COA                   : "tested by"
 
-    JOURNAL_ENTRY  ||--o{ JOURNAL_ENTRY_LINE    : "has"
-    GL_ACCOUNT     ||--o{ JOURNAL_ENTRY_LINE    : "posted to"
-    SUPPLIER       ||--o{ AP_INVOICE            : "billed by"
-    CUSTOMER       ||--o{ AR_INVOICE            : "billed"
+    %% -- Finance --
+    GL_ACCOUNT              ||--o{ GL_ACCOUNT               : "parent of"
+    ACCOUNTING_PERIOD       ||--o{ PERIOD_STATUS_HISTORY    : "history of"
+    ACCOUNTING_PERIOD       ||--o{ JOURNAL_ENTRY            : "period for"
+    JOURNAL_ENTRY           ||--o{ JOURNAL_ENTRY            : "reversed by"
+    JOURNAL_ENTRY           ||--o{ JOURNAL_ENTRY_LINE       : has
+    GL_ACCOUNT              ||--o{ JOURNAL_ENTRY_LINE       : "posted to"
+    DEPARTMENT              ||--o{ JOURNAL_ENTRY_LINE       : "tagged"
+    COST_CENTER             ||--o{ JOURNAL_ENTRY_LINE       : "tagged"
+    SUPPLIER                ||--o{ AP_INVOICE               : "billed by"
+    CUSTOMER                ||--o{ AR_INVOICE               : billed
+    PAYMENT                 ||--o{ PAYMENT_APPLICATION      : "applied via"
