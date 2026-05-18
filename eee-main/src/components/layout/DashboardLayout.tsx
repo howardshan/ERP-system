@@ -1,19 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { getPendingApprovals } from '../../services/api';
 
 interface DashboardLayoutProps {
   children: (activeScreen: string, setActiveScreen: (s: string) => void) => React.ReactNode;
+  onHome: () => void;
+  onLogout: () => void;
+  userName: string;
+  userEmail: string;
 }
 
-export function DashboardLayout({ children }: DashboardLayoutProps) {
+export function DashboardLayout({ children, onHome, onLogout, userName, userEmail }: DashboardLayoutProps) {
   const [activeScreen, setActiveScreen] = useState('dashboard');
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    getPendingApprovals()
+      .then(entries => setPendingCount(entries.length))
+      .catch(() => {});
+  }, [activeScreen]);
 
   return (
-    <div className="min-h-screen bg-[#f8f9ff]">
-      <Sidebar activeScreen={activeScreen} setActiveScreen={setActiveScreen} />
+    <div className="min-h-screen bg-[#faf8f5]">
+      <Sidebar
+        activeScreen={activeScreen}
+        setActiveScreen={setActiveScreen}
+        pendingApprovalCount={pendingCount}
+        onHome={onHome}
+      />
       <div className="ml-64 flex flex-col min-h-screen">
-        <TopBar />
+        <TopBar userName={userName} userEmail={userEmail} onLogout={onLogout} />
         <main className="flex-1 p-8">
           {children(activeScreen, setActiveScreen)}
         </main>
