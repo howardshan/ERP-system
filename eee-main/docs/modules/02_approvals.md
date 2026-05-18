@@ -92,7 +92,8 @@ interface UserProfile {
 ## 审批队列页（ApprovalsQueue）
 
 **路由**: `approvals`  
-**文件**: `src/pages/ApprovalsQueue.tsx`
+**文件**: `src/pages/ApprovalsQueue.tsx`  
+**完整路径**: `eee-main/src/pages/ApprovalsQueue.tsx`
 
 ### 功能
 - 展示所有 `status = 'pending_approval'` 的凭证
@@ -118,6 +119,7 @@ rejectJournalEntry(id: number, reason: string): Promise<void>
 
 **路由**: `approval-settings`  
 **文件**: `src/pages/ApprovalSettings.tsx`  
+**完整路径**: `eee-main/src/pages/ApprovalSettings.tsx`  
 **位置**: 侧边栏底部（设置区域）
 
 ### 功能

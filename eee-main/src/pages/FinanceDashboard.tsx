@@ -14,12 +14,14 @@ const statusColor: Record<string, 'positive' | 'neutral' | 'negative'> = {
 export default function FinanceDashboard({ onNavigate }: { onNavigate?: (screen: string) => void }) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    setLoading(true);
     getDashboardStats()
       .then(setStats)
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshKey]);
 
   if (loading) {
     return (
@@ -39,7 +41,7 @@ export default function FinanceDashboard({ onNavigate }: { onNavigate?: (screen:
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Overview</h2>
           <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">From posted general ledger entries</p>
         </div>
-        <button onClick={() => window.location.reload()} className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded shadow hover:bg-blue-700 uppercase tracking-wide">
+        <button onClick={() => setRefreshKey(k => k + 1)} className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded shadow hover:bg-blue-700 uppercase tracking-wide">
           Refresh
         </button>
       </div>

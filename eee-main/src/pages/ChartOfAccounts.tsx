@@ -4,6 +4,7 @@ import { Card, Badge } from '../components/ui/Cards';
 import { cn, formatCurrency } from '../lib/utils';
 import { GlAccount } from '../types';
 import { getAccounts, createAccount, updateAccount } from '../services/api';
+import { usePermissions } from '../contexts/PermissionContext';
 
 const ACCOUNT_TYPES: GlAccount['account_type'][] = ['asset', 'liability', 'equity', 'revenue', 'expense'];
 
@@ -70,6 +71,7 @@ function AccountModal({
         account_type: form.account_type,
         parent_id: form.parent_id === '' ? null : Number(form.parent_id),
         is_postable: form.is_postable,
+        is_active: true,
       });
     } catch (err: any) {
       setError(err.message);
@@ -189,9 +191,10 @@ interface AccountRowProps {
   account: GlAccount;
   depth: number;
   onEdit: (a: GlAccount) => void;
+  canEdit: boolean;
 }
 
-function AccountRow({ account, depth, onEdit }: AccountRowProps) {
+function AccountRow({ account, depth, onEdit, canEdit }: AccountRowProps) {
   const [open, setOpen] = useState(true);
   const hasChildren = (account.children?.length ?? 0) > 0;
 
@@ -227,17 +230,19 @@ function AccountRow({ account, depth, onEdit }: AccountRowProps) {
           <span className="font-mono text-sm text-slate-700">{formatCurrency(account.balance ?? 0)}</span>
         </td>
         <td className="px-5 py-3 text-right">
-          <button
-            onClick={() => onEdit(account)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-blue-600 p-1 rounded"
-            title="Edit account"
-          >
-            <Pencil size={14} />
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => onEdit(account)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-blue-600 p-1 rounded"
+              title="Edit account"
+            >
+              <Pencil size={14} />
+            </button>
+          )}
         </td>
       </tr>
       {open && account.children?.map(child => (
-        <AccountRow key={child.id} account={child} depth={depth + 1} onEdit={onEdit} />
+        <AccountRow key={child.id} account={child} depth={depth + 1} onEdit={onEdit} canEdit={canEdit} />
       ))}
     </>
   );
@@ -251,10 +256,12 @@ function TypeSection({
   type,
   accounts,
   onEdit,
+  canEdit,
 }: {
   type: GlAccount['account_type'];
   accounts: GlAccount[];
   onEdit: (a: GlAccount) => void;
+  canEdit: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const total = accounts.reduce((s, a) => s + (a.balance ?? 0), 0);
@@ -295,7 +302,7 @@ function TypeSection({
 
       {/* Account rows */}
       {open && roots.map(acc => (
-        <AccountRow key={acc.id} account={acc} depth={0} onEdit={onEdit} />
+        <AccountRow key={acc.id} account={acc} depth={0} onEdit={onEdit} canEdit={canEdit} />
       ))}
     </>
   );
@@ -306,6 +313,9 @@ function TypeSection({
 // ---------------------------------------------------------------
 
 export default function ChartOfAccounts() {
+  const { can } = usePermissions();
+  const canCreate = can('finance', 'chart_of_accounts', 'create');
+  const canEdit   = can('finance', 'chart_of_accounts', 'edit');
   const [allAccounts, setAllAccounts] = useState<GlAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -347,12 +357,14 @@ export default function ChartOfAccounts() {
             {allAccounts.length} accounts · balances from posted entries
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors uppercase tracking-wide flex items-center gap-2"
-        >
-          <Plus size={14} /> Create Account
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors uppercase tracking-wide flex items-center gap-2"
+          >
+            <Plus size={14} /> Create Account
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -387,9 +399,11 @@ export default function ChartOfAccounts() {
         ) : allAccounts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
             <p className="text-sm">No accounts yet.</p>
-            <button onClick={() => setShowCreate(true)} className="text-sm font-bold text-blue-600 hover:underline">
-              Create your first account →
-            </button>
+            {canCreate && (
+              <button onClick={() => setShowCreate(true)} className="text-sm font-bold text-blue-600 hover:underline">
+                Create your first account →
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -410,6 +424,7 @@ export default function ChartOfAccounts() {
                     type={type}
                     accounts={byType(type)}
                     onEdit={setEditing}
+                    canEdit={canEdit}
                   />
                 ))}
               </tbody>
@@ -419,7 +434,7 @@ export default function ChartOfAccounts() {
       </Card>
 
       {/* Create modal */}
-      {showCreate && (
+      {showCreate && canCreate && (
         <AccountModal
           title="Create Account"
           initial={{ account_type: 'asset', is_postable: true }}
@@ -434,7 +449,7 @@ export default function ChartOfAccounts() {
       )}
 
       {/* Edit modal */}
-      {editing && (
+      {editing && canEdit && (
         <AccountModal
           title={`Edit · ${editing.account_code} ${editing.name}`}
           initial={editing}

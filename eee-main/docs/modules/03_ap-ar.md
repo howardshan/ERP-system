@@ -7,7 +7,8 @@
 ## 应付账款（Accounts Payable）
 
 **路由**: `ap`  
-**文件**: `src/pages/AccountsSubmodule.tsx`（type="AP"）
+**文件**: `src/pages/AccountsSubmodule.tsx`（type="AP"）  
+**完整路径**: `eee-main/src/pages/AccountsSubmodule.tsx`
 
 ### 规划功能
 - 供应商发票登记与管理
@@ -23,7 +24,8 @@
 ## 应收账款（Accounts Receivable）
 
 **路由**: `ar`  
-**文件**: `src/pages/AccountsSubmodule.tsx`（type="AR"）
+**文件**: `src/pages/AccountsSubmodule.tsx`（type="AR"）  
+**完整路径**: `eee-main/src/pages/AccountsSubmodule.tsx`
 
 ### 规划功能
 - 客户发票开具与管理

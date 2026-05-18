@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Badge } from '../components/ui/Cards';
 import { cn, formatCurrency } from '../lib/utils';
-import { Loader2, CheckCircle2, XCircle, Eye, Clock, AlertTriangle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Eye, Clock, AlertTriangle, ShieldOff } from 'lucide-react';
 import { JournalEntry, ApprovalTier } from '../types';
 import { getPendingApprovals, approveJournalEntry, rejectJournalEntry, getApprovalTiers, getJournalEntry } from '../services/api';
+import { usePermissions } from '../contexts/PermissionContext';
 
 export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: string) => void }) {
+  const { can, approvalLimit } = usePermissions();
+  const canApprove = can('finance', 'journal_entry', 'approve');
+  const myLimit = approvalLimit('finance', 'journal_entry', 'approve');
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [tiers, setTiers] = useState<ApprovalTier[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,6 +117,16 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
     if (entry.total_debit != null) return entry.total_debit;
     return 0;
   };
+
+  if (!canApprove) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-3 text-slate-400">
+        <ShieldOff size={32} className="text-slate-300" />
+        <p className="text-sm font-medium">You don't have permission to approve journal entries.</p>
+        <p className="text-xs">Required: Financial Management → Journal Entries → Approve</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -394,18 +408,25 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                   </button>
                 )}
 
-                <button
-                  onClick={handleApprove}
-                  disabled={actionLoading}
-                  className="flex items-center gap-2 px-4 py-2 text-xs font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 uppercase tracking-wide"
-                >
-                  {actionLoading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <CheckCircle2 size={14} />
-                  )}
-                  Approve
-                </button>
+                {(() => {
+                  const amount = selectedEntry ? totalDebit(selectedEntry) : 0;
+                  const overLimit = myLimit !== null && amount > myLimit;
+                  return (
+                    <button
+                      onClick={handleApprove}
+                      disabled={actionLoading || overLimit}
+                      title={overLimit ? `Exceeds your approval limit of $${myLimit!.toLocaleString()}` : undefined}
+                      className="flex items-center gap-2 px-4 py-2 text-xs font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide"
+                    >
+                      {actionLoading ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <CheckCircle2 size={14} />
+                      )}
+                      {overLimit ? `Over Limit ($${myLimit!.toLocaleString()})` : 'Approve'}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>

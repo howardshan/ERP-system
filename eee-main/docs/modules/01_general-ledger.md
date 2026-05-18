@@ -7,7 +7,8 @@
 ## 1. 财务仪表盘（FinanceDashboard）
 
 **路由**: `dashboard`  
-**文件**: `src/pages/FinanceDashboard.tsx`
+**文件**: `src/pages/FinanceDashboard.tsx`  
+**完整路径**: `eee-main/src/pages/FinanceDashboard.tsx`
 
 ### 功能
 - 展示企业财务快照（资产、负债、权益、净利润）
@@ -51,7 +52,8 @@ interface DashboardStats {
 ## 2. 科目表（ChartOfAccounts）
 
 **路由**: `coa`  
-**文件**: `src/pages/ChartOfAccounts.tsx`
+**文件**: `src/pages/ChartOfAccounts.tsx`  
+**完整路径**: `eee-main/src/pages/ChartOfAccounts.tsx`
 
 ### 功能
 - 按类型分区展示所有会计科目（Asset / Liability / Equity / Revenue / Expense）
@@ -113,7 +115,8 @@ ELSE SUM(credit) - SUM(debit)
 ## 3. 记账凭证——新建（JournalEntryForm，create mode）
 
 **路由**: `je-create`  
-**文件**: `src/pages/JournalEntryForm.tsx`
+**文件**: `src/pages/JournalEntryForm.tsx`  
+**完整路径**: `eee-main/src/pages/JournalEntryForm.tsx`
 
 ### 表单字段
 
@@ -168,6 +171,8 @@ saveOrGetId():
 ## 4. 记账凭证——编辑/查看（JournalEntryForm，edit mode）
 
 **路由**: `je-edit:<id>`  
+**文件**: `src/pages/JournalEntryForm.tsx`  
+**完整路径**: `eee-main/src/pages/JournalEntryForm.tsx`  
 **Props**: `editEntryId: number`
 
 ### 状态感知行为
@@ -207,7 +212,8 @@ saveOrGetId():
 ## 5. 凭证列表（JournalEntriesList）
 
 **路由**: `je-list`  
-**文件**: `src/pages/JournalEntriesList.tsx`
+**文件**: `src/pages/JournalEntriesList.tsx`  
+**完整路径**: `eee-main/src/pages/JournalEntriesList.tsx`
 
 ### 功能
 - 分页展示所有凭证（默认 20 条/页）

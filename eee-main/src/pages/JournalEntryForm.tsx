@@ -14,6 +14,7 @@ import {
   submitJournalEntry,
   uploadAttachment, getAttachments, deleteAttachment, getAttachmentUrl,
 } from '../services/api';
+import { usePermissions } from '../contexts/PermissionContext';
 
 // ---------------------------------------------------------------
 // Helpers
@@ -321,6 +322,10 @@ export default function JournalEntryForm({
   onNavigate?: (screen: string) => void;
   editEntryId?: number;
 }) {
+  const { can } = usePermissions();
+  const canCreate  = can('finance', 'journal_entry', 'create');
+  const canEdit    = can('finance', 'journal_entry', 'edit');
+  const canReverse = can('finance', 'journal_entry', 'edit');
   const isEditMode = editEntryId != null;
 
   const [accounts, setAccounts] = useState<GlAccount[]>([]);
@@ -329,7 +334,7 @@ export default function JournalEntryForm({
   const [notes, setNotes] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [journalType, setJournalType] = useState('general');
-  const [entryStatus, setEntryStatus] = useState<'draft' | 'posted' | 'reversed'>('draft');
+  const [entryStatus, setEntryStatus] = useState<'draft' | 'posted' | 'reversed' | 'pending_approval' | 'rejected'>('draft');
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [loadingEntry, setLoadingEntry] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
@@ -522,7 +527,7 @@ export default function JournalEntryForm({
 
   async function handleReverse() {
     if (!savedId) return;
-    if (!confirm('Reverse this entry? A new offsetting entry will be created and posted.')) return;
+    // confirm() is disabled in Tauri — proceed directly
     setReversing(true);
     setError('');
     try {
@@ -580,16 +585,18 @@ export default function JournalEntryForm({
           <p className="text-sm font-mono text-slate-500 mt-1">{success}</p>
         </div>
         <div className="flex gap-4 justify-center">
-          <button
-            onClick={() => {
-              setSuccess(''); setSavedId(null); setSavedNumber('');
-              setLines([emptyLine(), emptyLine()]);
-              setDescription(''); setNotes(''); setAttachments([]);
-            }}
-            className="px-6 py-2 text-sm font-bold bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            New Entry
-          </button>
+          {canCreate && (
+            <button
+              onClick={() => {
+                setSuccess(''); setSavedId(null); setSavedNumber('');
+                setLines([emptyLine(), emptyLine()]);
+                setDescription(''); setNotes(''); setAttachments([]);
+              }}
+              className="px-6 py-2 text-sm font-bold bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              New Entry
+            </button>
+          )}
           {onNavigate && (
             <button
               onClick={() => onNavigate('je-list')}
@@ -612,7 +619,7 @@ export default function JournalEntryForm({
     );
   }
 
-  const isReadOnly = entryStatus !== 'draft' && entryStatus !== 'rejected';
+  const isReadOnly = (entryStatus !== 'draft' && entryStatus !== 'rejected') || (!isEditMode && !canCreate) || (isEditMode && !canEdit);
 
   return (
     <div className="max-w-6xl mx-auto space-y-5">
@@ -799,12 +806,14 @@ export default function JournalEntryForm({
 
         {/* Totals row */}
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
-          <button
-            onClick={() => setLines(prev => [...prev, emptyLine()])}
-            className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 uppercase tracking-wide"
-          >
-            <Plus size={16} /> Add Line
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={() => setLines(prev => [...prev, emptyLine()])}
+              className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 uppercase tracking-wide"
+            >
+              <Plus size={16} /> Add Line
+            </button>
+          )}
           <div className="flex gap-12 text-right">
             <div>
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Debit</p>
@@ -872,7 +881,7 @@ export default function JournalEntryForm({
               className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded">
               <ArrowLeft size={16} /> Back
             </button>
-            {entryStatus === 'posted' && (
+            {entryStatus === 'posted' && canReverse && (
               <button onClick={handleReverse} disabled={reversing}
                 className="flex items-center gap-2 px-6 py-2.5 rounded text-sm font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50">
                 {reversing ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
@@ -894,24 +903,28 @@ export default function JournalEntryForm({
         ) : (
           /* Draft / Rejected — editable */
           <>
-            <button onClick={handleSaveDraft} disabled={saving || submitting}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded disabled:opacity-50">
-              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              Save Draft
-            </button>
-            <button
-              onClick={handleSubmitForApproval}
-              disabled={!isBalanced || !hasAccounts || submitting || saving}
-              className={cn(
-                'flex items-center gap-2 px-8 py-3 rounded text-sm font-bold shadow transition-all',
-                isBalanced && hasAccounts
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed',
-              )}
-            >
-              {submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-              Submit for Approval
-            </button>
+            {(canCreate || canEdit) && (
+              <button onClick={handleSaveDraft} disabled={saving || submitting}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded disabled:opacity-50">
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                Save Draft
+              </button>
+            )}
+            {(canCreate || canEdit) && (
+              <button
+                onClick={handleSubmitForApproval}
+                disabled={!isBalanced || !hasAccounts || submitting || saving}
+                className={cn(
+                  'flex items-center gap-2 px-8 py-3 rounded text-sm font-bold shadow transition-all',
+                  isBalanced && hasAccounts
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed',
+                )}
+              >
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                Submit for Approval
+              </button>
+            )}
           </>
         )}
       </div>

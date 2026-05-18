@@ -30,12 +30,16 @@ eee-main/
 │   ├── main.tsx                   # React DOM 挂载
 │   ├── index.css                  # 全局样式
 │   ├── vite-env.d.ts
-│   ├── types/index.ts             # 所有 TypeScript 类型定义
+│   ├── types/
+│   │   ├── index.ts               # 财务模块 TypeScript 类型
+│   │   └── auth.ts                # 用户权限模块类型（ErpUser, UserPermissionGrant 等）
 │   ├── lib/
 │   │   ├── supabase.ts            # Supabase 客户端实例
-│   │   └── utils.ts               # cn() 工具函数
+│   │   ├── utils.ts               # cn() 工具函数
+│   │   └── permissionStructure.ts # 权限结构常量（前端定义）
 │   ├── services/
-│   │   └── api.ts                 # 所有 Supabase 调用（唯一数据层）
+│   │   ├── api.ts                 # 财务模块 Supabase 调用
+│   │   └── authApi.ts             # 用户权限模块 Supabase 调用
 │   ├── components/
 │   │   ├── layout/
 │   │   │   ├── DashboardLayout.tsx  # 主布局（Sidebar + TopBar + 内容区）
@@ -51,7 +55,14 @@ eee-main/
 │       ├── ApprovalsQueue.tsx        # 审批队列
 │       ├── ApprovalSettings.tsx      # 审批权限设置
 │       ├── AccountsSubmodule.tsx     # AP / AR 占位页
-│       └── ReportsAndPeriods.tsx     # 试算表 + 会计期间
+│       ├── ReportsAndPeriods.tsx     # 试算表 + 会计期间
+│       ├── LoginPage.tsx            # 登录页（Supabase Auth，仅登录，不可自助注册）
+│       ├── DocsPage.tsx             # 文档阅读器（渲染 docs/*.md）
+│       └── auth/
+│           ├── UserManagement.tsx   # 用户管理主页（By User / By Permission / IT 三视图）
+│           ├── UserDetail.tsx       # 单用户权限编辑（模块开关 + 权限矩阵）
+│           ├── PermissionBrowser.tsx # 按权限查看持有人
+│           └── ITPanel.tsx          # IT 管理：创建新 Auth 账号
 ├── supabase/
 │   ├── migrations/                  # 所有 DDL/DML，按顺序执行
 │   └── functions/                   # Edge Functions
@@ -67,32 +78,84 @@ eee-main/
     │   ├── 01_general-ledger.md     # GL：科目表 + 记账凭证
     │   ├── 02_approvals.md          # 审批工作流
     │   ├── 03_ap-ar.md              # 应付 / 应收
-    │   └── 04_reports-periods.md   # 报表 + 会计期间
+    │   ├── 04_reports-periods.md    # 报表 + 会计期间
+    │   ├── 05_workflow-studio.md    # Workflow Studio
+    │   └── 06_users-auth.md         # 用户管理与权限系统
     └── database/
         ├── 01_schema.md             # 完整数据库表结构
-        └── 02_rpc-functions.md      # 所有 RPC / View
+        ├── 02_rpc-functions.md      # 所有 RPC / View
+        └── 03_migrations-and-edge-functions.md  # Migration + Edge Function 索引
 ```
 
 ---
 
 ## 路由结构（`src/App.tsx`）
 
-系统使用单个 React state `activeScreen: string` 代替路由库，由 `DashboardLayout` 统一管理。
+系统使用**两层 state** 代替路由库：
 
-| `activeScreen` 值 | 渲染页面 | 说明 |
-|-------------------|---------|------|
-| `dashboard` | `FinanceDashboard` | 默认首页，财务总览 |
-| `coa` | `ChartOfAccounts` | 科目表 |
-| `je-create` | `JournalEntryForm` | 新建记账凭证 |
-| `je-list` | `JournalEntriesList` | 凭证列表（可翻页、搜索） |
-| `je-edit:<id>` | `JournalEntryForm` | 编辑指定凭证（deep-link 格式） |
-| `approvals` | `ApprovalsQueue` | 待审批凭证队列 |
-| `ap` | `AccountsSubmodule` (AP) | 应付账款（规划中） |
-| `ar` | `AccountsSubmodule` (AR) | 应收账款（规划中） |
-| `trial-balance` | `TrialBalance` | 试算平衡表 |
-| `periods` / `reports` | `AccountingPeriods` | 会计期间管理 |
-| `approval-settings` | `ApprovalSettings` | 审批权限配置 |
-| _其他_ | `FinanceDashboard` | fallback |
+- **第一层** `activeModule: string` — 当前所在大模块，由 `App.tsx` 管理
+- **第二层** `activeScreen: string` — 模块内的子页面，由 `DashboardLayout` 管理
+
+### 第一层：模块路由
+
+| `activeModule` | 渲染内容 | 文件路径 | 状态 |
+|----------------|---------|---------|------|
+| `home` | `HomePage` | `src/pages/HomePage.tsx` | ✅ 已完成 |
+| `finance` | `DashboardLayout` + 财务子页面 | `src/components/layout/DashboardLayout.tsx` | ✅ 已完成 |
+| `workflow` | `WorkflowModule` → `WorkflowList` / `WorkflowBuilder` | `src/pages/WorkflowList.tsx`, `src/pages/WorkflowBuilder.tsx` | ✅ 已完成（执行引擎待开发） |
+| `warehouse` | `ModulePlaceholder` | `src/App.tsx`（内联） | 🔲 规划中 |
+| `sales` | `ModulePlaceholder` | `src/App.tsx`（内联） | 🔲 规划中 |
+| `production` | `ModulePlaceholder` | `src/App.tsx`（内联） | 🔲 规划中 |
+| `auth` | `UserManagement` | `src/pages/auth/UserManagement.tsx` | ✅ 已完成 |
+| `docs` | `DocsPage` | `src/pages/DocsPage.tsx` | ✅ 已完成 |
+
+### Workflow 模块内子路由
+
+| `screen` | 渲染内容 | 说明 |
+|---------|---------|------|
+| `wf-list` | `WorkflowList` | 工作流列表（默认） |
+| `wf-builder:<id>` | `WorkflowBuilder` | 编辑指定工作流 |
+| `wf-builder:new` | `WorkflowBuilder` | 新建工作流（id=null） |
+
+### Auth 模块子视图
+
+`UserManagement` 内部用 `view` state 切换三个视图：
+
+| `view` | 组件/内容 | 说明 |
+|--------|---------|------|
+| `users` | 用户列表 + `UserDetail` | 所有 ERP 用户，点击进入权限编辑 |
+| `permissions` | `PermissionBrowser` | 按权限维度查看持有人 |
+| `it` | `ITPanel` | IT 管理员创建新 Supabase Auth 账号 |
+
+### 第二层：Finance 模块内子页面路由
+
+`DashboardLayout` 统一管理，初始值为 `dashboard`。
+
+| `activeScreen` 值 | 组件 | 文件路径 | 说明 |
+|-------------------|------|---------|------|
+| `dashboard` | `FinanceDashboard` | `src/pages/FinanceDashboard.tsx` | 默认首页，财务总览 |
+| `coa` | `ChartOfAccounts` | `src/pages/ChartOfAccounts.tsx` | 科目表 |
+| `je-create` | `JournalEntryForm` | `src/pages/JournalEntryForm.tsx` | 新建记账凭证 |
+| `je-list` | `JournalEntriesList` | `src/pages/JournalEntriesList.tsx` | 凭证列表（可翻页、搜索） |
+| `je-edit:<id>` | `JournalEntryForm` | `src/pages/JournalEntryForm.tsx` | 编辑指定凭证（deep-link 格式） |
+| `approvals` | `ApprovalsQueue` | `src/pages/ApprovalsQueue.tsx` | 待审批凭证队列 |
+| `ap` | `AccountsSubmodule` | `src/pages/AccountsSubmodule.tsx` | 应付账款（规划中） |
+| `ar` | `AccountsSubmodule` | `src/pages/AccountsSubmodule.tsx` | 应收账款（规划中） |
+| `trial-balance` | `TrialBalance` | `src/pages/ReportsAndPeriods.tsx` | 试算平衡表 |
+| `periods` / `reports` | `AccountingPeriods` | `src/pages/ReportsAndPeriods.tsx` | 会计期间管理 |
+| `approval-settings` | `ApprovalSettings` | `src/pages/ApprovalSettings.tsx` | 审批权限配置（已迁移至 Auth 模块，Finance sidebar 不再显示） |
+| _其他_ | `FinanceDashboard` | `src/pages/FinanceDashboard.tsx` | fallback |
+
+### 返回首页
+Sidebar 顶部的 logo 区域点击后触发 `onHome()`，将 `activeModule` 重置为 `home`，回到模块选择页。
+
+### 共有布局组件
+
+| 组件 | 文件路径 | 说明 |
+|------|---------|------|
+| `DashboardLayout` | `src/components/layout/DashboardLayout.tsx` | 主布局容器，管理 `activeScreen` state，拉取待审批数量 |
+| `Sidebar` | `src/components/layout/Sidebar.tsx` | 左侧导航，显示审批徽章 |
+| `TopBar` | `src/components/layout/TopBar.tsx` | 顶部栏 |
 
 ### Deep-link 格式
 
@@ -124,7 +187,6 @@ onNavigate(`je-edit:${entry.id}`)
   Accounting Periods
 
 ── 底部 ───────────────
-  Approval Settings
   Support
 ```
 
@@ -151,10 +213,34 @@ Supabase PostgreSQL
 
 ---
 
+## 认证流程（Supabase Auth）
+
+```
+App 启动
+  │
+  ▼
+supabase.auth.getSession()  ──── 无 session ──→ LoginPage（邮箱 + 密码）
+  │                                               │
+  │ 有 session                                    │ signInWithPassword()
+  ▼                                               │
+App（正常渲染）  ←─────────────────────────────────┘
+  │
+  ├─ onAuthStateChange 订阅（session 变化自动更新）
+  └─ 登出：supabase.auth.signOut() → 返回 LoginPage
+```
+
+**账号管理规则**:
+- 不开放自助注册，新账号只能由 IT 管理员在 `Users & Authentication → IT` 面板创建
+- 创建调用 Edge Function `create-auth-user`（使用 service role key）
+- 新账号创建后，触发器 `on_auth_user_created` 自动同步到 `erp_user`
+
+---
+
 ## 模块开发状态
 
 | 模块 | 状态 | 文档 |
 |------|------|------|
+| **Home Page（模块选择）** | ✅ 完成 | `src/pages/HomePage.tsx` |
 | 财务仪表盘 | ✅ 完成 | → modules/01_general-ledger.md |
 | 科目表 (CoA) | ✅ 完成 | → modules/01_general-ledger.md |
 | 记账凭证 GL | ✅ 完成 | → modules/01_general-ledger.md |
@@ -163,5 +249,29 @@ Supabase PostgreSQL
 | 应收账款 AR | 🔲 框架已建（无业务逻辑） | → modules/03_ap-ar.md |
 | 试算平衡表 | ✅ 完成（只读展示） | → modules/04_reports-periods.md |
 | 会计期间 | ✅ 完成 | → modules/04_reports-periods.md |
+| **Warehouse & Inventory** | 🔲 占位页（数据库表已建） | — |
+| **Sales & Distribution** | 🔲 占位页（数据库表已建） | — |
+| **Production & Manufacturing** | 🔲 占位页（数据库表已建） | — |
+| **Users & Authentication** | ✅ 完成 | → modules/06_users-auth.md |
 | P&L / 资产负债表 | 🔲 未开始 | — |
-| 用户认证 / 权限 | 🔲 未开始（Auth 已集成但无登录页） | — |
+| **Workflow Studio** | ✅ 完成（执行引擎待开发） | → modules/05_workflow-studio.md |
+
+---
+
+## 设计规范
+
+| Token | 值 | 说明 |
+|-------|----|------|
+| 主背景色（暖白） | `#faf8f5` | 所有页面背景：HomePage、WorkflowList、WorkflowBuilder toolbar/panels、DashboardLayout、ModulePlaceholder |
+| 工作流画布背景 | `#1e293b`（slate-800） | WorkflowBuilder 内的 React Flow 画布，深色保留以突出节点 |
+| 节点卡片背景 | `#111827` | BaseNode 组件，渲染于深色画布之上 |
+| 登录页背景 | `#faf8f5` | 与全局背景一致，LoginPage 使用白色卡片居中布局 |
+| IT 面板强调色 | violet-600 | ITPanel 区别于 By User（blue）和 By Permission（slate） |
+
+---
+
+## Claude Code 技能
+
+| 文件 | 说明 |
+|------|------|
+| `.claude/commands/erp-doc-sync.md` | 每次回复前检查文档同步的 checklist（新 SQL、新路由、新文件、设计变更均需更新对应文档） |

@@ -16,6 +16,10 @@
 | `20260517000004_seed_2026_periods.sql` | 2026 年 1–12 月 12 个 open 会计期间 |
 | `20260517000005_je_edit_and_audit.sql` | create_je_shell、update_je_draft、journal_entry_edit_log |
 | `20260517000006_approval_workflow.sql` | approval_tier、user_profile、审批 RPC 函数 |
+| `20260518000000_workflow_studio.sql` | workflow_definition、workflow_run 表及 RLS |
+| `20260518000001_user_permission_system.sql` | erp_user、user_module_access、user_permission_grant 表及种子数据 |
+| `20260518000002_link_erp_user_to_auth.sql` | erp_user.auth_user_id、list_erp_users() RPC、on_auth_user_created 触发器 |
+| `20260518000003_fix_list_erp_users.sql` | 修复 list_erp_users()，以 erp_user 为主表 |
 
 ---
 
@@ -562,6 +566,98 @@ GROUP BY a.id, a.account_code, a.name, a.account_type,
 - 连续下划线合并
 - 文件名主体截断至 80 字符
 - 保留原始扩展名
+
+---
+
+## Section 9 — 用户权限系统（Auth Module）
+
+> Migration M-009 建表，M-010 增加 auth 绑定列。
+
+### `erp_user`（ERP 内部用户档案）
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | uuid PK | `gen_random_uuid()` |
+| auth_user_id | uuid | → auth.users(id) UNIQUE，允许 NULL（M-010 新增） |
+| full_name | text | 显示名 |
+| email | text UNIQUE | |
+| department | text | 部门 |
+| manager_id | uuid | → erp_user.id 自引用，上级领导 |
+| is_active | boolean | 默认 true |
+| created_at | timestamptz | |
+
+**关联**: 新 Auth 用户注册后由触发器 `on_auth_user_created` 自动创建对应行。
+
+---
+
+### `user_module_access`（用户可访问模块）
+| 列 | 类型 | 说明 |
+|----|------|------|
+| user_id | uuid | → erp_user.id，ON DELETE CASCADE |
+| module_id | text | 模块标识符（finance / workflow / warehouse / sales / production） |
+| PK | (user_id, module_id) | |
+
+---
+
+### `user_permission_grant`（细粒度权限授予）
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | bigint PK | GENERATED ALWAYS AS IDENTITY |
+| user_id | uuid | → erp_user.id，ON DELETE CASCADE |
+| module_id | text | 所属模块 |
+| resource | text | 资源（journal_entry / chart_of_accounts / workflow 等） |
+| permission | text | 操作（view / create / edit / delete / approve） |
+| approval_limit | numeric | 审批金额上限（NULL = 无限额，仅 approve 权限有效） |
+| granted_at | timestamptz | 授权时间 |
+| granted_by_id | uuid | 授权人（可为 NULL） |
+| UNIQUE | (user_id, module_id, resource, permission) | |
+
+---
+
+### `workflow_definition`（工作流定义，M-008）
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | bigint PK | GENERATED ALWAYS AS IDENTITY |
+| name | text | |
+| description | text | |
+| nodes_json | jsonb | React Flow 节点数组（含位置、类型、配置） |
+| edges_json | jsonb | React Flow 连线数组 |
+| status | text | draft / active / archived |
+| created_by | uuid | |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+
+### `workflow_run`（工作流执行历史，M-008）
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | bigint PK | GENERATED ALWAYS AS IDENTITY |
+| workflow_id | bigint | → workflow_definition.id |
+| triggered_by | text | manual / schedule / event |
+| status | text | running / completed / failed |
+| result_json | jsonb | 执行结果 |
+| error_message | text | 失败时的错误信息 |
+| started_at | timestamptz | |
+| finished_at | timestamptz | |
+
+---
+
+### RPC：`list_erp_users()`（M-010/M-011）
+SECURITY DEFINER 函数，读取 auth.users 并与 erp_user 合并：
+
+```sql
+SELECT
+  ep.id                    AS erp_user_id,
+  ep.auth_user_id,
+  COALESCE(au.email, ep.email)         AS email,
+  COALESCE(au.raw_user_meta_data->>'full_name', ep.full_name, ...) AS full_name,
+  ep.department, ep.manager_id, mgr.full_name AS manager_name,
+  ep.is_active, ep.created_at
+FROM erp_user ep
+LEFT JOIN auth.users au  ON au.id = ep.auth_user_id
+LEFT JOIN erp_user mgr   ON mgr.id = ep.manager_id
+ORDER BY ...
+```
+
+**说明**: 以 `erp_user` 为主表，即使没有对应 auth 账号的记录也会返回（如种子数据）。
 
 ---
 

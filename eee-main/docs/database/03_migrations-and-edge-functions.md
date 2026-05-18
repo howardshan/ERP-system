@@ -181,6 +181,41 @@ supabase functions deploy post-journal-entry
 
 ---
 
+### EF-002 `create-auth-user`
+**目录**: `supabase/functions/create-auth-user/index.ts`  
+**用途**: 使用 service role key 在 Supabase Auth 中创建新用户，供 IT 管理员通过 app 内 IT 面板注册账号（不开放自助注册）。
+
+**请求**:
+```
+POST /functions/v1/create-auth-user
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{ "email": "user@company.com", "password": "...", "full_name": "Jane Smith" }
+```
+
+**响应**:
+```json
+// 成功
+{ "user_id": "<uuid>" }
+
+// 失败
+{ "error": "..." }
+```
+
+**技术细节**:
+- 调用方需提供有效 JWT（验证已登录）
+- 使用 `SUPABASE_SERVICE_ROLE_KEY`（服务端专用，不暴露前端）
+- 创建后 `email_confirm: true`（跳过邮件验证）
+- 触发器 `on_auth_user_created` 自动在 `erp_user` 创建 profile
+
+**部署命令**:
+```bash
+supabase functions deploy create-auth-user
+```
+
+---
+
 ## 变更操作规范
 
 ### 新增 Migration
@@ -215,6 +250,76 @@ supabase functions deploy post-journal-entry
 
 ---
 
+---
+
+### M-008 `20260518000000_workflow_studio.sql`
+**用途**: 创建 Workflow Studio 功能所需的两张表。
+
+**包含**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `workflow_definition` | CREATE TABLE | 存储工作流的节点和连线 JSON、状态、名称描述 |
+| `workflow_run` | CREATE TABLE | 工作流执行历史（触发方式、状态、结果、错误信息） |
+| RLS 策略 | CREATE POLICY | 开发阶段：所有用户可读写（生产应按 created_by 限制） |
+
+**关键字段**:
+- `workflow_definition.nodes_json` — React Flow 节点数组（JSON），包含节点位置、类型、配置
+- `workflow_definition.edges_json` — React Flow 连线数组（JSON）
+- `workflow_run.triggered_by` — manual / schedule / event
+- `workflow_run.result_json` — 执行结果数据（JSON）
+
+---
+
+### M-009 `20260518000001_user_permission_system.sql`
+**用途**: 用户管理与细粒度权限系统。
+
+**包含**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `erp_user` | CREATE TABLE | ERP 内部用户（姓名、邮箱、部门、上级） |
+| `user_module_access` | CREATE TABLE | 用户有权访问的模块列表 |
+| `user_permission_grant` | CREATE TABLE | 细粒度权限（module/resource/permission + approval_limit） |
+| Seed data | INSERT | 3 个演示用户（John Controller、Sarah Manager、Mike Ops） |
+
+**权限结构**（前端定义在 `src/lib/permissionStructure.ts`）：
+- Finance: journal_entry（view/create/edit/delete/approve）、chart_of_accounts、approvals、accounting_periods
+- Workflow: workflow（view/create/edit/delete/execute）
+- Warehouse / Sales / Production: 各自的基础权限集
+
+---
+
+### M-010 `20260518000002_link_erp_user_to_auth.sql`
+**用途**: 将 `erp_user` 表与 Supabase `auth.users` 关联，实现 ERP 用户与 Auth 账户的绑定。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `erp_user.auth_user_id` | ADD COLUMN | `uuid REFERENCES auth.users(id) UNIQUE`，允许 NULL（历史数据兼容） |
+| `list_erp_users()` | CREATE FUNCTION | SECURITY DEFINER RPC，从 `auth.users` 出发 LEFT JOIN `erp_user`，返回合并视图 |
+| `handle_new_auth_user()` | CREATE FUNCTION | SECURITY DEFINER 触发器函数，新 auth 用户注册后自动在 `erp_user` 创建 profile |
+| `on_auth_user_created` | CREATE TRIGGER | AFTER INSERT ON auth.users，调用 `handle_new_auth_user()` |
+| 存量同步 | INSERT | 将 auth.users 中已有用户同步到 erp_user（初次迁移时执行一次） |
+
+**依赖**: M-009
+
+---
+
+### M-011 `20260518000003_fix_list_erp_users.sql`
+**用途**: 修复 `list_erp_users()` 函数——原版以 `auth.users` 为主表，当 Supabase Auth 无用户时返回空集。改为以 `erp_user` 为主表，LEFT JOIN auth 数据，确保种子用户和历史数据始终可见。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `list_erp_users()` | CREATE OR REPLACE | 改为 `FROM erp_user ep LEFT JOIN auth.users au ON au.id = ep.auth_user_id`，兼容无 auth_user_id 的记录 |
+
+**依赖**: M-010
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -226,10 +331,15 @@ supabase functions deploy post-journal-entry
 | M-005 | 20260517000004_seed_2026_periods.sql |
 | M-006 | 20260517000005_je_edit_and_audit.sql |
 | M-007 | 20260517000006_approval_workflow.sql |
-| **M-008** | _(下一个)_ |
+| M-008 | 20260518000000_workflow_studio.sql |
+| M-009 | 20260518000001_user_permission_system.sql |
+| M-010 | 20260518000002_link_erp_user_to_auth.sql |
+| M-011 | 20260518000003_fix_list_erp_users.sql |
+| **M-012** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
 | EF-001 | functions/post-journal-entry/ |
 | EF-SHARED | functions/_shared/ |
-| **EF-002** | _(下一个)_ |
+| EF-002 | functions/create-auth-user/ |
+| **EF-003** | _(下一个)_ |

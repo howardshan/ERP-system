@@ -7,6 +7,7 @@ import {
   getTrialBalance, getAccountingPeriods,
   openAccountingPeriod, closeAccountingPeriod, createAccountingPeriod
 } from '../services/api';
+import { usePermissions } from '../contexts/PermissionContext';
 
 // ---------------------------------------------------------------
 //  Trial Balance
@@ -204,6 +205,10 @@ const periodStatusColors: Record<string, 'positive' | 'negative' | 'info' | 'neu
 };
 
 export function AccountingPeriods() {
+  const { can } = usePermissions();
+  const canClose  = can('finance', 'accounting_periods', 'close');
+  const canOpen   = can('finance', 'accounting_periods', 'open');
+  const canCreate = canClose || canOpen;
   const [periods, setPeriods] = useState<AccountingPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -223,7 +228,7 @@ export function AccountingPeriods() {
   useEffect(() => { load(); }, [load]);
 
   async function handleClose(id: number) {
-    if (!confirm('Close this period? No more entries can be posted to it.')) return;
+    // confirm() is disabled in Tauri — proceed directly
     setActionLoading(id);
     setError('');
     try {
@@ -256,12 +261,14 @@ export function AccountingPeriods() {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Accounting Periods</h2>
           <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">Fiscal year operational status</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded shadow hover:bg-blue-700 uppercase tracking-wide flex items-center gap-2"
-        >
-          <Plus size={14} /> New Period
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded shadow hover:bg-blue-700 uppercase tracking-wide flex items-center gap-2"
+          >
+            <Plus size={14} /> New Period
+          </button>
+        )}
       </div>
 
       {error && (
@@ -278,9 +285,11 @@ export function AccountingPeriods() {
       ) : periods.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
           <p className="text-sm">No accounting periods yet.</p>
-          <button onClick={() => setShowModal(true)} className="text-sm font-bold text-blue-600 hover:underline">
-            Create your first period →
-          </button>
+          {canCreate && (
+            <button onClick={() => setShowModal(true)} className="text-sm font-bold text-blue-600 hover:underline">
+              Create your first period →
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-4 gap-6">
@@ -299,7 +308,7 @@ export function AccountingPeriods() {
                 <p className="text-[10px] text-slate-400">FY {period.fiscal_year}</p>
               </div>
               <div className="mt-5">
-                {period.status === 'open' && (
+                {period.status === 'open' && canClose && (
                   <button
                     onClick={() => handleClose(period.id)}
                     disabled={actionLoading === period.id}
@@ -309,7 +318,7 @@ export function AccountingPeriods() {
                     Close Period
                   </button>
                 )}
-                {period.status === 'closed' && (
+                {period.status === 'closed' && canOpen && (
                   <button
                     onClick={() => handleOpen(period.id)}
                     disabled={actionLoading === period.id}
@@ -319,7 +328,7 @@ export function AccountingPeriods() {
                     Reopen
                   </button>
                 )}
-                {period.status === 'future' && (
+                {period.status === 'future' && canOpen && (
                   <button
                     onClick={() => handleOpen(period.id)}
                     disabled={actionLoading === period.id}

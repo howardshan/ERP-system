@@ -4,6 +4,7 @@ import { Search, Pencil, Eye, ChevronLeft, ChevronRight, Loader2, Plus } from 'l
 import { formatCurrency } from '../lib/utils';
 import { JournalEntry } from '../types';
 import { getJournalEntries } from '../services/api';
+import { usePermissions } from '../contexts/PermissionContext';
 
 const PAGE_SIZE = 20;
 
@@ -14,6 +15,9 @@ const statusColor: Record<string, 'positive' | 'neutral' | 'negative' | 'warning
 };
 
 export default function JournalEntriesList({ onNavigate }: { onNavigate?: (screen: string) => void }) {
+  const { can } = usePermissions();
+  const canCreate = can('finance', 'journal_entry', 'create');
+  const canEdit   = can('finance', 'journal_entry', 'edit');
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -52,12 +56,14 @@ export default function JournalEntriesList({ onNavigate }: { onNavigate?: (scree
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Journal Entries</h2>
           <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">{total} records total</p>
         </div>
-        <button
-          onClick={() => onNavigate?.('je-create')}
-          className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 flex items-center gap-2 uppercase tracking-wide"
-        >
-          <Plus size={14} /> New Entry
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => onNavigate?.('je-create')}
+            className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 flex items-center gap-2 uppercase tracking-wide"
+          >
+            <Plus size={14} /> New Entry
+          </button>
+        )}
       </div>
 
       <Card className="p-0">
@@ -129,7 +135,7 @@ export default function JournalEntriesList({ onNavigate }: { onNavigate?: (scree
                       <Badge type={statusColor[entry.status] ?? 'neutral'}>{entry.status}</Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {entry.status === 'draft'
+                      {entry.status === 'draft' && canEdit
                         ? <Pencil size={15} className="text-slate-300 group-hover:text-blue-500 transition-colors inline" />
                         : <Eye size={15} className="text-slate-300 group-hover:text-slate-500 transition-colors inline" />
                       }

@@ -5,7 +5,8 @@
 ## 1. 试算平衡表（Trial Balance）
 
 **路由**: `trial-balance`  
-**文件**: `src/pages/ReportsAndPeriods.tsx`（`TrialBalance` 组件）
+**文件**: `src/pages/ReportsAndPeriods.tsx`（`TrialBalance` 组件）  
+**完整路径**: `eee-main/src/pages/ReportsAndPeriods.tsx`
 
 ### 功能
 - 展示所有启用科目的累计借方、贷方和余额
@@ -45,7 +46,8 @@ interface GlAccount {
 ## 2. 会计期间管理（Accounting Periods）
 
 **路由**: `periods`（`reports` 也路由到此）  
-**文件**: `src/pages/ReportsAndPeriods.tsx`（`AccountingPeriods` 组件）
+**文件**: `src/pages/ReportsAndPeriods.tsx`（`AccountingPeriods` 组件）  
+**完整路径**: `eee-main/src/pages/ReportsAndPeriods.tsx`
 
 ### 功能
 - 展示所有会计期间（按 `start_date` 倒序）
