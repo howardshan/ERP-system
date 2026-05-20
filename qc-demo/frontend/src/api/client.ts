@@ -91,7 +91,7 @@ export const api = {
     request<{
       lot: ProductionLot;
       sub_lots: SubLot[];
-      events: Array<{ event_type: string; created_at: string; payload: unknown }>;
+      events: QualityEvent[];
     }>(`/production-lots/${id}`),
 
   pending: () => request<SubLot[]>('/pending-inspections'),
@@ -129,6 +129,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+};
+
+export type QualityEvent = {
+  id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+  sub_lot_code?: string | null;
+  summary: string;
 };
 
 export type ProductionLot = {

@@ -183,15 +183,17 @@ class TraceSubLot(BaseModel):
     dispositions: list[DispositionOut]
 
 
-class ProductionLotDetail(BaseModel):
-    lot: ProductionLotOut
-    sub_lots: list[DryingSubLotOut]
-    events: list[dict]
-
-
 class QualityEventOut(BaseModel):
     id: UUID
     event_type: str
     payload: dict
     created_at: datetime
+    sub_lot_code: str | None = None
+    summary: str
     actor_username: str | None = None
+
+
+class ProductionLotDetail(BaseModel):
+    lot: ProductionLotOut
+    sub_lots: list[DryingSubLotOut]
+    events: list[QualityEventOut]

@@ -3,7 +3,9 @@ import { Link, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
 import { StatusBadge } from '../../components/StatusBadge';
-import { formatDateTime } from '../../lib/utils';
+import { cn, formatDateTime } from '../../lib/utils';
+
+const FAIL_EVENTS = new Set(['inspection_failed_hold']);
 
 export function TracePage() {
   const { lotId } = useParams<{ lotId: string }>();
@@ -35,10 +37,26 @@ export function TracePage() {
       </ul>
 
       <h2 className="font-semibold mb-2">质量事件</h2>
-      <ul className="space-y-1 text-sm">
-        {detail.events.map((ev, i) => (
-          <li key={i} className="bg-slate-50 rounded p-2">
-            {ev.event_type} · {new Date(ev.created_at).toLocaleString('zh-CN')}
+      <ul className="space-y-2 text-sm">
+        {detail.events.map((ev) => (
+          <li
+            key={ev.id}
+            className={cn(
+              'rounded-xl border p-3',
+              FAIL_EVENTS.has(ev.event_type)
+                ? 'bg-red-50 border-red-200'
+                : 'bg-slate-50 border-slate-200'
+            )}
+          >
+            <p
+              className={cn(
+                'font-medium leading-snug',
+                FAIL_EVENTS.has(ev.event_type) ? 'text-red-900' : 'text-slate-800'
+              )}
+            >
+              {ev.summary}
+            </p>
+            <p className="text-xs text-slate-500 mt-1.5">{formatDateTime(ev.created_at)}</p>
           </li>
         ))}
         {detail.events.length === 0 && <p className="text-slate-500">暂无事件</p>}
