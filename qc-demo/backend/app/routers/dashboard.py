@@ -8,7 +8,17 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user, require_role
 from app.db import get_db
 from app.helpers import sub_lot_to_out
-from app.models import AppUser, Disposition, DryingSubLot, InspectionRecord, ProductSku, ProductionLot, QualityEvent
+from app.models import (
+    AppUser,
+    Disposition,
+    DryingSubLot,
+    InspectionRecord,
+    InspectionTemplate,
+    ProductSku,
+    ProductionLot,
+    QualityEvent,
+)
+from app.services.inspection_judge import format_fail_reason
 from app.schemas import DashboardSummary, DispositionCreate, DispositionOut, TodayInspectionItem
 from app.services.state_machine import can_transition, next_status
 
@@ -29,6 +39,20 @@ def _today_inspection_item(rec: InspectionRecord, db: Session) -> TodayInspectio
             if sku:
                 sku_name = sku.name
     aw_val = rec.values_json.get("aw") if rec.values_json else None
+    fail_reason = None
+    if rec.result == "fail" and sub:
+        item_name = "水活 Aw"
+        lower = upper = None
+        lot = db.get(ProductionLot, sub.production_lot_id)
+        if lot:
+            tmpl = db.query(InspectionTemplate).filter(InspectionTemplate.sku_id == lot.sku_id).first()
+            if tmpl:
+                item_name = tmpl.item_name
+                lower = float(tmpl.lower_limit)
+                upper = float(tmpl.upper_limit)
+        if aw_val is not None and lower is not None and upper is not None:
+            fail_reason = format_fail_reason(float(aw_val), lower, upper, item_name)
+
     return TodayInspectionItem(
         sub_lot_id=rec.drying_sub_lot_id,
         sub_lot_code=code,
@@ -37,6 +61,7 @@ def _today_inspection_item(rec: InspectionRecord, db: Session) -> TodayInspectio
         result=rec.result,
         submitted_at=rec.submitted_at,
         status=status,
+        fail_reason=fail_reason,
     )
 
 
@@ -92,7 +117,7 @@ def dashboard_summary(
         today_failed=failed,
         pass_rate=rate,
         pending_items=[sub_lot_to_out(s, db) for s in pending],
-        holds=[sub_lot_to_out(h, db) for h in holds],
+        holds=[sub_lot_to_out(h, db, include_hold_detail=True) for h in holds],
         today_passed_items=[_today_inspection_item(r, db) for r in passed_records],
         today_failed_items=[_today_inspection_item(r, db) for r in failed_records],
     )

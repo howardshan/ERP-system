@@ -179,6 +179,7 @@ export type TodayInspectionItem = {
   result: string;
   submitted_at: string;
   status: string;
+  fail_reason?: string | null;
 };
 
 export type DashboardSummary = {
@@ -206,4 +207,10 @@ export type SubLot = {
   lot_barcode?: string;
   sku_name?: string;
   wait_minutes?: number;
+  hold_reason?: string | null;
+  hold_aw?: number | null;
+  hold_item_name?: string | null;
+  hold_lower_limit?: number | null;
+  hold_upper_limit?: number | null;
+  hold_inspected_at?: string | null;
 };

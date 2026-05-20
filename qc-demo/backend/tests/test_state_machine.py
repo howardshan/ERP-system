@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.inspection_judge import judge_aw
+from app.services.inspection_judge import format_fail_reason, judge_aw
 from app.services.state_machine import can_transition, next_status
 
 
@@ -49,3 +49,11 @@ def test_judge_aw_closed_interval_pass():
 def test_judge_aw_fail():
     assert judge_aw(0.90, 0.65, 0.75) == "fail"
     assert judge_aw(0.60, 0.65, 0.75) == "fail"
+
+
+def test_format_fail_reason_high():
+    assert "高于合格上限" in format_fail_reason(0.90, 0.65, 0.75)
+
+
+def test_format_fail_reason_low():
+    assert "低于合格下限" in format_fail_reason(0.60, 0.65, 0.75)

@@ -141,9 +141,17 @@ export function AdminDashboard() {
                           )}
                         >
                           <div className="flex justify-between items-start gap-2">
-                            <div>
+                            <div className="min-w-0 flex-1">
                               <div className="font-semibold">{h.sub_lot_code}</div>
                               <p className="text-sm text-slate-600">{h.sku_name}</p>
+                              {h.hold_reason && (
+                                <p className="text-sm text-red-700 mt-2 leading-snug">Hold 原因：{h.hold_reason}</p>
+                              )}
+                              {h.hold_inspected_at && (
+                                <p className="text-xs text-slate-500 mt-1">
+                                  检验时间：{formatDateTime(h.hold_inspected_at)}
+                                </p>
+                              )}
                             </div>
                             <StatusBadge status={h.status} />
                           </div>
@@ -154,6 +162,11 @@ export function AdminDashboard() {
                   {selectedHold && (
                     <div className="bg-white rounded-xl border p-4 space-y-3">
                       <p className="font-medium">处置：{selectedHold.sub_lot_code}</p>
+                      {selectedHold.hold_reason && (
+                        <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3">
+                          {selectedHold.hold_reason}
+                        </p>
+                      )}
                       <select
                         className="w-full border rounded-lg px-3 py-3 min-h-[44px]"
                         value={dispType}
@@ -329,6 +342,9 @@ function TodayInspectionList({ items, emptyText }: { items: TodayInspectionItem[
           <p className="text-sm mt-2 text-slate-600">
             Aw {item.aw ?? '—'} · {formatDateTime(item.submitted_at)}
           </p>
+          {item.fail_reason && (
+            <p className="text-sm text-red-700 mt-1">{item.fail_reason}</p>
+          )}
         </li>
       ))}
     </ul>

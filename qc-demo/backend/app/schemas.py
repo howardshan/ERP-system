@@ -110,6 +110,12 @@ class DryingSubLotOut(BaseModel):
     lot_barcode: str | None = None
     sku_name: str | None = None
     wait_minutes: float | None = None
+    hold_reason: str | None = None
+    hold_aw: float | None = None
+    hold_item_name: str | None = None
+    hold_lower_limit: float | None = None
+    hold_upper_limit: float | None = None
+    hold_inspected_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -155,6 +161,7 @@ class TodayInspectionItem(BaseModel):
     result: str
     submitted_at: datetime
     status: str
+    fail_reason: str | None = None
 
 
 class DashboardSummary(BaseModel):

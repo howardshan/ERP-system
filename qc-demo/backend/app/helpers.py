@@ -2,10 +2,11 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
-from app.models import DryingSubLot, ProductionLot, ProductSku
+from app.models import DryingSubLot, InspectionRecord, InspectionTemplate, ProductionLot, ProductSku
+from app.services.inspection_judge import format_fail_reason
 
 
-def sub_lot_to_out(sub: DryingSubLot, db: Session) -> dict:
+def sub_lot_to_out(sub: DryingSubLot, db: Session, *, include_hold_detail: bool = False) -> dict:
     lot = db.get(ProductionLot, sub.production_lot_id)
     sku_name = None
     lot_barcode = None
@@ -19,7 +20,7 @@ def sub_lot_to_out(sub: DryingSubLot, db: Session) -> dict:
         delta = datetime.now(timezone.utc) - sub.out_time.replace(tzinfo=timezone.utc)
         wait_minutes = round(delta.total_seconds() / 60, 1)
     location_name = sub.location.display_name if sub.location else None
-    return {
+    out = {
         "id": sub.id,
         "production_lot_id": sub.production_lot_id,
         "sub_lot_code": sub.sub_lot_code,
@@ -31,7 +32,56 @@ def sub_lot_to_out(sub: DryingSubLot, db: Session) -> dict:
         "lot_barcode": lot_barcode,
         "sku_name": sku_name,
         "wait_minutes": wait_minutes,
+        "hold_reason": None,
+        "hold_aw": None,
+        "hold_item_name": None,
+        "hold_lower_limit": None,
+        "hold_upper_limit": None,
+        "hold_inspected_at": None,
     }
+    if include_hold_detail and sub.status == "hold":
+        _attach_hold_detail(out, sub, db)
+    return out
+
+
+def _attach_hold_detail(out: dict, sub: DryingSubLot, db: Session) -> None:
+    rec = (
+        db.query(InspectionRecord)
+        .filter(InspectionRecord.drying_sub_lot_id == sub.id, InspectionRecord.result == "fail")
+        .order_by(InspectionRecord.submitted_at.desc())
+        .first()
+    )
+    if not rec:
+        out["hold_reason"] = "检验不合格（暂无检验记录）"
+        return
+
+    aw_val = rec.values_json.get("aw") if rec.values_json else None
+    item_name = "水活 Aw"
+    lower: float | None = None
+    upper: float | None = None
+    lot = db.get(ProductionLot, sub.production_lot_id)
+    if lot:
+        tmpl = db.query(InspectionTemplate).filter(InspectionTemplate.sku_id == lot.sku_id).first()
+        if tmpl:
+            item_name = tmpl.item_name
+            lower = float(tmpl.lower_limit)
+            upper = float(tmpl.upper_limit)
+
+    out["hold_inspected_at"] = rec.submitted_at
+    if aw_val is not None:
+        out["hold_aw"] = float(aw_val)
+    out["hold_item_name"] = item_name
+    if lower is not None and upper is not None:
+        out["hold_lower_limit"] = lower
+        out["hold_upper_limit"] = upper
+        if aw_val is not None:
+            out["hold_reason"] = format_fail_reason(float(aw_val), lower, upper, item_name)
+        else:
+            out["hold_reason"] = f"检验不合格（{item_name} 读数缺失，标准 [{lower}, {upper}]）"
+    elif aw_val is not None:
+        out["hold_reason"] = f"检验不合格（{item_name} {aw_val}）"
+    else:
+        out["hold_reason"] = "检验不合格（读数缺失）"
 
 
 def lot_to_out(lot: ProductionLot, db: Session) -> dict:
