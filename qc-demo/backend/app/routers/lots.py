@@ -175,7 +175,10 @@ def check_out_sub_lot(
     if not sub:
         raise HTTPException(status_code=404, detail="Sub-lot not found")
     if sub.status != "drying":
-        raise HTTPException(status_code=400, detail=f"子批状态为 {sub.status}，无法出房登记")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot check out: sub-lot status is {sub.status}",
+        )
 
     out_time = body.out_time or datetime.now(timezone.utc)
     sub.out_time = out_time

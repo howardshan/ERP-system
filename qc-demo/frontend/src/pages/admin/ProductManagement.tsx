@@ -7,7 +7,7 @@ const emptyForm = (): ProductInput => ({
   code: '',
   name: '',
   standard_drying_minutes: 240,
-  template: { item_name: '水活 Aw', unit: null, lower_limit: 0.65, upper_limit: 0.75 },
+  template: { item_name: 'Water Activity (Aw)', unit: null, lower_limit: 0.65, upper_limit: 0.75 },
 });
 
 function productToForm(p: Product): ProductInput {
@@ -38,7 +38,7 @@ function ProductFormFields({
     <>
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-sm font-medium">SKU 编码</span>
+          <span className="text-sm font-medium">SKU code</span>
           <input
             className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
             value={form.code}
@@ -47,7 +47,7 @@ function ProductFormFields({
           />
         </label>
         <label className="block">
-          <span className="text-sm font-medium">产品名称</span>
+          <span className="text-sm font-medium">Product name</span>
           <input
             className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
             value={form.name}
@@ -57,7 +57,7 @@ function ProductFormFields({
         </label>
       </div>
       <label className="block">
-        <span className="text-sm font-medium">参考烘干时长（分钟，SOP）</span>
+        <span className="text-sm font-medium">Reference dry time (minutes, SOP)</span>
         <input
           type="number"
           min={1}
@@ -72,9 +72,9 @@ function ProductFormFields({
         />
       </label>
       <fieldset className="border rounded-lg p-3 space-y-3">
-        <legend className="text-sm font-semibold px-1">烘干后检验标准</legend>
+        <legend className="text-sm font-semibold px-1">Post-dry inspection spec</legend>
         <label className="block">
-          <span className="text-sm">检验项</span>
+          <span className="text-sm">Inspection item</span>
           <input
             className="mt-1 w-full border rounded-lg px-3 py-2"
             value={form.template.item_name}
@@ -85,7 +85,7 @@ function ProductFormFields({
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-sm">下限</span>
+            <span className="text-sm">Lower limit</span>
             <input
               type="number"
               step="0.01"
@@ -101,7 +101,7 @@ function ProductFormFields({
             />
           </label>
           <label className="block">
-            <span className="text-sm">上限</span>
+            <span className="text-sm">Upper limit</span>
             <input
               type="number"
               step="0.01"
@@ -164,38 +164,39 @@ export function ProductManagement() {
     try {
       if (editingId) {
         await api.updateProduct(editingId, form);
-        setMsg('产品已更新');
+        setMsg('Product updated');
         setEditingId(null);
       } else {
         await api.createProduct(form);
-        setMsg('产品已创建');
+        setMsg('Product created');
         setCreating(false);
       }
       setForm(emptyForm());
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存失败');
+      setError(err instanceof Error ? err.message : 'Save failed');
     }
   };
 
   const remove = async (id: string, code: string) => {
-    if (!confirm(`确定删除产品 ${code}？`)) return;
+    if (!confirm(`Delete product ${code}?`)) return;
     try {
       await api.deleteProduct(id);
       if (editingId === id) cancel();
-      setMsg('已删除');
+      setMsg('Deleted');
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '删除失败');
+      setError(err instanceof Error ? err.message : 'Delete failed');
     }
   };
 
   const isBusy = creating || editingId !== null;
 
   return (
-    <AppShell variant="admin" title="产品管理">
+    <AppShell variant="admin" title="Products">
       <p className="text-slate-600 mb-4 text-sm">
-        维护 SKU、参考烘干时长（SOP）及烘干后检验限值。现场子批的实际进/出房时间在生产批管理中登记。
+        Maintain SKU, reference dry time (SOP), and post-dry inspection limits. Actual sub-lot check-in/out
+        times are recorded under Production Lots on the QC floor.
       </p>
       {msg && <p className="text-emerald-700 bg-emerald-50 p-3 rounded-lg mb-4">{msg}</p>}
       {error && <p className="text-red-600 mb-4">{error}</p>}
@@ -211,19 +212,19 @@ export function ProductManagement() {
             : 'bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed'
         )}
       >
-        {creating ? '取消新增' : '新增产品'}
+        {creating ? 'Cancel new' : 'Add product'}
       </button>
 
       {creating && (
         <form onSubmit={submit} className="bg-white border-2 border-blue-400 rounded-xl p-4 mb-6 space-y-4 shadow-sm">
-          <h2 className="font-semibold text-blue-800">新增产品</h2>
+          <h2 className="font-semibold text-blue-800">New product</h2>
           <ProductFormFields form={form} setForm={setForm} />
           <div className="flex gap-2">
             <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl min-h-[48px]">
-              保存
+              Save
             </button>
             <button type="button" className="px-4 py-3 rounded-xl border min-h-[48px]" onClick={cancel}>
-              取消
+              Cancel
             </button>
           </div>
         </form>
@@ -246,14 +247,14 @@ export function ProductManagement() {
             >
               {isEditing ? (
                 <form onSubmit={submit} className="space-y-4">
-                  <h2 className="font-semibold text-blue-800">编辑 · {p.name}</h2>
+                  <h2 className="font-semibold text-blue-800">Edit · {p.name}</h2>
                   <ProductFormFields form={form} setForm={setForm} />
                   <div className="flex gap-2">
                     <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl min-h-[48px]">
-                      保存
+                      Save
                     </button>
                     <button type="button" className="px-4 py-3 rounded-xl border min-h-[48px]" onClick={cancel}>
-                      取消
+                      Cancel
                     </button>
                   </div>
                 </form>
@@ -271,7 +272,7 @@ export function ProductManagement() {
                         disabled={isBusy}
                         onClick={() => startEdit(p)}
                       >
-                        编辑
+                        Edit
                       </button>
                       <button
                         type="button"
@@ -279,18 +280,18 @@ export function ProductManagement() {
                         disabled={isBusy}
                         onClick={() => remove(p.id, p.code)}
                       >
-                        删除
+                        Delete
                       </button>
                     </div>
                   </div>
                   <dl className="mt-3 grid sm:grid-cols-2 gap-2 text-sm">
                     <div>
-                      <dt className="text-slate-500">参考烘干</dt>
-                      <dd>{p.standard_drying_minutes ? `${p.standard_drying_minutes} 分钟` : '未设置'}</dd>
+                      <dt className="text-slate-500">Reference dry</dt>
+                      <dd>{p.standard_drying_minutes ? `${p.standard_drying_minutes} min` : 'Not set'}</dd>
                     </div>
                     {t && (
                       <div>
-                        <dt className="text-slate-500">{t.item_name} 合格范围</dt>
+                        <dt className="text-slate-500">{t.item_name} spec range</dt>
                         <dd>
                           [{t.lower_limit}, {t.upper_limit}]
                         </dd>

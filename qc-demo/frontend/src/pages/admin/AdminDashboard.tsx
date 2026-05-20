@@ -8,10 +8,10 @@ import { cn, formatDateTime } from '../../lib/utils';
 type Panel = 'pending' | 'hold' | 'passed' | 'rate';
 
 const DISP_TYPES = [
-  { value: 'rework', label: '返烘' },
-  { value: 'grind', label: '粉碎回线' },
-  { value: 'scrap', label: '报废' },
-  { value: 'concession', label: '让步' },
+  { value: 'rework', label: 'Rework' },
+  { value: 'grind', label: 'Grind & re-line' },
+  { value: 'scrap', label: 'Scrap' },
+  { value: 'concession', label: 'Concession' },
 ];
 
 export function AdminDashboard() {
@@ -55,19 +55,20 @@ export function AdminDashboard() {
         type: dispType,
         remark: dispRemark || undefined,
       });
-      setMsg(`已处置：${selectedHold.sub_lot_code}`);
+      setMsg(`Disposition completed: ${selectedHold.sub_lot_code}`);
       setSelectedHold(null);
       setDispRemark('');
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '处置失败');
+      setError(e instanceof Error ? e.message : 'Disposition failed');
     }
   };
 
   return (
-    <AppShell variant="admin" title="管理看板">
+    <AppShell variant="admin" title="Dashboard">
       <p className="text-xs text-slate-500 mb-4">
-        点击指标卡片查看明细；每 4 秒自动刷新{!pollingEnabled ? '（处置中已暂停）' : ''}
+        Click a metric card for details · auto-refresh every 4s
+        {!pollingEnabled ? ' (paused while disposing)' : ''}
       </p>
       {msg && <p className="text-emerald-700 bg-emerald-50 p-3 rounded-lg mb-4">{msg}</p>}
       {error && <p className="text-red-600 mb-4">{error}</p>}
@@ -76,7 +77,7 @@ export function AdminDashboard() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <StatCard
-              label="待检"
+              label="Pending"
               value={data.pending_count}
               accent="amber"
               active={panel === 'pending'}
@@ -90,14 +91,14 @@ export function AdminDashboard() {
               onClick={() => togglePanel('hold')}
             />
             <StatCard
-              label="今日合格"
+              label="Passed today"
               value={data.today_passed}
               accent="emerald"
               active={panel === 'passed'}
               onClick={() => togglePanel('passed')}
             />
             <StatCard
-              label="合格率"
+              label="Pass rate"
               value={data.pass_rate != null ? `${data.pass_rate}%` : '—'}
               accent="blue"
               active={panel === 'rate'}
@@ -107,23 +108,23 @@ export function AdminDashboard() {
 
           {data.longest_wait_minutes != null && panel !== 'pending' && (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-              最长待检等待：{data.longest_wait_minutes} 分钟
+              Longest pending wait: {data.longest_wait_minutes} min
             </p>
           )}
 
           {panel === 'pending' && (
-            <DetailPanel title="待检子批">
+            <DetailPanel title="Pending sub-lots">
               {data.longest_wait_minutes != null && (
-                <p className="text-sm text-amber-800 mb-3">最长等待：{data.longest_wait_minutes} 分钟</p>
+                <p className="text-sm text-amber-800 mb-3">Longest wait: {data.longest_wait_minutes} min</p>
               )}
-              <SubLotList items={data.pending_items} emptyText="当前无待检子批" showWait />
+              <SubLotList items={data.pending_items} emptyText="No pending sub-lots" showWait />
             </DetailPanel>
           )}
 
           {panel === 'hold' && (
-            <DetailPanel title="Hold 子批 · 可在此处置">
+            <DetailPanel title="Hold sub-lots · dispose here">
               {data.holds.length === 0 ? (
-                <p className="text-slate-500">当前无 Hold</p>
+                <p className="text-slate-500">No holds</p>
               ) : (
                 <>
                   <ul className="space-y-2 mb-4">
@@ -145,11 +146,11 @@ export function AdminDashboard() {
                               <div className="font-semibold">{h.sub_lot_code}</div>
                               <p className="text-sm text-slate-600">{h.sku_name}</p>
                               {h.hold_reason && (
-                                <p className="text-sm text-red-700 mt-2 leading-snug">Hold 原因：{h.hold_reason}</p>
+                                <p className="text-sm text-red-700 mt-2 leading-snug">Hold reason: {h.hold_reason}</p>
                               )}
                               {h.hold_inspected_at && (
                                 <p className="text-xs text-slate-500 mt-1">
-                                  检验时间：{formatDateTime(h.hold_inspected_at)}
+                                  Inspected: {formatDateTime(h.hold_inspected_at)}
                                 </p>
                               )}
                             </div>
@@ -161,7 +162,7 @@ export function AdminDashboard() {
                   </ul>
                   {selectedHold && (
                     <div className="bg-white rounded-xl border p-4 space-y-3">
-                      <p className="font-medium">处置：{selectedHold.sub_lot_code}</p>
+                      <p className="font-medium">Dispose: {selectedHold.sub_lot_code}</p>
                       {selectedHold.hold_reason && (
                         <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3">
                           {selectedHold.hold_reason}
@@ -180,7 +181,7 @@ export function AdminDashboard() {
                       </select>
                       <textarea
                         className="w-full border rounded-lg px-3 py-3 min-h-[80px]"
-                        placeholder="备注"
+                        placeholder="Remarks"
                         value={dispRemark}
                         onChange={(e) => setDispRemark(e.target.value)}
                       />
@@ -190,14 +191,14 @@ export function AdminDashboard() {
                           onClick={submitDisposition}
                           className="flex-1 bg-red-600 text-white py-3 rounded-xl min-h-[48px] font-medium"
                         >
-                          确认处置
+                          Confirm disposition
                         </button>
                         <button
                           type="button"
                           onClick={() => setSelectedHold(null)}
                           className="px-4 py-3 rounded-xl border min-h-[48px]"
                         >
-                          取消
+                          Cancel
                         </button>
                       </div>
                     </div>
@@ -208,24 +209,24 @@ export function AdminDashboard() {
           )}
 
           {panel === 'passed' && (
-            <DetailPanel title="今日检验合格">
-              <TodayInspectionList items={data.today_passed_items} emptyText="今日尚无合格记录" />
+            <DetailPanel title="Passed inspections today">
+              <TodayInspectionList items={data.today_passed_items} emptyText="No passed inspections today" />
             </DetailPanel>
           )}
 
           {panel === 'rate' && (
-            <DetailPanel title="今日检验概况">
+            <DetailPanel title={"Today's inspection summary"}>
               <div className="grid sm:grid-cols-3 gap-3 mb-4 text-sm">
                 <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                  <p className="text-slate-600">合格</p>
+                  <p className="text-slate-600">Passed</p>
                   <p className="text-2xl font-bold text-emerald-800">{data.today_passed}</p>
                 </div>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-slate-600">不合格</p>
+                  <p className="text-slate-600">Failed</p>
                   <p className="text-2xl font-bold text-red-800">{data.today_failed}</p>
                 </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-slate-600">合格率</p>
+                  <p className="text-slate-600">Pass rate</p>
                   <p className="text-2xl font-bold text-blue-800">
                     {data.pass_rate != null ? `${data.pass_rate}%` : '—'}
                   </p>
@@ -233,12 +234,12 @@ export function AdminDashboard() {
               </div>
               {data.today_failed > 0 && (
                 <>
-                  <h3 className="font-medium text-red-800 mb-2">今日不合格（已 Hold）</h3>
+                  <h3 className="font-medium text-red-800 mb-2">Failed today (on Hold)</h3>
                   <TodayInspectionList items={data.today_failed_items} emptyText="" />
                 </>
               )}
               {data.today_passed === 0 && data.today_failed === 0 && (
-                <p className="text-slate-500">今日尚无检验记录</p>
+                <p className="text-slate-500">No inspections recorded today</p>
               )}
             </DetailPanel>
           )}
@@ -312,9 +313,9 @@ function SubLotList({
               {s.sku_name}
               {s.location_name ? ` · ${s.location_name}` : ''}
             </p>
-            <p className="text-sm text-slate-500 mt-1">出房：{formatDateTime(s.out_time)}</p>
+            <p className="text-sm text-slate-500 mt-1">Out: {formatDateTime(s.out_time)}</p>
             {showWait && s.wait_minutes != null && (
-              <p className="text-sm text-amber-800 mt-1">已等待 {s.wait_minutes} 分钟</p>
+              <p className="text-sm text-amber-800 mt-1">Waiting {s.wait_minutes} min</p>
             )}
           </div>
           <StatusBadge status={s.status} />

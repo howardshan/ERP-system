@@ -7,9 +7,9 @@ def judge_aw(value: float, lower: float, upper: float) -> str:
     return "fail"
 
 
-def format_fail_reason(value: float, lower: float, upper: float, item_name: str = "水活 Aw") -> str:
+def format_fail_reason(value: float, lower: float, upper: float, item_name: str = "Water Activity (Aw)") -> str:
     if value > upper:
-        return f"{item_name} {value}，高于合格上限 {upper}（标准 [{lower}, {upper}]）"
+        return f"{item_name} {value} above upper limit {upper} (spec [{lower}, {upper}])"
     if value < lower:
-        return f"{item_name} {value}，低于合格下限 {lower}（标准 [{lower}, {upper}]）"
-    return f"{item_name} {value}，未在合格范围 [{lower}, {upper}] 内"
+        return f"{item_name} {value} below lower limit {lower} (spec [{lower}, {upper}])"
+    return f"{item_name} {value} outside spec [{lower}, {upper}]"

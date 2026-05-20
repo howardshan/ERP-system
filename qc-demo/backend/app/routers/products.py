@@ -73,7 +73,7 @@ def create_product(
     if db.query(ProductSku).filter(ProductSku.code == body.code).first():
         raise HTTPException(status_code=400, detail="SKU code already exists")
     if body.template.lower_limit > body.template.upper_limit:
-        raise HTTPException(status_code=400, detail="下限不能大于上限")
+        raise HTTPException(status_code=400, detail="Lower limit cannot exceed upper limit")
 
     sku = ProductSku(
         code=body.code,
@@ -123,7 +123,7 @@ def update_product(
 
     if body.template:
         if body.template.lower_limit > body.template.upper_limit:
-            raise HTTPException(status_code=400, detail="下限不能大于上限")
+            raise HTTPException(status_code=400, detail="Lower limit cannot exceed upper limit")
         if sku.templates:
             t = sku.templates[0]
             t.item_name = body.template.item_name

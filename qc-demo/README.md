@@ -56,6 +56,8 @@ uvicorn app.main:app --reload --port 8000
 curl -X POST http://127.0.0.1:8000/demo/seed
 ```
 
+> **English UI：** The app UI and API display text are in English. Re-run seed after updates so product and dryer location names in the database match (e.g. Chicken Jerky, Dryer A - Top).
+
 ### 前端
 
 ```bash

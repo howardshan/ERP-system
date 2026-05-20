@@ -52,8 +52,8 @@ def test_judge_aw_fail():
 
 
 def test_format_fail_reason_high():
-    assert "高于合格上限" in format_fail_reason(0.90, 0.65, 0.75)
+    assert "above upper limit" in format_fail_reason(0.90, 0.65, 0.75)
 
 
 def test_format_fail_reason_low():
-    assert "低于合格下限" in format_fail_reason(0.60, 0.65, 0.75)
+    assert "below lower limit" in format_fail_reason(0.60, 0.65, 0.75)

@@ -24,7 +24,7 @@ export function LoginPage() {
       });
       navigate(res.role === 'manager' ? '/admin' : '/qc');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败');
+      setError(err instanceof Error ? err.message : 'Sign-in failed');
     } finally {
       setLoading(false);
     }
@@ -35,11 +35,11 @@ export function LoginPage() {
       <DemoBanner />
       <div className="flex-1 flex items-center justify-center p-4">
         <form onSubmit={submit} className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md space-y-4">
-          <h1 className="text-2xl font-bold text-center">QC Demo 登录</h1>
-          <p className="text-sm text-slate-500 text-center">qc / manager · 密码 demo123</p>
+          <h1 className="text-2xl font-bold text-center">QC Demo Sign In</h1>
+          <p className="text-sm text-slate-500 text-center">qc / manager · password demo123</p>
           {error && <p className="text-red-600 text-sm">{error}</p>}
           <label className="block">
-            <span className="text-sm font-medium">用户名</span>
+            <span className="text-sm font-medium">Username</span>
             <input
               className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
               value={username}
@@ -47,7 +47,7 @@ export function LoginPage() {
             />
           </label>
           <label className="block">
-            <span className="text-sm font-medium">密码</span>
+            <span className="text-sm font-medium">Password</span>
             <input
               type="password"
               className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
@@ -60,7 +60,7 @@ export function LoginPage() {
             disabled={loading}
             className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl min-h-[48px] disabled:opacity-50"
           >
-            {loading ? '登录中…' : '登录'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
       </div>

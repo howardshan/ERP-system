@@ -18,7 +18,7 @@ class TokenResponse(BaseModel):
 
 
 class InspectionTemplateInput(BaseModel):
-    item_name: str = "水活 Aw"
+    item_name: str = "Water Activity (Aw)"
     unit: str | None = None
     lower_limit: float
     upper_limit: float

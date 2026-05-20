@@ -3,10 +3,10 @@
 from app.services.inspection_judge import format_fail_reason
 
 DISP_LABELS = {
-    "rework": "返烘",
-    "grind": "粉碎回线",
-    "scrap": "报废",
-    "concession": "让步",
+    "rework": "Rework",
+    "grind": "Grind & re-line",
+    "scrap": "Scrap",
+    "concession": "Concession",
 }
 
 
@@ -15,34 +15,34 @@ def quality_event_summary(event_type: str, payload: dict, sub_lot_code: str | No
     p = payload or {}
 
     if event_type == "check_in":
-        code = p.get("sub_lot_code") or sub_lot_code or "子批"
-        return f"{prefix}登记进房（{code}）"
+        code = p.get("sub_lot_code") or sub_lot_code or "sub-lot"
+        return f"{prefix}Checked in to dryer ({code})"
 
     if event_type == "check_out":
-        return f"{prefix}登记出房，进入待检队列"
+        return f"{prefix}Checked out of dryer — pending inspection"
 
     if event_type in ("inspection_passed", "inspection_failed_hold"):
         aw = p.get("aw")
         limits = p.get("limits")
-        aw_text = f"水活 Aw {aw}" if aw is not None else "检验"
+        aw_text = f"Water Activity (Aw) {aw}" if aw is not None else "Inspection"
         if limits and len(limits) >= 2:
             lo, hi = float(limits[0]), float(limits[1])
-            range_text = f"（标准 [{lo}, {hi}]）"
+            range_text = f" (spec [{lo}, {hi}])"
             if event_type == "inspection_passed":
-                return f"{prefix}检验合格：{aw_text}{range_text}"
+                return f"{prefix}Inspection passed: {aw_text}{range_text}"
             if aw is not None:
                 reason = format_fail_reason(float(aw), lo, hi)
-                return f"{prefix}检验不合格，进入 Hold：{reason}"
-            return f"{prefix}检验不合格，进入 Hold{range_text}"
+                return f"{prefix}Inspection failed — Hold: {reason}"
+            return f"{prefix}Inspection failed — Hold{range_text}"
         if event_type == "inspection_passed":
-            return f"{prefix}检验合格：{aw_text}"
-        return f"{prefix}检验不合格，进入 Hold：{aw_text}"
+            return f"{prefix}Inspection passed: {aw_text}"
+        return f"{prefix}Inspection failed — Hold: {aw_text}"
 
     if event_type == "disposition_completed":
         dtype = p.get("type", "")
-        label = DISP_LABELS.get(dtype, dtype or "处置")
+        label = DISP_LABELS.get(dtype, dtype or "Disposition")
         remark = (p.get("remark") or "").strip()
-        base = f"{prefix}处置完成：{label}"
-        return f"{base}（{remark}）" if remark else base
+        base = f"{prefix}Disposition completed: {label}"
+        return f"{base} ({remark})" if remark else base
 
     return f"{prefix}{event_type}"

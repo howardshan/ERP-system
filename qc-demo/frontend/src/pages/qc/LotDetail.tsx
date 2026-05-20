@@ -40,26 +40,26 @@ export function LotDetail() {
         location_id: locationId,
         in_time: new Date(inTimeLocal).toISOString(),
       });
-      setMsg('已登记进房，子批状态：烘干中');
+      setMsg('Checked in — sub-lot status: Drying');
       setInTimeLocal(toLocalInputValue());
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '进房登记失败');
+      setError(err instanceof Error ? err.message : 'Check-in failed');
     }
   };
 
   const checkOut = async (sub: SubLot) => {
     try {
       await api.checkOutSubLot(sub.id, new Date(outTimeLocal).toISOString());
-      setMsg(`${sub.sub_lot_code} 已出房，进入待检队列`);
+      setMsg(`${sub.sub_lot_code} checked out — pending inspection`);
       setOutTimeLocal(toLocalInputValue());
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '出房登记失败');
+      setError(err instanceof Error ? err.message : 'Check-out failed');
     }
   };
 
-  if (!detail) return <AppShell variant="qc">加载中…</AppShell>;
+  if (!detail) return <AppShell variant="qc">Loading…</AppShell>;
 
   return (
     <AppShell variant="qc" title={detail.lot.lot_number}>
@@ -70,9 +70,9 @@ export function LotDetail() {
       {error && <p className="text-red-600 mb-3">{error}</p>}
 
       <form onSubmit={checkIn} className="bg-white rounded-xl border p-4 mb-6 space-y-3">
-        <h2 className="font-semibold">登记进房（新建烘干子批）</h2>
+        <h2 className="font-semibold">Check in (new drying sub-lot)</h2>
         <label className="block">
-          <span className="text-sm font-medium">烘干位置</span>
+          <span className="text-sm font-medium">Dryer location</span>
           <select
             className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
             value={locationId}
@@ -86,7 +86,7 @@ export function LotDetail() {
           </select>
         </label>
         <label className="block">
-          <span className="text-sm font-medium">进房时间</span>
+          <span className="text-sm font-medium">Check-in time</span>
           <input
             type="datetime-local"
             className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
@@ -95,11 +95,11 @@ export function LotDetail() {
           />
         </label>
         <button type="submit" className="w-full bg-sky-600 text-white py-3 rounded-xl min-h-[48px] font-medium">
-          确认进房
+          Confirm check-in
         </button>
       </form>
 
-      <h2 className="font-semibold mb-2">烘干子批</h2>
+      <h2 className="font-semibold mb-2">Drying sub-lots</h2>
       <ul className="space-y-3">
         {detail.sub_lots.map((s) => (
           <li key={s.id} className="bg-white rounded-xl border p-4 space-y-2">
@@ -108,16 +108,16 @@ export function LotDetail() {
               <StatusBadge status={s.status} />
             </div>
             <div className="text-sm text-slate-600 grid sm:grid-cols-2 gap-1">
-              <p>位置：{s.location_name || '—'}</p>
-              <p>进房：{formatDateTime(s.in_time)}</p>
-              <p>出房：{formatDateTime(s.out_time)}</p>
-              {s.wait_minutes != null && <p className="text-amber-800">待检等待：{s.wait_minutes} 分钟</p>}
+              <p>Location: {s.location_name || '—'}</p>
+              <p>In: {formatDateTime(s.in_time)}</p>
+              <p>Out: {formatDateTime(s.out_time)}</p>
+              {s.wait_minutes != null && <p className="text-amber-800">Wait: {s.wait_minutes} min</p>}
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
               {s.status === 'drying' && (
                 <div className="w-full space-y-2 pt-1 border-t border-slate-100">
                   <label className="block text-sm">
-                    <span className="font-medium">出房时间</span>
+                    <span className="font-medium">Check-out time</span>
                     <input
                       type="datetime-local"
                       className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
@@ -130,7 +130,7 @@ export function LotDetail() {
                     onClick={() => checkOut(s)}
                     className="w-full bg-amber-600 text-white py-2 rounded-xl min-h-[44px] font-medium"
                   >
-                    出房 → 待检
+                    Check out → Pending
                   </button>
                 </div>
               )}
@@ -139,13 +139,15 @@ export function LotDetail() {
                   to={`/qc/inspect/${s.id}`}
                   className="flex-1 text-center bg-blue-600 text-white py-2 rounded-xl min-h-[44px] font-medium flex items-center justify-center"
                 >
-                  检验
+                  Inspect
                 </Link>
               )}
             </div>
           </li>
         ))}
-        {detail.sub_lots.length === 0 && <p className="text-slate-500">暂无子批，请先登记进房。</p>}
+        {detail.sub_lots.length === 0 && (
+          <p className="text-slate-500">No sub-lots yet. Check in to create one.</p>
+        )}
       </ul>
     </AppShell>
   );

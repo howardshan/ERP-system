@@ -39,35 +39,35 @@ export function LotsList() {
       setWoBarcode('');
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '创建失败');
+      setError(e instanceof Error ? e.message : 'Create failed');
     }
   };
 
   return (
-    <AppShell variant="qc" title="生产批">
+    <AppShell variant="qc" title="Production Lots">
       <div className="flex justify-end mb-4">
         <button
           type="button"
           onClick={() => setShowForm(!showForm)}
           className="bg-blue-600 text-white px-4 py-2 rounded-xl min-h-[44px] font-medium"
         >
-          新建
+          New
         </button>
       </div>
       {error && <p className="text-red-600 mb-2">{error}</p>}
       {showForm && (
         <div className="bg-white rounded-xl border p-4 mb-4 space-y-3">
           <button type="button" onClick={fillDemo} className="text-sm text-blue-600 underline min-h-[44px]">
-            模拟扫码填入 DEMO 码
+            Fill DEMO barcodes (simulate scan)
           </button>
           <input
-            placeholder="批次条码"
+            placeholder="Lot barcode"
             className="w-full border rounded-lg px-3 py-3"
             value={lotBarcode}
             onChange={(e) => setLotBarcode(e.target.value)}
           />
           <input
-            placeholder="工单条码"
+            placeholder="Work order barcode"
             className="w-full border rounded-lg px-3 py-3"
             value={woBarcode}
             onChange={(e) => setWoBarcode(e.target.value)}
@@ -80,7 +80,7 @@ export function LotsList() {
             ))}
           </select>
           <button type="button" onClick={create} className="w-full bg-emerald-600 text-white py-3 rounded-xl min-h-[48px]">
-            保存
+            Save
           </button>
         </div>
       )}

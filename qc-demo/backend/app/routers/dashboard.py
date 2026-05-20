@@ -41,7 +41,7 @@ def _today_inspection_item(rec: InspectionRecord, db: Session) -> TodayInspectio
     aw_val = rec.values_json.get("aw") if rec.values_json else None
     fail_reason = None
     if rec.result == "fail" and sub:
-        item_name = "水活 Aw"
+        item_name = "Water Activity (Aw)"
         lower = upper = None
         lot = db.get(ProductionLot, sub.production_lot_id)
         if lot:

@@ -12,8 +12,8 @@ export function TraceListPage() {
   }, []);
 
   return (
-    <AppShell variant="admin" title="批次追溯">
-      <p className="text-sm text-slate-600 mb-4">选择生产批查看烘干子批与质量事件时间线。</p>
+    <AppShell variant="admin" title="Batch Trace">
+      <p className="text-sm text-slate-600 mb-4">Select a production lot to view sub-lots and quality events.</p>
       {error && <p className="text-red-600 mb-4">{error}</p>}
       <ul className="space-y-3">
         {lots.map((lot) => (
@@ -29,7 +29,7 @@ export function TraceListPage() {
             </Link>
           </li>
         ))}
-        {lots.length === 0 && <p className="text-slate-500">暂无生产批</p>}
+        {lots.length === 0 && <p className="text-slate-500">No production lots</p>}
       </ul>
     </AppShell>
   );

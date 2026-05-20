@@ -15,13 +15,13 @@ export function TracePage() {
     if (lotId) api.productionLotDetail(lotId).then(setDetail);
   }, [lotId]);
 
-  if (!detail) return <AppShell variant="admin">加载中…</AppShell>;
+  if (!detail) return <AppShell variant="admin">Loading…</AppShell>;
 
   return (
-    <AppShell variant="admin" title={`追溯 · ${detail.lot.lot_number}`}>
+    <AppShell variant="admin" title={`Trace · ${detail.lot.lot_number}`}>
       <p className="text-slate-600 mb-4">{detail.lot.sku_name}</p>
 
-      <h2 className="font-semibold mb-2">烘干子批</h2>
+      <h2 className="font-semibold mb-2">Drying sub-lots</h2>
       <ul className="space-y-2 mb-6">
         {detail.sub_lots.map((s) => (
           <li key={s.id} className="bg-white border rounded-xl p-3">
@@ -30,13 +30,13 @@ export function TracePage() {
               <StatusBadge status={s.status} />
             </div>
             <p className="text-sm text-slate-600">
-              进房 {formatDateTime(s.in_time)} · 出房 {formatDateTime(s.out_time)}
+              In {formatDateTime(s.in_time)} · Out {formatDateTime(s.out_time)}
             </p>
           </li>
         ))}
       </ul>
 
-      <h2 className="font-semibold mb-2">质量事件</h2>
+      <h2 className="font-semibold mb-2">Quality events</h2>
       <ul className="space-y-2 text-sm">
         {detail.events.map((ev) => (
           <li
@@ -59,11 +59,11 @@ export function TracePage() {
             <p className="text-xs text-slate-500 mt-1.5">{formatDateTime(ev.created_at)}</p>
           </li>
         ))}
-        {detail.events.length === 0 && <p className="text-slate-500">暂无事件</p>}
+        {detail.events.length === 0 && <p className="text-slate-500">No events</p>}
       </ul>
 
       <Link to="/admin/trace" className="inline-block mt-6 text-blue-600 min-h-[44px] flex items-center">
-        返回批次列表
+        Back to batch list
       </Link>
     </AppShell>
   );

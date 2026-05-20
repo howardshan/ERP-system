@@ -16,7 +16,7 @@ export function Layout({
     <div className="min-h-screen flex flex-col">
       <DemoBanner />
       <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-2">
-        <div className="font-bold text-lg text-slate-800">烘干后 QC</div>
+        <div className="font-bold text-lg text-slate-800">Post-Dry QC</div>
         <div className="flex items-center gap-2 text-sm flex-wrap justify-end">
           {nav?.map((n) => (
             <Link key={n.to} to={n.to} className="text-blue-600 font-medium px-2 py-1 min-h-[44px] flex items-center">
@@ -32,7 +32,7 @@ export function Layout({
               navigate('/login');
             }}
           >
-            退出
+            Sign out
           </button>
         </div>
       </header>

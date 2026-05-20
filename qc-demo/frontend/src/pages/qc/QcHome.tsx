@@ -2,14 +2,14 @@ import { Link } from 'react-router-dom';
 import { AppShell } from '../../components/AppShell';
 
 const links = [
-  { to: '/qc/lots', label: '生产批管理', desc: '登记生产批、烘干子批进/出房时间' },
-  { to: '/qc/pending', label: '待检队列', desc: '出房待检子批，按等待时间排序' },
+  { to: '/qc/lots', label: 'Production Lots', desc: 'Register lots and sub-lot check-in / check-out times' },
+  { to: '/qc/pending', label: 'Pending Queue', desc: 'Sub-lots awaiting inspection, sorted by wait time' },
 ];
 
 export function QcHome() {
   return (
-    <AppShell variant="qc" title="QC 工作台">
-      <p className="text-slate-600 mb-6">请选择下方入口开始现场作业。</p>
+    <AppShell variant="qc" title="QC Home">
+      <p className="text-slate-600 mb-6">Choose an entry point below to start floor work.</p>
       <div className="grid gap-4 sm:grid-cols-2">
         {links.map((l) => (
           <Link

@@ -52,11 +52,11 @@ def _attach_hold_detail(out: dict, sub: DryingSubLot, db: Session) -> None:
         .first()
     )
     if not rec:
-        out["hold_reason"] = "检验不合格（暂无检验记录）"
+        out["hold_reason"] = "Inspection failed (no inspection record)"
         return
 
     aw_val = rec.values_json.get("aw") if rec.values_json else None
-    item_name = "水活 Aw"
+    item_name = "Water Activity (Aw)"
     lower: float | None = None
     upper: float | None = None
     lot = db.get(ProductionLot, sub.production_lot_id)
@@ -77,11 +77,11 @@ def _attach_hold_detail(out: dict, sub: DryingSubLot, db: Session) -> None:
         if aw_val is not None:
             out["hold_reason"] = format_fail_reason(float(aw_val), lower, upper, item_name)
         else:
-            out["hold_reason"] = f"检验不合格（{item_name} 读数缺失，标准 [{lower}, {upper}]）"
+            out["hold_reason"] = f"Inspection failed ({item_name} reading missing, spec [{lower}, {upper}])"
     elif aw_val is not None:
-        out["hold_reason"] = f"检验不合格（{item_name} {aw_val}）"
+        out["hold_reason"] = f"Inspection failed ({item_name} {aw_val})"
     else:
-        out["hold_reason"] = "检验不合格（读数缺失）"
+        out["hold_reason"] = "Inspection failed (reading missing)"
 
 
 def lot_to_out(lot: ProductionLot, db: Session) -> dict:

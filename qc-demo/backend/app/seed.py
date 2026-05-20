@@ -1,4 +1,4 @@
-"""Demo seed data per QC模块Demo开发计划书 §7."""
+"""Demo seed data (QC demo plan §7)."""
 
 from datetime import datetime, timedelta, timezone
 
@@ -19,17 +19,17 @@ from app.models import (
 )
 
 LOCATIONS = [
-    ("DRY-A-TOP", "烘干房 A - 上层"),
-    ("DRY-A-MID", "烘干房 A - 中层"),
-    ("DRY-A-BOT", "烘干房 A - 下层"),
-    ("DRY-B-TOP", "烘干房 B - 上层"),
-    ("DRY-B-MID", "烘干房 B - 中层"),
-    ("DRY-B-BOT", "烘干房 B - 下层"),
+    ("DRY-A-TOP", "Dryer A - Top"),
+    ("DRY-A-MID", "Dryer A - Middle"),
+    ("DRY-A-BOT", "Dryer A - Bottom"),
+    ("DRY-B-TOP", "Dryer B - Top"),
+    ("DRY-B-MID", "Dryer B - Middle"),
+    ("DRY-B-BOT", "Dryer B - Bottom"),
 ]
 
 SKUS = [
-    ("SKU-CHICKEN", "鸡肉条（烘干后）", 0.65, 0.75, 240),
-    ("SKU-COWHID", "牛皮卷（烘干后）", 0.55, 0.68, 360),
+    ("SKU-CHICKEN", "Chicken Jerky (post-dry)", 0.65, 0.75, 240),
+    ("SKU-COWHID", "Rawhide Roll (post-dry)", 0.55, 0.68, 360),
 ]
 
 
@@ -57,12 +57,12 @@ def run_seed(db: Session) -> dict[str, int]:
     clear_qc_tables(db)
 
     users = [
-        AppUser(username="qc", password_hash=hash_password("demo123"), role="qc", display_name="QC 员"),
+        AppUser(username="qc", password_hash=hash_password("demo123"), role="qc", display_name="QC Operator"),
         AppUser(
             username="manager",
             password_hash=hash_password("demo123"),
             role="manager",
-            display_name="质量管理员",
+            display_name="Quality Manager",
         ),
     ]
     db.add_all(users)
@@ -83,7 +83,7 @@ def run_seed(db: Session) -> dict[str, int]:
         templates.append(
             InspectionTemplate(
                 sku_id=sku.id,
-                item_name="水活 Aw",
+                item_name="Water Activity (Aw)",
                 unit=None,
                 lower_limit=lo,
                 upper_limit=hi,
