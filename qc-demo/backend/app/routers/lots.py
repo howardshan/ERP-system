@@ -3,11 +3,12 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user, require_role
 from app.db import get_db
-from app.helpers import lot_to_out, sub_lot_to_out
+from app.helpers import build_sub_lot_counts, empty_sub_lot_counts, lot_to_out, sub_lot_to_out
 from app.models import (
     AppUser,
     DryingSubLot,
@@ -29,13 +30,30 @@ from app.services.state_machine import next_status
 router = APIRouter(tags=["lots"])
 
 
+def _counts_by_lot_id(db: Session, lot_ids: list[UUID]) -> dict[UUID, dict]:
+    if not lot_ids:
+        return {}
+    rows = (
+        db.query(DryingSubLot.production_lot_id, DryingSubLot.status, func.count())
+        .filter(DryingSubLot.production_lot_id.in_(lot_ids))
+        .group_by(DryingSubLot.production_lot_id, DryingSubLot.status)
+        .all()
+    )
+    grouped: dict[UUID, list[tuple[str, int]]] = {}
+    for lot_id, status, n in rows:
+        grouped.setdefault(lot_id, []).append((status, int(n)))
+    return {lid: build_sub_lot_counts(grouped.get(lid, [])) for lid in lot_ids}
+
+
 @router.get("/production-lots", response_model=list[ProductionLotOut])
 def list_production_lots(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[AppUser, Depends(get_current_user)],
 ):
     lots = db.query(ProductionLot).order_by(ProductionLot.created_at.desc()).all()
-    return [lot_to_out(lot, db) for lot in lots]
+    lot_ids = [lot.id for lot in lots]
+    counts_map = _counts_by_lot_id(db, lot_ids)
+    return [lot_to_out(lot, db, sub_lot_counts=counts_map.get(lot.id, empty_sub_lot_counts())) for lot in lots]
 
 
 @router.post("/production-lots", response_model=ProductionLotOut)

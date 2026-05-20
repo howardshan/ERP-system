@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ProductionLot } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
+import { LotSubLotSummary } from '../../components/LotSubLotSummary';
 
 export function TraceListPage() {
   const [lots, setLots] = useState<ProductionLot[]>([]);
@@ -26,6 +27,7 @@ export function TraceListPage() {
               <p className="text-sm text-slate-600 mt-1">
                 {lot.sku_name} · {lot.lot_barcode}
               </p>
+              <LotSubLotSummary counts={lot.sub_lot_counts} />
             </Link>
           </li>
         ))}

@@ -140,6 +140,16 @@ export type QualityEvent = {
   summary: string;
 };
 
+export type SubLotStatusCounts = {
+  total: number;
+  drying: number;
+  pending: number;
+  passed: number;
+  hold: number;
+  disposing: number;
+  closed: number;
+};
+
 export type ProductionLot = {
   id: string;
   lot_number: string;
@@ -149,6 +159,7 @@ export type ProductionLot = {
   sku_code?: string;
   sku_name?: string;
   created_at: string;
+  sub_lot_counts: SubLotStatusCounts;
 };
 
 export type InspectionTemplate = {

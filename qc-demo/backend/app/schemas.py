@@ -74,6 +74,16 @@ class ProductionLotCreate(BaseModel):
     sku_id: UUID
 
 
+class SubLotStatusCounts(BaseModel):
+    total: int = 0
+    drying: int = 0
+    pending: int = 0
+    passed: int = 0
+    hold: int = 0
+    disposing: int = 0
+    closed: int = 0
+
+
 class ProductionLotOut(BaseModel):
     id: UUID
     lot_number: str
@@ -83,6 +93,7 @@ class ProductionLotOut(BaseModel):
     sku_code: str | None = None
     sku_name: str | None = None
     created_at: datetime
+    sub_lot_counts: SubLotStatusCounts = Field(default_factory=SubLotStatusCounts)
 
     model_config = {"from_attributes": True}
 
