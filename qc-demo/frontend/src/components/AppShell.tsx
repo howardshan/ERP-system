@@ -7,15 +7,15 @@ import { cn } from '../lib/utils';
 type NavItem = { to: string; label: string };
 
 const QC_NAV: NavItem[] = [
-  { to: '/qc', label: 'QC 工作台' },
-  { to: '/qc/lots', label: '生产批管理' },
-  { to: '/qc/pending', label: '待检队列' },
+  { to: '/qc', label: 'QC Home' },
+  { to: '/qc/lots', label: 'Production Lots' },
+  { to: '/qc/pending', label: 'Pending Queue' },
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { to: '/admin', label: '管理看板' },
-  { to: '/admin/products', label: '产品管理' },
-  { to: '/admin/holds', label: 'Hold 处置' },
+  { to: '/admin', label: 'Dashboard' },
+  { to: '/admin/products', label: 'Products' },
+  { to: '/admin/trace', label: 'Batch Trace' },
 ];
 
 export function AppShell({
@@ -33,7 +33,7 @@ export function AppShell({
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const nav = variant === 'qc' ? QC_NAV : ADMIN_NAV;
-  const roleTitle = variant === 'qc' ? 'QC 现场' : '质量管理';
+  const roleTitle = variant === 'qc' ? 'QC Floor' : 'Quality Management';
 
   const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
     <nav className="flex flex-col gap-1 p-3">
@@ -66,7 +66,7 @@ export function AppShell({
           type="button"
           className="lg:hidden min-h-[44px] min-w-[44px] rounded-lg border border-slate-200 text-xl"
           onClick={() => setDrawerOpen(true)}
-          aria-label="打开菜单"
+          aria-label="Open menu"
         >
           ☰
         </button>
@@ -74,12 +74,12 @@ export function AppShell({
         <div className="flex-1" />
         {auth?.role === 'manager' && variant === 'admin' && (
           <Link to="/qc" className="text-sm text-blue-600 min-h-[44px] flex items-center px-2">
-            QC 现场
+            QC Floor
           </Link>
         )}
         {auth?.role === 'manager' && variant === 'qc' && (
           <Link to="/admin" className="text-sm text-blue-600 min-h-[44px] flex items-center px-2">
-            管理端
+            Admin
           </Link>
         )}
         <span className="text-sm text-slate-500 hidden sm:inline">{auth?.displayName || auth?.username}</span>
@@ -91,13 +91,13 @@ export function AppShell({
             navigate('/login');
           }}
         >
-          退出
+          Sign out
         </button>
       </header>
 
       <div className="flex flex-1 min-h-0">
         <aside className="hidden lg:flex w-56 shrink-0 bg-white border-r border-slate-200 flex-col">
-          <p className="p-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">菜单</p>
+          <p className="p-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">Menu</p>
           <NavLinks />
         </aside>
 
@@ -107,7 +107,7 @@ export function AppShell({
               type="button"
               className="fixed inset-0 bg-black/40 z-40 lg:hidden"
               onClick={() => setDrawerOpen(false)}
-              aria-label="关闭遮罩"
+              aria-label="Close overlay"
             />
             <aside className="fixed left-0 top-0 bottom-0 w-72 bg-white z-50 shadow-xl lg:hidden flex flex-col pt-14">
               <NavLinks onNavigate={() => setDrawerOpen(false)} />

@@ -18,7 +18,7 @@ class TokenResponse(BaseModel):
 
 
 class InspectionTemplateInput(BaseModel):
-    item_name: str = "水活 Aw"
+    item_name: str = "Water Activity (Aw)"
     unit: str | None = None
     lower_limit: float
     upper_limit: float
@@ -110,6 +110,12 @@ class DryingSubLotOut(BaseModel):
     lot_barcode: str | None = None
     sku_name: str | None = None
     wait_minutes: float | None = None
+    hold_reason: str | None = None
+    hold_aw: float | None = None
+    hold_item_name: str | None = None
+    hold_lower_limit: float | None = None
+    hold_upper_limit: float | None = None
+    hold_inspected_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -147,6 +153,17 @@ class DispositionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TodayInspectionItem(BaseModel):
+    sub_lot_id: UUID
+    sub_lot_code: str
+    sku_name: str | None
+    aw: float | None
+    result: str
+    submitted_at: datetime
+    status: str
+    fail_reason: str | None = None
+
+
 class DashboardSummary(BaseModel):
     pending_count: int
     longest_wait_minutes: float | None
@@ -154,7 +171,10 @@ class DashboardSummary(BaseModel):
     today_passed: int
     today_failed: int
     pass_rate: float | None
+    pending_items: list[DryingSubLotOut]
     holds: list[DryingSubLotOut]
+    today_passed_items: list[TodayInspectionItem]
+    today_failed_items: list[TodayInspectionItem]
 
 
 class TraceSubLot(BaseModel):
@@ -163,15 +183,17 @@ class TraceSubLot(BaseModel):
     dispositions: list[DispositionOut]
 
 
-class ProductionLotDetail(BaseModel):
-    lot: ProductionLotOut
-    sub_lots: list[DryingSubLotOut]
-    events: list[dict]
-
-
 class QualityEventOut(BaseModel):
     id: UUID
     event_type: str
     payload: dict
     created_at: datetime
+    sub_lot_code: str | None = None
+    summary: str
     actor_username: str | None = None
+
+
+class ProductionLotDetail(BaseModel):
+    lot: ProductionLotOut
+    sub_lots: list[DryingSubLotOut]
+    events: list[QualityEventOut]

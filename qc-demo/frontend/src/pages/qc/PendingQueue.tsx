@@ -18,8 +18,8 @@ export function PendingQueue() {
   }, []);
 
   return (
-    <AppShell variant="qc" title="待检队列">
-      <p className="text-sm text-slate-500 mb-4">按出房时间排序，每 5 秒自动刷新</p>
+    <AppShell variant="qc" title="Pending Queue">
+      <p className="text-sm text-slate-500 mb-4">Sorted by check-out time · refreshes every 5s</p>
       {error && <p className="text-red-600">{error}</p>}
       <ul className="space-y-3">
         {items.map((s) => (
@@ -41,15 +41,16 @@ export function PendingQueue() {
                 <StatusBadge status={s.status} />
               </div>
               <div className="text-sm mt-2 text-slate-600 space-y-0.5">
-                <p>出房：{formatDateTime(s.out_time)}</p>
+                <p>In: {formatDateTime(s.in_time)}</p>
+                <p>Out: {formatDateTime(s.out_time)}</p>
                 {s.wait_minutes != null && (
-                  <p className="text-amber-800 font-medium">已等待 {s.wait_minutes} 分钟</p>
+                  <p className="text-amber-800 font-medium">Waiting {s.wait_minutes} min</p>
                 )}
               </div>
             </Link>
           </li>
         ))}
-        {items.length === 0 && <p className="text-slate-500">暂无待检子批</p>}
+        {items.length === 0 && <p className="text-slate-500">No pending sub-lots</p>}
       </ul>
     </AppShell>
   );

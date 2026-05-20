@@ -6,13 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const STATUS_LABEL: Record<string, string> = {
-  drying: '烘干中',
-  pending: '待检',
-  inspecting: '检验中',
-  passed: '合格',
+  drying: 'Drying',
+  pending: 'Pending',
+  inspecting: 'Inspecting',
+  passed: 'Passed',
   hold: 'Hold',
-  disposing: '处置中',
-  closed: '已关闭',
+  disposing: 'Disposing',
+  closed: 'Closed',
 };
 
 export const STATUS_COLOR: Record<string, string> = {
@@ -28,7 +28,7 @@ export const STATUS_COLOR: Record<string, string> = {
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleString('zh-CN', {
+    return new Date(iso).toLocaleString('en-US', {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',

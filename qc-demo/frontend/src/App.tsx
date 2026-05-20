@@ -3,8 +3,8 @@ import { RequireAuth } from './auth/RequireAuth';
 import { loadAuth } from './api/client';
 import { LoginPage } from './pages/LoginPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
-import { HoldsPage } from './pages/admin/HoldsPage';
 import { TracePage } from './pages/admin/TracePage';
+import { TraceListPage } from './pages/admin/TraceListPage';
 import { ProductManagement } from './pages/admin/ProductManagement';
 import { QcHome } from './pages/qc/QcHome';
 import { LotsList } from './pages/qc/LotsList';
@@ -81,11 +81,12 @@ export default function App() {
           </RequireAuth>
         }
       />
+      <Route path="/admin/holds" element={<Navigate to="/admin" replace />} />
       <Route
-        path="/admin/holds"
+        path="/admin/trace"
         element={
           <RequireAuth roles={['manager']}>
-            <HoldsPage />
+            <TraceListPage />
           </RequireAuth>
         }
       />

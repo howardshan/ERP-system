@@ -21,7 +21,9 @@ from app.schemas import (
     ProductionLotCreate,
     ProductionLotDetail,
     ProductionLotOut,
+    QualityEventOut,
 )
+from app.services.event_display import quality_event_summary
 from app.services.state_machine import next_status
 
 router = APIRouter(tags=["lots"])
@@ -74,8 +76,9 @@ def get_production_lot_detail(
         .order_by(DryingSubLot.created_at)
         .all()
     )
-    sub_ids = [s.id for s in subs]
-    events = []
+    sub_codes = {s.id: s.sub_lot_code for s in subs}
+    sub_ids = list(sub_codes.keys())
+    events: list[QualityEventOut] = []
     if sub_ids:
         qevents = (
             db.query(QualityEvent)
@@ -85,13 +88,17 @@ def get_production_lot_detail(
             .all()
         )
         for ev in qevents:
+            code = sub_codes.get(ev.drying_sub_lot_id) if ev.drying_sub_lot_id else None
+            payload = ev.payload or {}
             events.append(
-                {
-                    "id": str(ev.id),
-                    "event_type": ev.event_type,
-                    "payload": ev.payload,
-                    "created_at": ev.created_at.isoformat(),
-                }
+                QualityEventOut(
+                    id=ev.id,
+                    event_type=ev.event_type,
+                    payload=payload,
+                    created_at=ev.created_at,
+                    sub_lot_code=code,
+                    summary=quality_event_summary(ev.event_type, payload, code),
+                )
             )
     return ProductionLotDetail(
         lot=lot_to_out(lot, db),
@@ -168,7 +175,10 @@ def check_out_sub_lot(
     if not sub:
         raise HTTPException(status_code=404, detail="Sub-lot not found")
     if sub.status != "drying":
-        raise HTTPException(status_code=400, detail=f"子批状态为 {sub.status}，无法出房登记")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot check out: sub-lot status is {sub.status}",
+        )
 
     out_time = body.out_time or datetime.now(timezone.utc)
     sub.out_time = out_time

@@ -91,7 +91,7 @@ export const api = {
     request<{
       lot: ProductionLot;
       sub_lots: SubLot[];
-      events: Array<{ event_type: string; created_at: string; payload: unknown }>;
+      events: QualityEvent[];
     }>(`/production-lots/${id}`),
 
   pending: () => request<SubLot[]>('/pending-inspections'),
@@ -122,21 +122,22 @@ export const api = {
     }),
 
   dashboard: () =>
-    request<{
-      pending_count: number;
-      longest_wait_minutes: number | null;
-      hold_count: number;
-      today_passed: number;
-      today_failed: number;
-      pass_rate: number | null;
-      holds: SubLot[];
-    }>('/dashboard/summary'),
+    request<DashboardSummary>('/dashboard/summary'),
 
   disposition: (body: { drying_sub_lot_id: string; type: string; remark?: string }) =>
     request<{ new_status: string }>('/dispositions', {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+};
+
+export type QualityEvent = {
+  id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+  sub_lot_code?: string | null;
+  summary: string;
 };
 
 export type ProductionLot = {
@@ -179,6 +180,30 @@ export type ProductInput = {
   };
 };
 
+export type TodayInspectionItem = {
+  sub_lot_id: string;
+  sub_lot_code: string;
+  sku_name?: string | null;
+  aw: number | null;
+  result: string;
+  submitted_at: string;
+  status: string;
+  fail_reason?: string | null;
+};
+
+export type DashboardSummary = {
+  pending_count: number;
+  longest_wait_minutes: number | null;
+  hold_count: number;
+  today_passed: number;
+  today_failed: number;
+  pass_rate: number | null;
+  pending_items: SubLot[];
+  holds: SubLot[];
+  today_passed_items: TodayInspectionItem[];
+  today_failed_items: TodayInspectionItem[];
+};
+
 export type SubLot = {
   id: string;
   production_lot_id: string;
@@ -191,4 +216,10 @@ export type SubLot = {
   lot_barcode?: string;
   sku_name?: string;
   wait_minutes?: number;
+  hold_reason?: string | null;
+  hold_aw?: number | null;
+  hold_item_name?: string | null;
+  hold_lower_limit?: number | null;
+  hold_upper_limit?: number | null;
+  hold_inspected_at?: string | null;
 };
