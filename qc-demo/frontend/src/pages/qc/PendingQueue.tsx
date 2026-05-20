@@ -41,6 +41,7 @@ export function PendingQueue() {
                 <StatusBadge status={s.status} />
               </div>
               <div className="text-sm mt-2 text-slate-600 space-y-0.5">
+                <p>In: {formatDateTime(s.in_time)}</p>
                 <p>Out: {formatDateTime(s.out_time)}</p>
                 {s.wait_minutes != null && (
                   <p className="text-amber-800 font-medium">Waiting {s.wait_minutes} min</p>

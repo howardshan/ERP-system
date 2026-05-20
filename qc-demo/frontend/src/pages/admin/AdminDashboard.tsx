@@ -313,7 +313,8 @@ function SubLotList({
               {s.sku_name}
               {s.location_name ? ` · ${s.location_name}` : ''}
             </p>
-            <p className="text-sm text-slate-500 mt-1">Out: {formatDateTime(s.out_time)}</p>
+            <p className="text-sm text-slate-500 mt-1">In: {formatDateTime(s.in_time)}</p>
+            <p className="text-sm text-slate-500">Out: {formatDateTime(s.out_time)}</p>
             {showWait && s.wait_minutes != null && (
               <p className="text-sm text-amber-800 mt-1">Waiting {s.wait_minutes} min</p>
             )}
