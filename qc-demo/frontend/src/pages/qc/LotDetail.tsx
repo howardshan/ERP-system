@@ -5,6 +5,10 @@ import { AppShell } from '../../components/AppShell';
 import { StatusBadge } from '../../components/StatusBadge';
 import { formatDateTime, toLocalInputValue } from '../../lib/utils';
 
+function suggestedSubLotCode(lotBarcode: string, existingCount: number): string {
+  return `${lotBarcode}-D${String(existingCount + 1).padStart(2, '0')}`;
+}
+
 export function LotDetail() {
   const { id } = useParams<{ id: string }>();
   const [detail, setDetail] = useState<{
@@ -12,6 +16,7 @@ export function LotDetail() {
     sub_lots: SubLot[];
   } | null>(null);
   const [locations, setLocations] = useState<Array<{ id: string; display_name: string }>>([]);
+  const [subLotCode, setSubLotCode] = useState('');
   const [locationId, setLocationId] = useState('');
   const [inTimeLocal, setInTimeLocal] = useState(toLocalInputValue());
   const [outTimeLocal, setOutTimeLocal] = useState(toLocalInputValue());
@@ -31,16 +36,30 @@ export function LotDetail() {
     });
   }, [id]);
 
+  const fillSimulatedScan = () => {
+    if (!detail) return;
+    setSubLotCode(suggestedSubLotCode(detail.lot.lot_barcode, detail.sub_lots.length));
+    setError('');
+  };
+
   const checkIn = async (e: FormEvent) => {
     e.preventDefault();
     if (!id) return;
+    const code = subLotCode.trim();
+    if (!code) {
+      setError('Sub-lot code is required');
+      return;
+    }
+    setError('');
     try {
       await api.checkInSubLot({
         production_lot_id: id,
+        sub_lot_code: code,
         location_id: locationId,
         in_time: new Date(inTimeLocal).toISOString(),
       });
-      setMsg('Checked in — sub-lot status: Drying');
+      setMsg(`Checked in ${code} — status: Drying`);
+      setSubLotCode('');
       setInTimeLocal(toLocalInputValue());
       load();
     } catch (err) {
@@ -61,6 +80,8 @@ export function LotDetail() {
 
   if (!detail) return <AppShell variant="qc">Loading…</AppShell>;
 
+  const subLotCount = detail.sub_lots.length;
+
   return (
     <AppShell variant="qc" title={detail.lot.lot_number}>
       <p className="text-slate-600 mb-2">
@@ -71,6 +92,24 @@ export function LotDetail() {
 
       <form onSubmit={checkIn} className="bg-white rounded-xl border p-4 mb-6 space-y-3">
         <h2 className="font-semibold">Check in (new drying sub-lot)</h2>
+        <label className="block">
+          <span className="text-sm font-medium">Sub-lot code (scan or type)</span>
+          <input
+            className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px] font-mono"
+            value={subLotCode}
+            onChange={(e) => setSubLotCode(e.target.value)}
+            placeholder="e.g. LOT-DEMO-001-D03"
+            required
+            autoComplete="off"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={fillSimulatedScan}
+          className="text-sm text-blue-600 underline min-h-[44px]"
+        >
+          Simulate barcode scan (fill next code)
+        </button>
         <label className="block">
           <span className="text-sm font-medium">Dryer location</span>
           <select
@@ -94,12 +133,21 @@ export function LotDetail() {
             onChange={(e) => setInTimeLocal(e.target.value)}
           />
         </label>
-        <button type="submit" className="w-full bg-sky-600 text-white py-3 rounded-xl min-h-[48px] font-medium">
+        <button
+          type="submit"
+          disabled={!subLotCode.trim()}
+          className="w-full bg-sky-600 text-white py-3 rounded-xl min-h-[48px] font-medium disabled:opacity-50"
+        >
           Confirm check-in
         </button>
       </form>
 
-      <h2 className="font-semibold mb-2">Drying sub-lots</h2>
+      <h2 className="font-semibold mb-2 flex items-center gap-2">
+        Drying sub-lots
+        <span className="text-sm font-normal text-slate-600 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-0.5 tabular-nums">
+          {subLotCount}
+        </span>
+      </h2>
       <ul className="space-y-3">
         {detail.sub_lots.map((s) => (
           <li key={s.id} className="bg-white rounded-xl border p-4 space-y-2">
@@ -145,7 +193,7 @@ export function LotDetail() {
             </div>
           </li>
         ))}
-        {detail.sub_lots.length === 0 && (
+        {subLotCount === 0 && (
           <p className="text-slate-500">No sub-lots yet. Check in to create one.</p>
         )}
       </ul>

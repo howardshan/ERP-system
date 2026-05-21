@@ -97,9 +97,9 @@ export const api = {
   pending: () => request<SubLot[]>('/pending-inspections'),
   checkInSubLot: (body: {
     production_lot_id: string;
+    sub_lot_code: string;
     location_id?: string;
     in_time?: string;
-    sub_lot_code?: string;
   }) =>
     request<SubLot>('/drying-sub-lots/check-in', { method: 'POST', body: JSON.stringify(body) }),
 

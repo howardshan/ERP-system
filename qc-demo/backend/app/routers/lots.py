@@ -148,11 +148,9 @@ def check_in_sub_lot(
     if not lot:
         raise HTTPException(status_code=404, detail="Production lot not found")
 
-    existing_count = (
-        db.query(DryingSubLot).filter(DryingSubLot.production_lot_id == body.production_lot_id).count()
-    )
-    seq = existing_count + 1
-    code = body.sub_lot_code or f"{lot.lot_barcode}-D{seq:02d}"
+    code = (body.sub_lot_code or "").strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Sub-lot code is required")
 
     if db.query(DryingSubLot).filter(DryingSubLot.sub_lot_code == code).first():
         raise HTTPException(status_code=400, detail="Sub-lot code already exists")
