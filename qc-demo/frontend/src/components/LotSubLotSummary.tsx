@@ -97,21 +97,23 @@ export function LotSubLotSummary({ counts }: { counts: SubLotStatusCounts }) {
           <p className="text-sm text-slate-500">No sub-lots yet</p>
         ) : (
           <>
-            <p className="text-xs text-slate-500 mb-1.5">
-              {counts.total} sub-lot{counts.total === 1 ? '' : 's'}
+            <p className="text-xs text-slate-500 mb-2">
+              <span className="font-medium text-slate-700 tabular-nums">{counts.total}</span> sub-lot
+              {counts.total === 1 ? '' : 's'}
               {rate != null && (
-                <span className="text-slate-600">
+                <span className="text-slate-500">
                   {' '}
-                  · {counts.passed} passed
+                  · <span className="tabular-nums">{counts.passed}</span> passed
                 </span>
               )}
             </p>
-            <ul className="flex flex-wrap gap-x-3 gap-y-1">
+            <ul className="flex flex-wrap gap-x-3 gap-y-1.5">
               {visible.map((s) => (
-                <li key={s.key} className="flex items-center gap-1 text-xs text-slate-600">
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                <li key={s.key} className="flex items-center gap-1.5 text-xs text-slate-600">
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-white" style={{ backgroundColor: s.color }} />
                   <span>
-                    {s.label} <span className="font-semibold tabular-nums">{counts[s.key]}</span>
+                    {s.label}{' '}
+                    <span className="font-semibold tabular-nums text-slate-800">{counts[s.key]}</span>
                   </span>
                 </li>
               ))}

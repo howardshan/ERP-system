@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
 import { NumericKeypad } from '../../components/NumericKeypad';
 import { StatusBadge } from '../../components/StatusBadge';
+import { Alert, Button, Card, PageHeader, PageSkeleton } from '../../components/ui';
+import { cn } from '../../lib/utils';
 
 export function InspectPage() {
   const { subLotId } = useParams<{ subLotId: string }>();
@@ -15,9 +18,11 @@ export function InspectPage() {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!subLotId) return;
+    setLoading(true);
     api
       .inspectionTemplate(subLotId)
       .then((d) => {
@@ -25,7 +30,8 @@ export function InspectPage() {
         setStatus(d.sub_lot.status);
         setLimits([d.template.lower_limit, d.template.upper_limit]);
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
   }, [subLotId]);
 
   const submit = async () => {
@@ -43,49 +49,73 @@ export function InspectPage() {
     }
   };
 
+  if (loading && !subCode) {
+    return (
+      <AppShell variant="qc">
+        <PageSkeleton />
+      </AppShell>
+    );
+  }
+
+  const passed = result === 'pass';
+
   return (
-    <AppShell variant="qc" title={subCode || 'Inspection'}>
-      <div className="flex justify-end -mt-2 mb-2">
-        {status && <StatusBadge status={status} />}
-      </div>
-      {limits && (
-        <p className="text-sm text-slate-600 mb-4">
-          Water Activity (Aw) acceptable range: [{limits[0]}, {limits[1]}]
-        </p>
-      )}
+    <AppShell variant="qc">
+      <PageHeader
+        title={subCode || 'Inspection'}
+        description={
+          limits
+            ? `Water Activity (Aw) acceptable range: [${limits[0]}, ${limits[1]}]`
+            : undefined
+        }
+        action={status ? <StatusBadge status={status} /> : undefined}
+      />
 
       {result ? (
-        <div
-          className={`rounded-2xl p-8 text-center mb-6 ${
-            result === 'pass' ? 'bg-emerald-100 text-emerald-900' : 'bg-red-100 text-red-900'
-          }`}
+        <Card
+          variant="elevated"
+          className={cn(
+            'p-8 text-center mb-6 border-2',
+            passed ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
+          )}
         >
-          <p className="text-3xl font-bold">{result === 'pass' ? 'Passed' : 'Failed · On Hold'}</p>
-          <button
-            type="button"
-            className="mt-6 w-full bg-slate-800 text-white py-3 rounded-xl min-h-[48px]"
-            onClick={() => navigate('/qc/pending')}
-          >
+          {passed ? (
+            <CheckCircle2 className="h-16 w-16 text-emerald-600 mx-auto mb-4" aria-hidden />
+          ) : (
+            <XCircle className="h-16 w-16 text-red-600 mx-auto mb-4" aria-hidden />
+          )}
+          <p className={cn('text-3xl font-bold', passed ? 'text-emerald-900' : 'text-red-900')}>
+            {passed ? 'Passed' : 'Failed · On Hold'}
+          </p>
+          <Button variant="secondary" tone="qc" fullWidth size="lg" className="mt-6" onClick={() => navigate('/qc/pending')}>
             Back to pending queue
-          </button>
-        </div>
+          </Button>
+        </Card>
       ) : (
-        <>
-          <div className="bg-white rounded-2xl border-2 p-6 mb-6 text-center">
-            <p className="text-sm text-slate-500 mb-2">Water Activity (Aw)</p>
-            <p className="text-5xl font-bold tabular-nums">{aw || '—'}</p>
-          </div>
+        <div className="max-w-md mx-auto">
+          <Card variant="elevated" className="p-8 mb-6 text-center border-2 border-teal-100">
+            <p className="text-sm font-medium text-slate-500 mb-2 uppercase tracking-wide">Water Activity (Aw)</p>
+            <p className="text-6xl font-bold tabular-nums text-slate-900">{aw || '—'}</p>
+          </Card>
           <NumericKeypad value={aw} onChange={setAw} />
-          {error && <p className="text-red-600 mt-4 text-center">{error}</p>}
-          <button
-            type="button"
+          {error && (
+            <div className="mt-4">
+              <Alert variant="error">{error}</Alert>
+            </div>
+          )}
+          <Button
+            variant="primary"
+            tone="qc"
+            fullWidth
+            size="lg"
+            className="mt-6"
             disabled={!aw || submitting}
+            loading={submitting}
             onClick={submit}
-            className="mt-6 w-full bg-blue-600 text-white text-lg font-semibold py-4 rounded-xl min-h-[52px] disabled:opacity-50"
           >
-            {submitting ? 'Submitting…' : 'Submit inspection'}
-          </button>
-        </>
+            Submit inspection
+          </Button>
+        </div>
       )}
     </AppShell>
   );

@@ -1,7 +1,15 @@
 import { FormEvent, useState } from 'react';
+import { ClipboardCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api, saveAuth } from '../api/client';
+import { ShellAccentProvider } from '../context/ShellAccentContext';
 import { DemoBanner } from '../components/DemoBanner';
+import { Alert, Button, Card, Field, Input } from '../components/ui';
+
+const DEMO_ACCOUNTS = [
+  { username: 'qc', password: 'demo123', label: 'QC Operator' },
+  { username: 'manager', password: 'demo123', label: 'Quality Manager' },
+] as const;
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -31,39 +39,66 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <DemoBanner />
-      <div className="flex-1 flex items-center justify-center p-4">
-        <form onSubmit={submit} className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md space-y-4">
-          <h1 className="text-2xl font-bold text-center">QC Demo Sign In</h1>
-          <p className="text-sm text-slate-500 text-center">qc / manager · password demo123</p>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          <label className="block">
-            <span className="text-sm font-medium">Username</span>
-            <input
-              className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">Password</span>
-            <input
-              type="password"
-              className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl min-h-[48px] disabled:opacity-50"
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
+    <ShellAccentProvider accent="admin">
+      <div className="min-h-screen flex flex-col bg-slate-50">
+        <DemoBanner />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card variant="elevated" className="w-full max-w-md p-8 shadow-lg">
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white mb-4">
+                <ClipboardCheck className="h-8 w-8" aria-hidden />
+              </div>
+              <h1 className="text-2xl font-bold text-slate-900">QC Demo</h1>
+              <p className="text-sm text-slate-600 mt-1">Post-dry inspection & batch trace</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 justify-center mb-6">
+              {DEMO_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.username}
+                  type="button"
+                  onClick={() => {
+                    setUsername(acc.username);
+                    setPassword(acc.password);
+                    setError('');
+                  }}
+                  className={cnChip(username === acc.username)}
+                >
+                  {acc.label}
+                </button>
+              ))}
+            </div>
+
+            <form onSubmit={submit} className="space-y-4">
+              {error && <Alert variant="error">{error}</Alert>}
+              <Field label="Username">
+                <Input
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                />
+              </Field>
+              <Field label="Password">
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </Field>
+              <Button type="submit" variant="primary" tone="admin" fullWidth loading={loading} size="lg">
+                Sign in
+              </Button>
+            </form>
+          </Card>
+        </div>
       </div>
-    </div>
+    </ShellAccentProvider>
   );
+}
+
+function cnChip(active: boolean) {
+  return active
+    ? 'text-xs font-medium px-3 py-1.5 rounded-full bg-indigo-600 text-white'
+    : 'text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200';
 }

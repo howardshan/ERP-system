@@ -1,14 +1,28 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { ArrowLeft, Layers } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { api, SubLot } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
 import { RowActionsMenu } from '../../components/RowActionsMenu';
 import { StatusBadge } from '../../components/StatusBadge';
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  PageSkeleton,
+  Select,
+} from '../../components/ui';
+import { getTone } from '../../components/ui/tone';
 import { cn, formatDateTime, STATUS_LABEL, toLocalInputValue } from '../../lib/utils';
 
 const FAIL_EVENTS = new Set(['inspection_failed_hold']);
-
 const STATUS_OPTIONS = Object.keys(STATUS_LABEL);
+const accentForm = getTone('admin').outlineAccent;
+const linkClass = getTone('admin').link;
 
 function suggestedSubLotCode(lotBarcode: string, existingCount: number): string {
   return `${lotBarcode}-D${String(existingCount + 1).padStart(2, '0')}`;
@@ -67,9 +81,7 @@ export function TracePage() {
     load();
     api.locations().then((locs) => {
       setLocations(locs);
-      if (locs[0]) {
-        setCheckInLocationId(locs[0].id);
-      }
+      if (locs[0]) setCheckInLocationId(locs[0].id);
     });
   }, [lotId]);
 
@@ -156,227 +168,227 @@ export function TracePage() {
     }
   };
 
-  if (!detail) return <AppShell variant="admin">Loading…</AppShell>;
+  if (!detail) {
+    return (
+      <AppShell variant="admin">
+        <PageSkeleton />
+      </AppShell>
+    );
+  }
 
   return (
-    <AppShell variant="admin" title={`Trace · ${detail.lot.lot_number}`}>
-      <p className="text-slate-600 mb-2">
-        {detail.lot.sku_name} · {detail.lot.lot_barcode} · WO {detail.lot.work_order_barcode}
-      </p>
-      <Link to="/admin/trace" className="text-sm text-blue-600 mb-4 inline-block min-h-[44px] flex items-center">
-        ← Back to batch list
-      </Link>
-
-      {msg && <p className="text-emerald-700 bg-emerald-50 p-3 rounded-lg mb-3">{msg}</p>}
-      {error && <p className="text-red-600 mb-3">{error}</p>}
-
-      <button
-        type="button"
-        onClick={addingCheckIn ? cancelAddingCheckIn : startAddingCheckIn}
-        disabled={editingSubId !== null}
-        className={cn(
-          'mb-4 px-4 py-2 rounded-xl min-h-[44px] font-medium',
-          addingCheckIn
-            ? 'bg-slate-200 text-slate-700'
-            : 'bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed'
-        )}
+    <AppShell variant="admin">
+      <Link
+        to="/admin/trace"
+        className={cn('text-sm font-medium mb-4 inline-flex items-center gap-1 min-h-[44px]', linkClass)}
       >
-        {addingCheckIn ? 'Cancel' : 'Add sub-lot'}
-      </button>
+        <ArrowLeft className="h-4 w-4" />
+        Back to batch list
+      </Link>
+      <PageHeader
+        title={`Trace · ${detail.lot.lot_number}`}
+        description={`${detail.lot.sku_name} · ${detail.lot.lot_barcode} · WO ${detail.lot.work_order_barcode}`}
+        action={
+          <Button
+            variant={addingCheckIn ? 'secondary' : 'primary'}
+            onClick={addingCheckIn ? cancelAddingCheckIn : startAddingCheckIn}
+            disabled={editingSubId !== null}
+          >
+            {addingCheckIn ? 'Cancel' : 'Add sub-lot'}
+          </Button>
+        }
+      />
+      <div className="space-y-4 mb-4">
+        {msg && <Alert variant="success">{msg}</Alert>}
+        {error && <Alert variant="error">{error}</Alert>}
+      </div>
 
       {addingCheckIn && (
-        <form onSubmit={checkIn} className="bg-white border-2 border-blue-400 rounded-xl p-4 mb-6 space-y-3 shadow-sm">
-          <h2 className="font-semibold text-blue-800">Add sub-lot (check in)</h2>
-          <label className="block">
-            <span className="text-sm font-medium">Sub-lot code</span>
-            <input
-              className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px] font-mono"
-              value={checkInCode}
-              onChange={(e) => setCheckInCode(e.target.value)}
-              required
-            />
-          </label>
-          <button type="button" onClick={fillSimulatedScan} className="text-sm text-blue-600 underline min-h-[44px]">
-            Simulate barcode scan (fill next code)
-          </button>
-          <label className="block">
-            <span className="text-sm font-medium">Dryer location</span>
-            <select
-              className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
-              value={checkInLocationId}
-              onChange={(e) => setCheckInLocationId(e.target.value)}
-            >
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.display_name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="text-sm font-medium">Check-in time</span>
-            <input
-              type="datetime-local"
-              className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
-              value={checkInTime}
-              onChange={(e) => setCheckInTime(e.target.value)}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={!checkInCode.trim()}
-            className="w-full bg-sky-600 text-white py-3 rounded-xl min-h-[48px] font-medium disabled:opacity-50"
-          >
-            Confirm check-in
-          </button>
-        </form>
+        <Card variant="outline" className={cn('p-4 mb-6 space-y-3 border-2 shadow-sm', accentForm)}>
+          <h2 className="font-semibold text-indigo-800">Add sub-lot (check in)</h2>
+          <form onSubmit={checkIn} className="space-y-3">
+            <Field label="Sub-lot code">
+              <Input
+                className="font-mono"
+                value={checkInCode}
+                onChange={(e) => setCheckInCode(e.target.value)}
+                required
+              />
+            </Field>
+            <Button type="button" variant="ghost" onClick={fillSimulatedScan} className="!min-h-[36px] text-sm">
+              Simulate barcode scan (fill next code)
+            </Button>
+            <Field label="Dryer location">
+              <Select value={checkInLocationId} onChange={(e) => setCheckInLocationId(e.target.value)}>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.display_name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Check-in time">
+              <Input
+                type="datetime-local"
+                value={checkInTime}
+                onChange={(e) => setCheckInTime(e.target.value)}
+              />
+            </Field>
+            <Button type="submit" variant="primary" fullWidth disabled={!checkInCode.trim()}>
+              Confirm check-in
+            </Button>
+          </form>
+        </Card>
       )}
 
-      <h2 className="font-semibold mb-2 flex items-center gap-2">
+      <h2 className="font-semibold mb-3 flex items-center gap-2 text-slate-900">
         Drying sub-lots
         <span className="text-sm font-normal text-slate-600 bg-slate-100 border border-slate-200 rounded-full px-2.5 py-0.5 tabular-nums">
           {detail.sub_lots.length}
         </span>
       </h2>
-      <ul className="space-y-3 mb-6">
+      <ul className="space-y-2 mb-8">
         {detail.sub_lots.map((s) => {
           const isEditing = editingSubId === s.id && subForm;
           return (
-            <li
-              key={s.id}
-              className={cn(
-                'rounded-xl p-4',
-                isEditing ? 'bg-white border-2 border-blue-500' : 'bg-white border'
-              )}
-            >
-              {isEditing ? (
-                <form onSubmit={saveSub} className="space-y-3">
-                  <h3 className="font-medium text-blue-800">Edit sub-lot</h3>
-                  <label className="block">
-                    <span className="text-sm font-medium">Sub-lot code</span>
-                    <input
-                      className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px] font-mono"
-                      value={subForm.sub_lot_code}
-                      onChange={(e) => setSubForm({ ...subForm, sub_lot_code: e.target.value })}
-                      required
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-sm font-medium">Location</span>
-                    <select
-                      className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
-                      value={subForm.location_id}
-                      onChange={(e) => setSubForm({ ...subForm, location_id: e.target.value })}
-                    >
-                      <option value="">— None —</option>
-                      {locations.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.display_name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    <label className="block">
-                      <span className="text-sm font-medium">Check-in time</span>
-                      <input
-                        type="datetime-local"
-                        className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
-                        value={subForm.in_time}
-                        onChange={(e) => setSubForm({ ...subForm, in_time: e.target.value })}
+            <li key={s.id}>
+              <Card
+                variant="outline"
+                className={cn('p-4', isEditing && cn('border-2', accentForm))}
+              >
+                {isEditing ? (
+                  <form onSubmit={saveSub} className="space-y-3">
+                    <h3 className="font-medium text-indigo-800">Edit sub-lot</h3>
+                    <Field label="Sub-lot code">
+                      <Input
+                        className="font-mono"
+                        value={subForm.sub_lot_code}
+                        onChange={(e) => setSubForm({ ...subForm, sub_lot_code: e.target.value })}
+                        required
                       />
-                    </label>
-                    <label className="block">
-                      <span className="text-sm font-medium">Check-out time</span>
-                      <input
-                        type="datetime-local"
-                        className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
-                        value={subForm.out_time}
-                        onChange={(e) => setSubForm({ ...subForm, out_time: e.target.value })}
-                      />
-                    </label>
-                  </div>
-                  <label className="block">
-                    <span className="text-sm font-medium">Status</span>
-                    <select
-                      className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
-                      value={subForm.status}
-                      onChange={(e) => setSubForm({ ...subForm, status: e.target.value })}
-                    >
-                      {STATUS_OPTIONS.map((st) => (
-                        <option key={st} value={st}>
-                          {STATUS_LABEL[st]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <p className="text-xs text-amber-800">
-                    Manual status edits are for demo corrections only. Prefer check-in/out on the QC floor for
-                    normal workflow.
-                  </p>
-                  <div className="flex gap-2">
-                    <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl min-h-[48px]">
-                      Save
-                    </button>
-                    <button type="button" className="px-4 py-3 rounded-xl border min-h-[48px]" onClick={cancelEditSub}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <>
-                  <div className="flex justify-between items-start gap-2 mb-1">
-                    <span className="font-medium text-lg">{s.sub_lot_code}</span>
-                    <div className="flex gap-2 shrink-0 items-center">
-                      <StatusBadge status={s.status} />
-                      <RowActionsMenu
-                        disabled={editingSubId !== null}
-                        actions={[
-                          { label: 'Edit', onClick: () => startEditSub(s) },
-                          { label: 'Delete', variant: 'danger', onClick: () => removeSub(s) },
-                        ]}
-                      />
+                    </Field>
+                    <Field label="Location">
+                      <Select
+                        value={subForm.location_id}
+                        onChange={(e) => setSubForm({ ...subForm, location_id: e.target.value })}
+                      >
+                        <option value="">— None —</option>
+                        {locations.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.display_name}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <Field label="Check-in time">
+                        <Input
+                          type="datetime-local"
+                          value={subForm.in_time}
+                          onChange={(e) => setSubForm({ ...subForm, in_time: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="Check-out time">
+                        <Input
+                          type="datetime-local"
+                          value={subForm.out_time}
+                          onChange={(e) => setSubForm({ ...subForm, out_time: e.target.value })}
+                        />
+                      </Field>
                     </div>
-                  </div>
-                  <p className="text-sm text-slate-600">
-                    {s.location_name || 'No location'} · In {formatDateTime(s.in_time)} · Out{' '}
-                    {formatDateTime(s.out_time)}
-                  </p>
-                </>
-              )}
+                    <Field label="Status">
+                      <Select
+                        value={subForm.status}
+                        onChange={(e) => setSubForm({ ...subForm, status: e.target.value })}
+                      >
+                        {STATUS_OPTIONS.map((st) => (
+                          <option key={st} value={st}>
+                            {STATUS_LABEL[st]}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <Alert variant="info">
+                      Manual status edits are for demo corrections only. Prefer check-in/out on the QC floor for
+                      normal workflow.
+                    </Alert>
+                    <div className="flex gap-2">
+                      <Button type="submit" variant="primary" className="flex-1">
+                        Save
+                      </Button>
+                      <Button type="button" variant="secondary" onClick={cancelEditSub}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="font-medium text-lg font-mono text-slate-900">{s.sub_lot_code}</span>
+                      <div className="flex gap-2 shrink-0 items-center">
+                        <StatusBadge status={s.status} />
+                        <RowActionsMenu
+                          disabled={editingSubId !== null}
+                          actions={[
+                            { label: 'Edit', onClick: () => startEditSub(s) },
+                            { label: 'Delete', variant: 'danger', onClick: () => removeSub(s) },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-sm text-slate-600 mt-1">
+                      {s.location_name || 'No location'} · In {formatDateTime(s.in_time)} · Out{' '}
+                      {formatDateTime(s.out_time)}
+                    </p>
+                  </>
+                )}
+              </Card>
             </li>
           );
         })}
         {detail.sub_lots.length === 0 && (
-          <p className="text-slate-500">No sub-lots yet. Click Add sub-lot to check in.</p>
+          <EmptyState
+            icon={Layers}
+            title="No sub-lots yet"
+            description="Click Add sub-lot to check in a drying sub-lot."
+          />
         )}
       </ul>
 
-      <h2 className="font-semibold mb-2">Quality events</h2>
-      <ul className="space-y-2 text-sm">
-        {detail.events.map((ev) => (
-          <li
-            key={ev.id}
-            className={cn(
-              'rounded-xl border p-3',
-              FAIL_EVENTS.has(ev.event_type)
-                ? 'bg-red-50 border-red-200'
-                : 'bg-slate-50 border-slate-200'
-            )}
-          >
-            <p
-              className={cn(
-                'font-medium leading-snug',
-                FAIL_EVENTS.has(ev.event_type) ? 'text-red-900' : 'text-slate-800'
-              )}
-            >
-              {ev.summary}
-            </p>
-            <p className="text-xs text-slate-500 mt-1.5">{formatDateTime(ev.created_at)}</p>
-          </li>
-        ))}
-        {detail.events.length === 0 && <p className="text-slate-500">No events</p>}
-      </ul>
+      <h2 className="font-semibold mb-3 text-slate-900">Quality events</h2>
+      {detail.events.length === 0 ? (
+        <EmptyState title="No events" description="Check-in, inspection, and disposition events will appear here." />
+      ) : (
+        <ul className="relative border-l-2 border-slate-200 ml-2 space-y-4 pl-6">
+          {detail.events.map((ev) => (
+            <li key={ev.id} className="relative">
+              <span
+                className={cn(
+                  'absolute -left-[1.55rem] top-1.5 h-3 w-3 rounded-full ring-2 ring-white',
+                  FAIL_EVENTS.has(ev.event_type) ? 'bg-red-500' : 'bg-indigo-400'
+                )}
+              />
+              <Card
+                variant="outline"
+                className={cn(
+                  'p-3 text-sm',
+                  FAIL_EVENTS.has(ev.event_type) && 'bg-red-50/80 border-red-200'
+                )}
+              >
+                <p
+                  className={cn(
+                    'font-medium leading-snug',
+                    FAIL_EVENTS.has(ev.event_type) ? 'text-red-900' : 'text-slate-800'
+                  )}
+                >
+                  {ev.summary}
+                </p>
+                <p className="text-xs text-slate-500 mt-1.5">{formatDateTime(ev.created_at)}</p>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
     </AppShell>
   );
 }
