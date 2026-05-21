@@ -58,9 +58,16 @@ interface DashboardStats {
 ### 功能
 - 按类型分区展示所有会计科目（Asset / Liability / Equity / Revenue / Expense）
 - 每个类型区块可折叠，显示该类型下所有科目及其余额
-- 每行鼠标悬停显示编辑按钮（铅笔图标）
-- 新建科目弹窗（AccountModal）
+- 每行鼠标悬停显示编辑按钮（铅笔图标，需 `finance.chart_of_accounts.edit` 权限）
+- 新建科目弹窗（AccountModal，需 `finance.chart_of_accounts.create` 权限）
 - 编辑科目弹窗（复用同一 AccountModal）
+
+### 权限控制
+| 元素 | 所需权限 |
+|------|---------|
+| Create Account 按钮 | `finance.chart_of_accounts.create` |
+| 行内编辑铅笔图标 | `finance.chart_of_accounts.edit` |
+| 查看科目列表 | 无权限限制（导航项本身需要 `finance.chart_of_accounts.view`） |
 
 ### 颜色规则
 | 类型 | 颜色 |
@@ -78,11 +85,19 @@ interface DashboardStats {
 - 只显示与新科目**相同 account_type** 的科目
 - 编辑时排除自身（防止自引用）
 
+### 循环引用防护（BR-F8）
+
+`updateAccount()` 在执行 UPDATE 前调用 `wouldCreateCycle(accountId, proposedParentId)`，从 `proposedParentId` 出发向上遍历祖先链，若在链上找到 `accountId` 则判定为循环引用，抛出错误：
+
+> `"Cannot set this parent account: it would create a circular reference in the account hierarchy."`
+
+此检查在前端（`src/services/api.ts`）执行，防止例如"将 A 的父科目设为 A 的子孙"这类操作在数据库层静默写入。
+
 ### API 函数
 ```ts
 getAccounts(): Promise<GlAccount[]>           // 从 account_balance VIEW 读取
 createAccount(account): Promise<GlAccount>    // 直接 INSERT gl_account
-updateAccount(id, updates): Promise<void>     // 直接 UPDATE gl_account
+updateAccount(id, updates): Promise<void>     // 更新前验证循环引用（BR-F8），再 UPDATE gl_account
 ```
 
 ### TypeScript 类型
@@ -163,8 +178,9 @@ saveOrGetId():
 ```
 
 ### Action 按钮（草稿/拒绝状态下）
-- **Save Draft** — 保存为 draft，不触发审批
-- **Submit for Approval** — 调用 `submitJournalEntry()`，状态变为 `pending_approval`
+- **Save Draft** — 保存为 draft，不触发审批（需 `finance.journal_entry.create` 或 `.edit`）
+- **Submit for Approval** — 调用 `submitJournalEntry()`，状态变为 `pending_approval`（需 `.create` 或 `.edit`）
+- **Add Line** — 仅在可编辑状态且有 create/edit 权限时显示
 
 ---
 
@@ -177,12 +193,16 @@ saveOrGetId():
 
 ### 状态感知行为
 
+`isReadOnly` 由两个条件决定（任一满足即只读）：
+1. 凭证状态不为 `draft` / `rejected`
+2. 用户无 `finance.journal_entry.create`（新建模式）或 `.edit`（编辑模式）权限
+
 | 凭证状态 | 表单是否可编辑 | 可用操作 |
 |---------|--------------|---------|
-| `draft` | ✅ 可编辑 | Save Draft / Submit for Approval |
-| `rejected` | ✅ 可编辑 | Save Draft / Submit for Approval（可重新提交） |
+| `draft` | ✅ 可编辑（需 create/edit 权限） | Save Draft / Submit for Approval |
+| `rejected` | ✅ 可编辑（需 create/edit 权限） | Save Draft / Submit for Approval（可重新提交） |
 | `pending_approval` | ❌ 只读 | — 显示"Awaiting Approval"提示 |
-| `posted` | ❌ 只读 | Reverse Entry（反冲） |
+| `posted` | ❌ 只读 | Reverse Entry（需 `finance.journal_entry.edit`） |
 | `reversed` | ❌ 只读 | — 显示"已反冲"标识 |
 
 ### 拒绝通知横幅
@@ -220,7 +240,14 @@ saveOrGetId():
 - 状态筛选（All / Draft / Pending / Posted / Reversed / Rejected）
 - 关键字搜索（凭证号、摘要）
 - 点击任意行导航至 `je-edit:<id>`（编辑/查看）
-- 草稿行显示铅笔图标，已过账/已反冲显示眼睛图标
+- 草稿行显示铅笔图标（需 `finance.journal_entry.edit`），否则显示眼睛图标
+
+### 权限控制
+| 元素 | 所需权限 |
+|------|---------|
+| New Entry 按钮 | `finance.journal_entry.create` |
+| 行图标显示为铅笔（可编辑） | `finance.journal_entry.edit` |
+| 导航至此页 | Sidebar 隐藏需要 `finance.journal_entry.view` |
 
 ### 列字段
 
@@ -283,3 +310,12 @@ getJournalEntries(params?: {
 | BR-F5 | 过账是单向的（draft → posted，不可撤销，只能反冲） |
 | BR-F6 | 反冲凭证自动过账，原凭证状态变为 `reversed` |
 | BR-F7 | 关闭会计期间前，该期间内不能有 draft 状态的凭证 |
+| BR-F8 | 科目的父科目链不能形成环路（`updateAccount` 在更新 `parent_id` 前检测并阻止循环引用） |
+
+---
+
+## Finance 审计日志
+
+所有财务模块的变更操作均会被记录到 `finance_audit_log` 表，包括科目的创建与修改、凭证的全生命周期操作、会计期间的开关、以及附件的上传与删除。
+
+详见 `docs/modules/08_finance-audit-log.md`。

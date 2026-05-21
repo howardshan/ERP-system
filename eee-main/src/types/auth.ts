@@ -3,6 +3,7 @@ export interface ErpUser {
   auth_user_id?: string | null;
   full_name: string;
   email: string;
+  role: string | null;
   department: string | null;
   manager_id: string | null;
   manager?: Pick<ErpUser, 'id' | 'full_name'>;

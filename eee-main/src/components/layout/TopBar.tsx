@@ -1,6 +1,7 @@
-import React from 'react';
-import { Bell, Search, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { Bell, Search, LogOut, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
+import { usePermissions } from '../../contexts/PermissionContext';
 
 interface TopBarProps {
   userName: string;
@@ -9,6 +10,15 @@ interface TopBarProps {
 }
 
 export function TopBar({ userName, userEmail, onLogout }: TopBarProps) {
+  const { reload } = usePermissions();
+  const [reloading, setReloading] = useState(false);
+
+  async function handleReload() {
+    setReloading(true);
+    await reload();
+    setReloading(false);
+  }
+
   const initials = userName
     .split(' ')
     .map(n => n[0])
@@ -49,6 +59,14 @@ export function TopBar({ userName, userEmail, onLogout }: TopBarProps) {
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
             {initials}
           </div>
+          <button
+            onClick={handleReload}
+            disabled={reloading}
+            title="Reload permissions"
+            className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors disabled:opacity-40"
+          >
+            <RefreshCw size={15} className={reloading ? 'animate-spin' : ''} />
+          </button>
           <button
             onClick={onLogout}
             title="Sign out"

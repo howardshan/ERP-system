@@ -46,6 +46,7 @@ export function PermissionProvider({ authUserId, children }: { authUserId: strin
       auth_user_id: row.auth_user_id,
       full_name: row.full_name,
       email: row.email,
+      role: (row as any).role ?? null,
       department: row.department,
       manager_id: row.manager_id,
       is_active: row.is_active,

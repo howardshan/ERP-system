@@ -7,7 +7,7 @@ export async function getUsers(): Promise<ErpUser[]> {
 
   const rows = (data ?? []) as Array<{
     erp_user_id: string; auth_user_id: string | null; email: string;
-    full_name: string; department: string | null;
+    full_name: string; role: string | null; department: string | null;
     manager_id: string | null; manager_name: string | null;
     is_active: boolean; created_at: string;
   }>;
@@ -23,6 +23,7 @@ export async function getUsers(): Promise<ErpUser[]> {
     auth_user_id: r.auth_user_id ?? undefined,
     full_name: r.full_name,
     email: r.email,
+    role: r.role,
     department: r.department,
     manager_id: r.manager_id,
     manager: r.manager_id && r.manager_name ? { id: r.manager_id, full_name: r.manager_name } : undefined,
@@ -39,7 +40,7 @@ export async function getUser(id: string): Promise<ErpUser> {
 
   const rows = (data ?? []) as Array<{
     erp_user_id: string; auth_user_id: string | null; email: string;
-    full_name: string; department: string | null;
+    full_name: string; role: string | null; department: string | null;
     manager_id: string | null; manager_name: string | null;
     is_active: boolean; created_at: string;
   }>;
@@ -57,6 +58,7 @@ export async function getUser(id: string): Promise<ErpUser> {
     auth_user_id: row.auth_user_id ?? undefined,
     full_name: row.full_name,
     email: row.email,
+    role: row.role,
     department: row.department,
     manager_id: row.manager_id,
     manager: row.manager_id && row.manager_name ? { id: row.manager_id, full_name: row.manager_name } : undefined,
@@ -66,7 +68,7 @@ export async function getUser(id: string): Promise<ErpUser> {
   };
 }
 
-export async function updateUser(id: string, patch: Partial<Pick<ErpUser, 'full_name' | 'department' | 'manager_id' | 'is_active'>>): Promise<void> {
+export async function updateUser(id: string, patch: Partial<Pick<ErpUser, 'full_name' | 'role' | 'department' | 'manager_id' | 'is_active'>>): Promise<void> {
   const { error } = await supabase.from('erp_user').update(patch).eq('id', id);
   if (error) throw error;
 }

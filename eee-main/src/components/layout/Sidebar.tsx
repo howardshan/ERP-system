@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   HelpCircle,
   LayoutGrid,
+  ScrollText,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -70,6 +71,7 @@ export function Sidebar({ activeScreen, setActiveScreen, pendingApprovalCount = 
   const canCreateJE     = can('finance', 'journal_entry', 'create');
   const canViewCoA      = can('finance', 'chart_of_accounts', 'view');
   const canViewPeriods  = can('finance', 'accounting_periods', 'view');
+  const canViewAuditLog = can('finance', 'audit_log', 'view');
 
   return (
     <aside className="w-64 bg-[#0a0f1d] border-r border-white/10 flex flex-col h-screen fixed left-0 top-0">
@@ -119,6 +121,11 @@ export function Sidebar({ activeScreen, setActiveScreen, pendingApprovalCount = 
         )}
         {canViewPeriods && (
           <NavItem icon={CalendarDays} label="Accounting Periods" isActive={isActive('periods')} onClick={() => setActiveScreen('periods')} />
+        )}
+
+        {canViewAuditLog && <NavSection title="Administration" />}
+        {canViewAuditLog && (
+          <NavItem icon={ScrollText} label="Audit Log" isActive={isActive('audit-log')} onClick={() => setActiveScreen('audit-log')} />
         )}
       </nav>
 

@@ -9,7 +9,7 @@ import { cn, formatCurrency } from '../lib/utils';
 import { Card } from '../components/ui/Cards';
 import { Badge } from '../components/ui/Cards';
 import {
-  getAccounts, createJournalEntry, createJeShell, updateJeDraft, postJournalEntry,
+  getAccounts, createJournalEntry, createJeShell, updateJeDraft, updateJePosted, postJournalEntry,
   reverseJournalEntry, getJournalEntry, getEditLog, EditLogEntry,
   submitJournalEntry,
   uploadAttachment, getAttachments, deleteAttachment, getAttachmentUrl,
@@ -188,12 +188,14 @@ function AttachmentPanel({
   uploading,
   onUpload,
   onDelete,
+  isReadOnly,
 }: {
   entryId: number | null;
   attachments: JournalEntryAttachment[];
   uploading: boolean;
   onUpload: (files: FileList) => void;
   onDelete: (a: JournalEntryAttachment) => void;
+  isReadOnly?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -215,27 +217,31 @@ function AttachmentPanel({
             </span>
           )}
         </span>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {uploading ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-          Upload File
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls"
-          className="hidden"
-          onChange={e => e.target.files && onUpload(e.target.files)}
-        />
+        {!isReadOnly && (
+          <>
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {uploading ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+              Upload File
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls"
+              className="hidden"
+              onChange={e => e.target.files && onUpload(e.target.files)}
+            />
+          </>
+        )}
       </div>
 
-      {/* Drop zone (shown when no files) */}
-      {attachments.length === 0 && (
+      {/* Drop zone (shown when no files and not read-only) */}
+      {attachments.length === 0 && !isReadOnly && (
         <div
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
@@ -256,12 +262,12 @@ function AttachmentPanel({
       {/* File list */}
       {attachments.length > 0 && (
         <div
-          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
+          onDragOver={isReadOnly ? undefined : e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={isReadOnly ? undefined : () => setDragOver(false)}
+          onDrop={isReadOnly ? undefined : handleDrop}
           className={cn(
             'rounded-lg border divide-y divide-slate-100 transition-colors',
-            dragOver ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200',
+            !isReadOnly && dragOver ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200',
           )}
         >
           {attachments.map(a => (
@@ -284,27 +290,31 @@ function AttachmentPanel({
                 </button>
                 <span className="text-[10px] text-slate-400">{formatBytes(a.file_size)}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => onDelete(a)}
-                className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-              >
-                <X size={15} />
-              </button>
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(a)}
+                  className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <X size={15} />
+                </button>
+              )}
             </div>
           ))}
           {/* Add more button when files exist */}
-          <div className="px-4 py-2.5">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={uploading}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-blue-600 transition-colors"
-            >
-              {uploading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-              Add more
-            </button>
-          </div>
+          {!isReadOnly && (
+            <div className="px-4 py-2.5">
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-blue-600 transition-colors"
+              >
+                {uploading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                Add more
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -340,6 +350,7 @@ export default function JournalEntryForm({
   const [saving, setSaving] = useState(false);
   const [posting, setPosting] = useState(false);
   const [reversing, setReversing] = useState(false);
+  const [isEditingPosted, setIsEditingPosted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [savedId, setSavedId] = useState<number | null>(editEntryId ?? null);
   const [savedNumber, setSavedNumber] = useState<string>('');
@@ -540,6 +551,32 @@ export default function JournalEntryForm({
     }
   }
 
+  async function handleSavePosted() {
+    if (!savedId) return;
+    setError('');
+    if (!description.trim()) { setError('Entry description is required.'); return; }
+    if (lines.some(l => l.gl_account_id === '')) { setError('All lines need an account.'); return; }
+    if (!isBalanced) { setError('Entry must be balanced before saving.'); return; }
+    setSaving(true);
+    try {
+      await updateJePosted({
+        entry_id: savedId,
+        entry_date: date,
+        description,
+        journal_type: journalType,
+        notes: notes || undefined,
+        lines: lines.map(({ _key, ...l }) => l),
+      });
+      const log = await getEditLog(savedId);
+      setEditLog(log);
+      setIsEditingPosted(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleUpload(files: FileList) {
     setUploading(true);
     setError('');
@@ -619,7 +656,7 @@ export default function JournalEntryForm({
     );
   }
 
-  const isReadOnly = (entryStatus !== 'draft' && entryStatus !== 'rejected') || (!isEditMode && !canCreate) || (isEditMode && !canEdit);
+  const isReadOnly = ((entryStatus !== 'draft' && entryStatus !== 'rejected') && !isEditingPosted) || (!isEditMode && !canCreate) || (isEditMode && !canEdit);
 
   return (
     <div className="max-w-6xl mx-auto space-y-5">
@@ -674,6 +711,16 @@ export default function JournalEntryForm({
               : `Out of balance by ${formatCurrency(Math.abs(totalDebit - totalCredit))}`}
         </div>
       </div>
+
+      {/* ── Editing posted warning ── */}
+      {isEditingPosted && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+          <AlertCircle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-700">
+            <span className="font-bold">Editing a posted entry.</span> All changes are logged in the audit trail. The entry will remain posted after saving.
+          </p>
+        </div>
+      )}
 
       {/* ── Rejection notice ── */}
       {entryStatus === 'rejected' && (
@@ -838,8 +885,13 @@ export default function JournalEntryForm({
             rows={4}
             placeholder="Internal memo, audit trail notes, approval remarks..."
             value={notes}
-            onChange={e => setNotes(e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+            readOnly={isReadOnly}
+            onChange={e => !isReadOnly && setNotes(e.target.value)}
+            className={`w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none resize-none ${
+              isReadOnly
+                ? 'bg-slate-100 text-slate-500 cursor-default'
+                : 'bg-slate-50 focus:ring-1 focus:ring-blue-500'
+            }`}
           />
         </Card>
 
@@ -851,6 +903,7 @@ export default function JournalEntryForm({
             uploading={uploading}
             onUpload={handleUpload}
             onDelete={handleDeleteAttachment}
+            isReadOnly={isReadOnly}
           />
         </Card>
       </div>
@@ -875,18 +928,44 @@ export default function JournalEntryForm({
       {/* ── Action bar ── */}
       <div className="flex justify-between items-center bg-white p-4 border border-slate-200 rounded-lg">
         {entryStatus === 'posted' || entryStatus === 'reversed' ? (
-          /* Posted / Reversed — read-only */
+          /* Posted / Reversed */
           <>
-            <button onClick={() => onNavigate?.('je-list')}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded">
-              <ArrowLeft size={16} /> Back
-            </button>
-            {entryStatus === 'posted' && canReverse && (
-              <button onClick={handleReverse} disabled={reversing}
-                className="flex items-center gap-2 px-6 py-2.5 rounded text-sm font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50">
-                {reversing ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-                Reverse Entry
-              </button>
+            {isEditingPosted ? (
+              /* Editing a posted entry */
+              <>
+                <button onClick={() => { setIsEditingPosted(false); setError(''); }}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded">
+                  <X size={16} /> Cancel
+                </button>
+                <button onClick={handleSavePosted} disabled={saving || !isBalanced}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  Save Changes
+                </button>
+              </>
+            ) : (
+              /* Normal posted view */
+              <>
+                <button onClick={() => onNavigate?.('je-list')}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded">
+                  <ArrowLeft size={16} /> Back
+                </button>
+                <div className="flex items-center gap-3">
+                  {entryStatus === 'posted' && canEdit && (
+                    <button onClick={() => { setIsEditingPosted(true); setError(''); }}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200">
+                      Edit Entry
+                    </button>
+                  )}
+                  {entryStatus === 'posted' && canReverse && (
+                    <button onClick={handleReverse} disabled={reversing}
+                      className="flex items-center gap-2 px-6 py-2.5 rounded text-sm font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50">
+                      {reversing ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                      Reverse Entry
+                    </button>
+                  )}
+                </div>
+              </>
             )}
           </>
         ) : entryStatus === 'pending_approval' ? (
