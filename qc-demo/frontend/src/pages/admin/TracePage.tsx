@@ -41,8 +41,22 @@ export function TracePage() {
   const [checkInCode, setCheckInCode] = useState('');
   const [checkInLocationId, setCheckInLocationId] = useState('');
   const [checkInTime, setCheckInTime] = useState(toLocalInputValue());
+  const [addingCheckIn, setAddingCheckIn] = useState(false);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
+
+  const startAddingCheckIn = () => {
+    setAddingCheckIn(true);
+    setMsg('');
+    setError('');
+  };
+
+  const cancelAddingCheckIn = () => {
+    setAddingCheckIn(false);
+    setCheckInCode('');
+    setCheckInTime(toLocalInputValue());
+    setError('');
+  };
 
   const load = () => {
     if (!lotId) return;
@@ -84,6 +98,7 @@ export function TracePage() {
       setMsg(`Checked in ${code}`);
       setCheckInCode('');
       setCheckInTime(toLocalInputValue());
+      setAddingCheckIn(false);
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Check-in failed');
@@ -91,6 +106,7 @@ export function TracePage() {
   };
 
   const startEditSub = (s: SubLot) => {
+    setAddingCheckIn(false);
     setEditingSubId(s.id);
     setSubForm(subToForm(s));
     setMsg('');
@@ -154,51 +170,67 @@ export function TracePage() {
       {msg && <p className="text-emerald-700 bg-emerald-50 p-3 rounded-lg mb-3">{msg}</p>}
       {error && <p className="text-red-600 mb-3">{error}</p>}
 
-      <form onSubmit={checkIn} className="bg-white rounded-xl border p-4 mb-6 space-y-3">
-        <h2 className="font-semibold">Add sub-lot (check in)</h2>
-        <label className="block">
-          <span className="text-sm font-medium">Sub-lot code</span>
-          <input
-            className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px] font-mono"
-            value={checkInCode}
-            onChange={(e) => setCheckInCode(e.target.value)}
-            required
-          />
-        </label>
-        <button type="button" onClick={fillSimulatedScan} className="text-sm text-blue-600 underline min-h-[44px]">
-          Simulate barcode scan (fill next code)
-        </button>
-        <label className="block">
-          <span className="text-sm font-medium">Dryer location</span>
-          <select
-            className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
-            value={checkInLocationId}
-            onChange={(e) => setCheckInLocationId(e.target.value)}
+      <button
+        type="button"
+        onClick={addingCheckIn ? cancelAddingCheckIn : startAddingCheckIn}
+        disabled={editingSubId !== null}
+        className={cn(
+          'mb-4 px-4 py-2 rounded-xl min-h-[44px] font-medium',
+          addingCheckIn
+            ? 'bg-slate-200 text-slate-700'
+            : 'bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed'
+        )}
+      >
+        {addingCheckIn ? 'Cancel' : 'Add sub-lot'}
+      </button>
+
+      {addingCheckIn && (
+        <form onSubmit={checkIn} className="bg-white border-2 border-blue-400 rounded-xl p-4 mb-6 space-y-3 shadow-sm">
+          <h2 className="font-semibold text-blue-800">Add sub-lot (check in)</h2>
+          <label className="block">
+            <span className="text-sm font-medium">Sub-lot code</span>
+            <input
+              className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px] font-mono"
+              value={checkInCode}
+              onChange={(e) => setCheckInCode(e.target.value)}
+              required
+            />
+          </label>
+          <button type="button" onClick={fillSimulatedScan} className="text-sm text-blue-600 underline min-h-[44px]">
+            Simulate barcode scan (fill next code)
+          </button>
+          <label className="block">
+            <span className="text-sm font-medium">Dryer location</span>
+            <select
+              className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
+              value={checkInLocationId}
+              onChange={(e) => setCheckInLocationId(e.target.value)}
+            >
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">Check-in time</span>
+            <input
+              type="datetime-local"
+              className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
+              value={checkInTime}
+              onChange={(e) => setCheckInTime(e.target.value)}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={!checkInCode.trim()}
+            className="w-full bg-sky-600 text-white py-3 rounded-xl min-h-[48px] font-medium disabled:opacity-50"
           >
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.display_name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium">Check-in time</span>
-          <input
-            type="datetime-local"
-            className="mt-1 w-full border rounded-lg px-3 py-3 min-h-[44px]"
-            value={checkInTime}
-            onChange={(e) => setCheckInTime(e.target.value)}
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={!checkInCode.trim()}
-          className="w-full bg-sky-600 text-white py-3 rounded-xl min-h-[48px] font-medium disabled:opacity-50"
-        >
-          Confirm check-in
-        </button>
-      </form>
+            Confirm check-in
+          </button>
+        </form>
+      )}
 
       <h2 className="font-semibold mb-2 flex items-center gap-2">
         Drying sub-lots
@@ -316,7 +348,7 @@ export function TracePage() {
           );
         })}
         {detail.sub_lots.length === 0 && (
-          <p className="text-slate-500">No sub-lots yet. Use the form above to check in.</p>
+          <p className="text-slate-500">No sub-lots yet. Click Add sub-lot to check in.</p>
         )}
       </ul>
 
