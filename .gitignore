@@ -1,0 +1,41 @@
+# ── macOS Finder noise ────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+._*
+
+# ── Node / Vite / TypeScript ──────────────────────────────────────────
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.cache/
+
+# ── Env files (never commit secrets) ──────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── IDE / editor ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Claude Code working dir ──────────────────────────────────────────
+.claude/
+
+# ── Logs ──────────────────────────────────────────────────────────────
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Tauri build artifacts ─────────────────────────────────────────────
+eee-main/src-tauri/target/
+
+# ── Supabase ──────────────────────────────────────────────────────────
+**/supabase/.branches/
+**/supabase/.temp/
+
+# ── Misc ──────────────────────────────────────────────────────────────
+*.log
+.tmp/

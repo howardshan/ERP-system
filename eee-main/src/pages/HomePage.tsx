@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   BarChart3,
   Package,
@@ -7,9 +7,13 @@ import {
   ShieldCheck,
   GitBranch,
   BookOpen,
+  Users,
+  ClipboardCheck,
   ArrowRight,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react';
+import { usePermissions } from '../contexts/PermissionContext';
 
 interface Module {
   id: string;
@@ -140,6 +144,42 @@ const MODULES: Module[] = [
     features: ['Routing Structure', 'Module Specs', 'DB Schema & RPC', 'Migrations Index'],
   },
   {
+    id: 'qc',
+    label: 'Quality Control',
+    description: 'Post-dry inspection workflow: production lots, drying sub-lots, pending queue, hold disposition, and batch trace.',
+    icon: ClipboardCheck,
+    status: 'active',
+    color: {
+      bg: 'bg-rose-50',
+      border: 'border-rose-200',
+      icon: 'text-rose-700',
+      iconBg: 'bg-rose-100',
+      badge: 'bg-rose-100 border-rose-200',
+      badgeText: 'text-rose-700',
+      button: 'bg-rose-600 hover:bg-rose-500 text-white',
+      chevron: 'text-rose-500',
+    },
+    features: ['Sub-lot Check-in/out', 'Pending Queue', 'Hold Disposition', 'Batch Trace'],
+  },
+  {
+    id: 'hr',
+    label: 'Human Resources',
+    description: 'Employee directory, job titles, departments, reporting lines, and profile management.',
+    icon: Users,
+    status: 'active',
+    color: {
+      bg: 'bg-teal-50',
+      border: 'border-teal-200',
+      icon: 'text-teal-600',
+      iconBg: 'bg-teal-100',
+      badge: 'bg-teal-100 border-teal-200',
+      badgeText: 'text-teal-700',
+      button: 'bg-teal-600 hover:bg-teal-500 text-white',
+      chevron: 'text-teal-500',
+    },
+    features: ['Employee Directory', 'Job Titles & Roles', 'Department & Manager', 'Profile Editing'],
+  },
+  {
     id: 'auth',
     label: 'Users & Authentication',
     description: 'User accounts, role-based access control, approval tier assignments, and audit logs.',
@@ -167,6 +207,15 @@ interface HomePageProps {
 }
 
 export default function HomePage({ onNavigate, onLogout, userName, userEmail }: HomePageProps) {
+  const { reload, canAccessModule } = usePermissions();
+  const [reloading, setReloading] = useState(false);
+
+  async function handleReload() {
+    setReloading(true);
+    await reload();
+    setReloading(false);
+  }
+
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       {/* Header */}
@@ -191,6 +240,14 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
             <p className="text-[11px] text-slate-400 mt-0.5">{userEmail}</p>
           </div>
           <button
+            onClick={handleReload}
+            disabled={reloading}
+            title="Reload permissions"
+            className="p-2 text-slate-400 hover:text-slate-700 disabled:opacity-40 transition-colors"
+          >
+            <RefreshCw size={15} className={reloading ? 'animate-spin' : ''} />
+          </button>
+          <button
             onClick={onLogout}
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors"
           >
@@ -205,7 +262,7 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
       {/* Module Grid */}
       <main className="flex-1 px-12 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {MODULES.map((mod) => {
+          {MODULES.filter((mod) => canAccessModule(mod.id)).map((mod) => {
             const Icon = mod.icon;
             const isActive = mod.status === 'active';
 

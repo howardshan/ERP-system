@@ -56,6 +56,14 @@ interface GlAccount {
 - 快速操作：Open / Close 按钮
 - 错误横幅：当凭证保存失败因"No open accounting period"时，展示跳转至本页的按钮
 
+### 权限控制
+| 元素 | 所需权限 |
+|------|---------|
+| New Period 按钮 | `finance.accounting_periods.close` 或 `.open` 之一 |
+| Close Period 按钮 | `finance.accounting_periods.close` |
+| Reopen / Open Period 按钮 | `finance.accounting_periods.open` |
+| 导航至此页 | Sidebar 需要 `finance.accounting_periods.view` |
+
 ### 状态流
 
 ```

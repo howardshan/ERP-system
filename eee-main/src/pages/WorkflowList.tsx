@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, GitBranch, Play, Archive, Pencil, Trash2, Clock } from 'lucide-react';
+import { Plus, GitBranch, Play, Archive, Pencil, Trash2, Clock, ArrowLeft } from 'lucide-react';
 import { getWorkflows, deleteWorkflow, updateWorkflowStatus, createWorkflow } from '../services/workflowApi';
 import type { WorkflowDefinition } from '../types/workflow';
 import { format } from 'date-fns';
@@ -72,7 +72,12 @@ export default function WorkflowList({ onNavigate }: WorkflowListProps) {
       {/* Header */}
       <div className="px-10 pt-10 pb-6 flex items-center justify-between">
         <div>
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1">Workflow Studio</p>
+          <button
+            onClick={() => onNavigate('home')}
+            className="flex items-center gap-1.5 text-slate-400 hover:text-slate-700 text-[10px] uppercase tracking-widest font-bold mb-2 transition-colors"
+          >
+            <ArrowLeft size={12} /> All Modules
+          </button>
           <h1 className="text-3xl font-bold text-slate-900">Workflows</h1>
           <p className="text-slate-500 text-sm mt-1.5">
             Build custom automations by connecting data sources, logic, and actions.
