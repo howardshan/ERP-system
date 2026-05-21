@@ -25,3 +25,9 @@ def test_inspection_passed_summary():
 def test_disposition_summary():
     s = quality_event_summary("disposition_completed", {"type": "rework", "remark": "Rework cycle 1"}, "D01")
     assert "Rework" in s
+
+
+def test_admin_sub_lot_updated_summary():
+    s = quality_event_summary("admin_sub_lot_updated", {}, "LOT-DEMO-001-D03")
+    assert "updated by administrator" in s
+    assert "LOT-DEMO-001-D03" in s

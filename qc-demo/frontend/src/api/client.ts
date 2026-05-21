@@ -87,6 +87,38 @@ export const api = {
   }) =>
     request<ProductionLot>('/production-lots', { method: 'POST', body: JSON.stringify(body) }),
 
+  updateProductionLot: (
+    id: string,
+    body: {
+      lot_number?: string;
+      lot_barcode?: string;
+      work_order_barcode?: string;
+      sku_id?: string;
+    }
+  ) =>
+    request<ProductionLot>(`/production-lots/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  deleteProductionLot: (id: string) =>
+    request<{ ok: boolean }>(`/production-lots/${id}`, { method: 'DELETE' }),
+
+  updateSubLot: (
+    id: string,
+    body: {
+      sub_lot_code?: string;
+      location_id?: string | null;
+      in_time?: string | null;
+      out_time?: string | null;
+      status?: string;
+    }
+  ) =>
+    request<SubLot>(`/drying-sub-lots/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deleteSubLot: (id: string) =>
+    request<{ ok: boolean }>(`/drying-sub-lots/${id}`, { method: 'DELETE' }),
+
   productionLotDetail: (id: string) =>
     request<{
       lot: ProductionLot;
@@ -97,9 +129,9 @@ export const api = {
   pending: () => request<SubLot[]>('/pending-inspections'),
   checkInSubLot: (body: {
     production_lot_id: string;
+    sub_lot_code: string;
     location_id?: string;
     in_time?: string;
-    sub_lot_code?: string;
   }) =>
     request<SubLot>('/drying-sub-lots/check-in', { method: 'POST', body: JSON.stringify(body) }),
 
@@ -140,6 +172,16 @@ export type QualityEvent = {
   summary: string;
 };
 
+export type SubLotStatusCounts = {
+  total: number;
+  drying: number;
+  pending: number;
+  passed: number;
+  hold: number;
+  disposing: number;
+  closed: number;
+};
+
 export type ProductionLot = {
   id: string;
   lot_number: string;
@@ -149,6 +191,7 @@ export type ProductionLot = {
   sku_code?: string;
   sku_name?: string;
   created_at: string;
+  sub_lot_counts: SubLotStatusCounts;
 };
 
 export type InspectionTemplate = {

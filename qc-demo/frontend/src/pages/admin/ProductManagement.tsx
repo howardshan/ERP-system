@@ -1,6 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { Box } from 'lucide-react';
 import { api, Product, ProductInput } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
+import { RowActionsMenu } from '../../components/RowActionsMenu';
+import { Alert, Button, Card, EmptyState, Field, Input, PageHeader } from '../../components/ui';
+import { getTone } from '../../components/ui/tone';
 import { cn } from '../../lib/utils';
 
 const emptyForm = (): ProductInput => ({
@@ -9,6 +13,8 @@ const emptyForm = (): ProductInput => ({
   standard_drying_minutes: 240,
   template: { item_name: 'Water Activity (Aw)', unit: null, lower_limit: 0.65, upper_limit: 0.75 },
 });
+
+const accentForm = getTone('admin').outlineAccent;
 
 function productToForm(p: Product): ProductInput {
   const t = p.templates[0];
@@ -37,31 +43,17 @@ function ProductFormFields({
   return (
     <>
       <div className="grid sm:grid-cols-2 gap-3">
-        <label className="block">
-          <span className="text-sm font-medium">SKU code</span>
-          <input
-            className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
-            value={form.code}
-            onChange={(e) => setForm({ ...form, code: e.target.value })}
-            required
-          />
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium">Product name</span>
-          <input
-            className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-          />
-        </label>
+        <Field label="SKU code">
+          <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
+        </Field>
+        <Field label="Product name">
+          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+        </Field>
       </div>
-      <label className="block">
-        <span className="text-sm font-medium">Reference dry time (minutes, SOP)</span>
-        <input
+      <Field label="Reference dry time (minutes, SOP)">
+        <Input
           type="number"
           min={1}
-          className="mt-1 w-full border rounded-lg px-3 py-2 min-h-[44px]"
           value={form.standard_drying_minutes ?? ''}
           onChange={(e) =>
             setForm({
@@ -70,26 +62,20 @@ function ProductFormFields({
             })
           }
         />
-      </label>
-      <fieldset className="border rounded-lg p-3 space-y-3">
-        <legend className="text-sm font-semibold px-1">Post-dry inspection spec</legend>
-        <label className="block">
-          <span className="text-sm">Inspection item</span>
-          <input
-            className="mt-1 w-full border rounded-lg px-3 py-2"
+      </Field>
+      <fieldset className={cn('border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50')}>
+        <legend className="text-sm font-semibold px-1 text-slate-800">Post-dry inspection spec</legend>
+        <Field label="Inspection item">
+          <Input
             value={form.template.item_name}
-            onChange={(e) =>
-              setForm({ ...form, template: { ...form.template, item_name: e.target.value } })
-            }
+            onChange={(e) => setForm({ ...form, template: { ...form.template, item_name: e.target.value } })}
           />
-        </label>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-sm">Lower limit</span>
-            <input
+          <Field label="Lower limit">
+            <Input
               type="number"
               step="0.01"
-              className="mt-1 w-full border rounded-lg px-3 py-2"
               value={form.template.lower_limit}
               onChange={(e) =>
                 setForm({
@@ -99,13 +85,11 @@ function ProductFormFields({
               }
               required
             />
-          </label>
-          <label className="block">
-            <span className="text-sm">Upper limit</span>
-            <input
+          </Field>
+          <Field label="Upper limit">
+            <Input
               type="number"
               step="0.01"
-              className="mt-1 w-full border rounded-lg px-3 py-2"
               value={form.template.upper_limit}
               onChange={(e) =>
                 setForm({
@@ -115,7 +99,7 @@ function ProductFormFields({
               }
               required
             />
-          </label>
+          </Field>
         </div>
       </fieldset>
     </>
@@ -193,41 +177,36 @@ export function ProductManagement() {
   const isBusy = creating || editingId !== null;
 
   return (
-    <AppShell variant="admin" title="Products">
-      <p className="text-slate-600 mb-4 text-sm">
-        Maintain SKU, reference dry time (SOP), and post-dry inspection limits. Actual sub-lot check-in/out
-        times are recorded under Production Lots on the QC floor.
-      </p>
-      {msg && <p className="text-emerald-700 bg-emerald-50 p-3 rounded-lg mb-4">{msg}</p>}
-      {error && <p className="text-red-600 mb-4">{error}</p>}
-
-      <button
-        type="button"
-        onClick={creating ? cancel : startCreate}
-        disabled={editingId !== null}
-        className={cn(
-          'mb-4 px-4 py-2 rounded-xl min-h-[44px] font-medium',
-          creating
-            ? 'bg-slate-200 text-slate-700'
-            : 'bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed'
-        )}
-      >
-        {creating ? 'Cancel new' : 'Add product'}
-      </button>
+    <AppShell variant="admin">
+      <PageHeader
+        title="Products"
+        description="Maintain SKU, reference dry time (SOP), and post-dry inspection limits. Actual sub-lot check-in/out times are recorded under Production Lots on the QC floor."
+        action={
+          <Button variant={creating ? 'secondary' : 'primary'} onClick={creating ? cancel : startCreate} disabled={editingId !== null}>
+            {creating ? 'Cancel new' : 'Add product'}
+          </Button>
+        }
+      />
+      <div className="space-y-4 mb-4">
+        {msg && <Alert variant="success">{msg}</Alert>}
+        {error && <Alert variant="error">{error}</Alert>}
+      </div>
 
       {creating && (
-        <form onSubmit={submit} className="bg-white border-2 border-blue-400 rounded-xl p-4 mb-6 space-y-4 shadow-sm">
-          <h2 className="font-semibold text-blue-800">New product</h2>
-          <ProductFormFields form={form} setForm={setForm} />
-          <div className="flex gap-2">
-            <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl min-h-[48px]">
-              Save
-            </button>
-            <button type="button" className="px-4 py-3 rounded-xl border min-h-[48px]" onClick={cancel}>
-              Cancel
-            </button>
-          </div>
-        </form>
+        <Card variant="outline" className={cn('p-4 mb-6 space-y-4 border-2 shadow-sm', accentForm)}>
+          <h2 className="font-semibold text-indigo-800">New product</h2>
+          <form onSubmit={submit} className="space-y-4">
+            <ProductFormFields form={form} setForm={setForm} />
+            <div className="flex gap-2">
+              <Button type="submit" variant="primary" className="flex-1">
+                Save
+              </Button>
+              <Button type="button" variant="secondary" onClick={cancel}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Card>
       )}
 
       <ul className="space-y-3">
@@ -236,73 +215,65 @@ export function ProductManagement() {
           const isEditing = editingId === p.id;
 
           return (
-            <li
-              key={p.id}
-              className={cn(
-                'rounded-xl p-4 transition-colors',
-                isEditing
-                  ? 'bg-white border-2 border-blue-500 shadow-sm'
-                  : 'bg-white border'
-              )}
-            >
-              {isEditing ? (
-                <form onSubmit={submit} className="space-y-4">
-                  <h2 className="font-semibold text-blue-800">Edit · {p.name}</h2>
-                  <ProductFormFields form={form} setForm={setForm} />
-                  <div className="flex gap-2">
-                    <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl min-h-[48px]">
-                      Save
-                    </button>
-                    <button type="button" className="px-4 py-3 rounded-xl border min-h-[48px]" onClick={cancel}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <>
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <div className="font-semibold text-lg">{p.name}</div>
-                      <div className="text-sm text-slate-500">{p.code}</div>
+            <li key={p.id}>
+              <Card variant="elevated" className={cn('p-4', isEditing && cn('border-2', accentForm))}>
+                {isEditing ? (
+                  <form onSubmit={submit} className="space-y-4">
+                    <h2 className="font-semibold text-indigo-800">Edit · {p.name}</h2>
+                    <ProductFormFields form={form} setForm={setForm} />
+                    <div className="flex gap-2">
+                      <Button type="submit" variant="primary" className="flex-1">
+                        Save
+                      </Button>
+                      <Button type="button" variant="secondary" onClick={cancel}>
+                        Cancel
+                      </Button>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        type="button"
-                        className="text-blue-600 min-h-[44px] px-2 disabled:opacity-40"
-                        disabled={isBusy}
-                        onClick={() => startEdit(p)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="text-red-600 min-h-[44px] px-2 disabled:opacity-40"
-                        disabled={isBusy}
-                        onClick={() => remove(p.id, p.code)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                  <dl className="mt-3 grid sm:grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <dt className="text-slate-500">Reference dry</dt>
-                      <dd>{p.standard_drying_minutes ? `${p.standard_drying_minutes} min` : 'Not set'}</dd>
-                    </div>
-                    {t && (
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start gap-2">
                       <div>
-                        <dt className="text-slate-500">{t.item_name} spec range</dt>
-                        <dd>
-                          [{t.lower_limit}, {t.upper_limit}]
+                        <div className="font-semibold text-lg text-slate-900">{p.name}</div>
+                        <div className="text-sm text-slate-500 font-mono">{p.code}</div>
+                      </div>
+                      <RowActionsMenu
+                        disabled={isBusy}
+                        actions={[
+                          { label: 'Edit', onClick: () => startEdit(p) },
+                          { label: 'Delete', variant: 'danger', onClick: () => remove(p.id, p.code) },
+                        ]}
+                      />
+                    </div>
+                    <dl className="mt-3 grid sm:grid-cols-2 gap-3 text-sm border-t border-slate-100 pt-3">
+                      <div>
+                        <dt className="text-slate-500 text-xs uppercase tracking-wide">Reference dry</dt>
+                        <dd className="font-medium mt-0.5">
+                          {p.standard_drying_minutes ? `${p.standard_drying_minutes} min` : 'Not set'}
                         </dd>
                       </div>
-                    )}
-                  </dl>
-                </>
-              )}
+                      {t && (
+                        <div>
+                          <dt className="text-slate-500 text-xs uppercase tracking-wide">{t.item_name} spec</dt>
+                          <dd className="font-medium mt-0.5 tabular-nums">
+                            [{t.lower_limit}, {t.upper_limit}]
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+                  </>
+                )}
+              </Card>
             </li>
           );
         })}
+        {products.length === 0 && !creating && (
+          <EmptyState
+            icon={Box}
+            title="No products"
+            description="Add a product SKU and inspection limits for post-dry QC."
+          />
+        )}
       </ul>
     </AppShell>
   );

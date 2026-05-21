@@ -84,7 +84,30 @@ def _attach_hold_detail(out: dict, sub: DryingSubLot, db: Session) -> None:
         out["hold_reason"] = "Inspection failed (reading missing)"
 
 
-def lot_to_out(lot: ProductionLot, db: Session) -> dict:
+def empty_sub_lot_counts() -> dict:
+    return {
+        "total": 0,
+        "drying": 0,
+        "pending": 0,
+        "passed": 0,
+        "hold": 0,
+        "disposing": 0,
+        "closed": 0,
+    }
+
+
+def build_sub_lot_counts(status_rows: list[tuple[str, int]]) -> dict:
+    counts = empty_sub_lot_counts()
+    for status, n in status_rows:
+        counts["total"] += n
+        if status == "inspecting":
+            counts["pending"] += n
+        elif status in counts:
+            counts[status] += n
+    return counts
+
+
+def lot_to_out(lot: ProductionLot, db: Session, *, sub_lot_counts: dict | None = None) -> dict:
     sku = db.get(ProductSku, lot.sku_id)
     return {
         "id": lot.id,
@@ -95,4 +118,5 @@ def lot_to_out(lot: ProductionLot, db: Session) -> dict:
         "sku_code": sku.code if sku else None,
         "sku_name": sku.name if sku else None,
         "created_at": lot.created_at,
+        "sub_lot_counts": sub_lot_counts or empty_sub_lot_counts(),
     }
