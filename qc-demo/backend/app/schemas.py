@@ -74,6 +74,21 @@ class ProductionLotCreate(BaseModel):
     sku_id: UUID
 
 
+class ProductionLotUpdate(BaseModel):
+    lot_number: str | None = None
+    lot_barcode: str | None = None
+    work_order_barcode: str | None = None
+    sku_id: UUID | None = None
+
+
+class DryingSubLotUpdate(BaseModel):
+    sub_lot_code: str | None = None
+    location_id: UUID | None = None
+    in_time: datetime | None = None
+    out_time: datetime | None = None
+    status: str | None = None
+
+
 class SubLotStatusCounts(BaseModel):
     total: int = 0
     drying: int = 0

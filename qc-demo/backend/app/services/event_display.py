@@ -45,4 +45,7 @@ def quality_event_summary(event_type: str, payload: dict, sub_lot_code: str | No
         base = f"{prefix}Disposition completed: {label}"
         return f"{base} ({remark})" if remark else base
 
+    if event_type == "admin_sub_lot_updated":
+        return f"{prefix}Sub-lot record updated by administrator"
+
     return f"{prefix}{event_type}"
