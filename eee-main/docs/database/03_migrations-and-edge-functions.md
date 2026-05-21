@@ -320,6 +320,104 @@ supabase functions deploy create-auth-user
 
 ---
 
+---
+
+### M-012 `20260518000004_seed_manage_permissions.sql`
+**用途**: 为 ysha@smu.edu 预置 Finance 模块所有权限（首次让该账号进入财务模块可正常使用）。
+
+**变更**:
+- `user_module_access`: 新增 `finance` 模块访问
+- `user_permission_grant`: 批量授予 `finance` 下全部权限（journal_entry、chart_of_accounts、accounting_periods 全套 + module_permissions.manage）
+
+---
+
+### M-013 `20260518000005_auth_module_permissions.sql`
+**用途**: 为 ysha@smu.edu 预置 Auth 模块所有权限（让该账号可以管理用户和权限）。
+
+**变更**:
+- `user_module_access`: 新增 `auth` 模块访问
+- `user_permission_grant`: 批量授予 `auth` 下全部权限（users 全套、roles 全套、departments 全套、module_permissions.manage）
+
+---
+
+### M-014 `20260518000006_workflow_permissions_seed.sql`
+**用途**: 为 ysha@smu.edu 授予 Workflow Studio 权限，并补充 docs / warehouse / sales / production 模块访问（保证首页所有模块卡片可见）。
+
+**变更**:
+- `user_module_access`: 批量新增 `workflow`, `docs`, `warehouse`, `sales`, `production`
+- `user_permission_grant`: 授予 `workflow` 下全部权限（view/create/edit/delete/execute + module_permissions.manage）
+
+**背景**: HomePage 改为按 `canAccessModule()` 过滤模块卡片，无 module_access 记录则卡片不显示，故需为管理员账号补全所有模块。
+
+---
+
+### M-015 `20260518000007_add_role_to_erp_user.sql`
+**用途**: 在 `erp_user` 表增加 `role` 字段（职位 / 职称），并更新 `list_erp_users()` RPC 包含该字段。
+
+**变更**:
+- `ALTER TABLE erp_user ADD COLUMN IF NOT EXISTS role text` — 职位/职称字段
+- `list_erp_users()`: 更新返回类型及 SELECT，包含 `role` 列
+
+**依赖**: M-011
+
+---
+
+### M-016 `20260518000008_hr_module_seed.sql`
+**用途**: 为 ysha@smu.edu 预置 HR 模块访问及员工权限。
+
+**变更**:
+- `user_module_access`: 新增 `hr` 模块访问
+- `user_permission_grant`: 授予 `hr.employees.view`（查看员工列表）和 `hr.employees.edit`（编辑员工档案）
+
+**依赖**: M-009, M-015
+
+---
+
+### M-017 `20260518000009_storage_policies.sql`
+**用途**: 为 `journal-attachments` Storage bucket 补充 RLS 策略，修复上传 JE 附件时触发的"new row violates row-level security policy"错误。
+
+**变更**:
+- `journal-attachments` bucket 新增 RLS 策略：
+  - INSERT — `authenticated` 角色可上传
+  - SELECT — `authenticated` 角色可读取
+  - DELETE — `authenticated` 角色可删除
+
+**依赖**: M-003
+
+---
+
+### M-018 `20260518000010_finance_audit_log.sql`
+**用途**: 创建财务操作审计日志表，为所有财务模块变更提供完整追踪。
+
+**包含**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `finance_audit_log` | CREATE TABLE | 财务审计日志主表 |
+| RLS 策略 | CREATE POLICY | `authenticated` 角色可 INSERT + SELECT |
+| Seed data | INSERT | 为 ysha@smu.edu 授予 `finance.audit_log.view` 权限 |
+
+**`finance_audit_log` 表结构**:
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `id` | bigserial PK | 自增主键 |
+| `entity_type` | text | `journal_entry` / `chart_of_accounts` / `accounting_period` / `attachment` |
+| `entity_id` | text | 稳定的数据库主键（字符串化），即使科目代码等字段变更也不变 |
+| `action` | text | `create` / `edit` / `delete` / `post` / `submit` / `approve` / `reject` / `reverse` / `open` / `close` |
+| `actor_auth_id` | uuid | 操作人的 Supabase auth UUID |
+| `actor_name` | text | 操作人姓名（冗余存储，防止用户被删后无法显示） |
+| `changed_at` | timestamptz | 操作时间（默认 `now()`） |
+| `before_snapshot` | jsonb | 操作前完整记录快照 |
+| `after_snapshot` | jsonb | 操作后完整记录快照 |
+| `diff` | jsonb | 变更字段的前后对比 |
+| `entry_number` | text | 可搜索的业务引用：JE 编号 / 科目代码 / 期间名称 / 文件名 |
+| `description` | text | 人类可读的操作摘要 |
+
+**依赖**: M-009, M-012
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -335,7 +433,14 @@ supabase functions deploy create-auth-user
 | M-009 | 20260518000001_user_permission_system.sql |
 | M-010 | 20260518000002_link_erp_user_to_auth.sql |
 | M-011 | 20260518000003_fix_list_erp_users.sql |
-| **M-012** | _(下一个)_ |
+| M-012 | 20260518000004_seed_manage_permissions.sql |
+| M-013 | 20260518000005_auth_module_permissions.sql |
+| M-014 | 20260518000006_workflow_permissions_seed.sql |
+| M-015 | 20260518000007_add_role_to_erp_user.sql |
+| M-016 | 20260518000008_hr_module_seed.sql |
+| M-017 | 20260518000009_storage_policies.sql |
+| M-018 | 20260518000010_finance_audit_log.sql |
+| **M-019** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

@@ -17,6 +17,8 @@ import WorkflowList from './pages/WorkflowList';
 import WorkflowBuilder from './pages/WorkflowBuilder';
 import DocsPage from './pages/DocsPage';
 import UserManagement from './pages/auth/UserManagement';
+import HRModule from './pages/hr/HRModule';
+import AuditLog from './pages/finance/AuditLog';
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -112,6 +114,8 @@ function AppShell({
               return <AccountingPeriods />;
             case 'approval-settings':
               return <ApprovalSettings />;
+            case 'audit-log':
+              return <AuditLog />;
             default:
               return <FinanceDashboard onNavigate={setActiveScreen} />;
           }
@@ -130,6 +134,10 @@ function AppShell({
 
   if (activeModule === 'auth') {
     return <UserManagement onHome={() => setActiveModule('home')} />;
+  }
+
+  if (activeModule === 'hr') {
+    return <HRModule onHome={() => setActiveModule('home')} />;
   }
 
   return <ModulePlaceholder name={activeModule} onHome={() => setActiveModule('home')} />;

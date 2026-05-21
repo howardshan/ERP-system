@@ -1,29 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Save, Loader2, UserCircle, KeyRound, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, KeyRound, Eye, EyeOff, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { getUser, getUsers, getUserPermissions, setPermission, setModuleAccess, updateUser, resetUserPassword } from '../../services/authApi';
 import { PERMISSION_STRUCTURE } from '../../lib/permissionStructure';
 import type { ErpUser, UserPermissionGrant } from '../../types/auth';
+import { usePermissions } from '../../contexts/PermissionContext';
 
 interface Props {
   userId: string;
   onBack: () => void;
 }
 
-type LeftPanel = 'profile' | string; // 'profile' or a module id
+type LeftPanel = 'account' | string; // 'account' or a module id
 
 export default function UserDetail({ userId, onBack }: Props) {
+  const { reload: reloadPermissions } = usePermissions();
   const [user, setUser] = useState<ErpUser | null>(null);
-  const [allUsers, setAllUsers] = useState<ErpUser[]>([]);
   const [grants, setGrants] = useState<UserPermissionGrant[]>([]);
-  const [selectedPanel, setSelectedPanel] = useState<LeftPanel>('profile');
+  const [selectedPanel, setSelectedPanel] = useState<LeftPanel>('account');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
-  // Profile edits
-  const [profileEdits, setProfileEdits] = useState<{ full_name: string; department: string; manager_id: string }>({
-    full_name: '', department: '', manager_id: '',
-  });
   const [deactivating, setDeactivating] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
@@ -40,16 +37,10 @@ export default function UserDetail({ userId, onBack }: Props) {
   const [removedGrants, setRemovedGrants] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    Promise.all([getUser(userId), getUserPermissions(userId), getUsers()]).then(([u, g, all]) => {
+    Promise.all([getUser(userId), getUserPermissions(userId)]).then(([u, g]) => {
       setUser(u);
       setGrants(g);
-      setAllUsers(all.filter(a => a.id !== userId));
       setLocalModules(new Set(u.module_access ?? []));
-      setProfileEdits({
-        full_name: u.full_name ?? '',
-        department: u.department ?? '',
-        manager_id: u.manager_id ?? '',
-      });
       setLoading(false);
     });
   }, [userId]);
@@ -102,22 +93,14 @@ export default function UserDetail({ userId, onBack }: Props) {
     setRemovedGrants(prev => { const s = new Set(prev); s.delete(key); return s; });
   }
 
-  // ── Save ─────────────────────────────────────────────────────────────
+  // ── Save (module access + permissions only) ───────────────────────────
 
   async function handleSave() {
     if (!user) return;
     setSaving(true);
     setSaveMsg(null);
     try {
-      // Profile
-      await updateUser(userId, {
-        full_name: profileEdits.full_name || undefined,
-        department: profileEdits.department || null,
-        manager_id: profileEdits.manager_id || null,
-      });
-      // Module access
       await setModuleAccess(userId, [...localModules]);
-      // Permission grants
       for (const [key, limit] of localGrants) {
         const [mod, res, perm] = key.split('|');
         await setPermission(userId, mod, res, perm, true, limit);
@@ -127,12 +110,17 @@ export default function UserDetail({ userId, onBack }: Props) {
         await setPermission(userId, mod, res, perm, false);
       }
       const [u, g] = await Promise.all([getUser(userId), getUserPermissions(userId)]);
+      for (const key of removedGrants) {
+        const [mod, res, perm] = key.split('|');
+        const stillExists = g.some(gr => gr.module_id === mod && gr.resource === res && gr.permission === perm);
+        if (stillExists) throw new Error(`Failed to remove permission: ${mod}.${res}.${perm}`);
+      }
       setUser(u); setGrants(g);
       setLocalGrants(new Map()); setRemovedGrants(new Set());
       setLocalModules(new Set(u.module_access ?? []));
-      setProfileEdits({ full_name: u.full_name ?? '', department: u.department ?? '', manager_id: u.manager_id ?? '' });
       setSaveMsg({ type: 'ok', text: 'Saved' });
       setTimeout(() => setSaveMsg(null), 2500);
+      await reloadPermissions();
     } catch (e: any) {
       setSaveMsg({ type: 'err', text: e?.message ?? 'Error' });
     }
@@ -184,7 +172,7 @@ export default function UserDetail({ userId, onBack }: Props) {
     );
   }
 
-  const moduleDef = selectedPanel !== 'profile' ? PERMISSION_STRUCTURE[selectedPanel] : null;
+  const moduleDef = selectedPanel !== 'account' ? PERMISSION_STRUCTURE[selectedPanel] : null;
   const pwMismatch = confirmPassword && newPassword !== confirmPassword;
   const pwCanSubmit = user.auth_user_id && newPassword.length >= 6 && newPassword === confirmPassword;
 
@@ -231,16 +219,16 @@ export default function UserDetail({ userId, onBack }: Props) {
       <div className="flex-1 flex overflow-hidden">
         {/* Left sidebar */}
         <nav className="w-56 bg-[#faf8f5] border-r border-slate-200 flex flex-col py-3 overflow-y-auto shrink-0">
-          {/* Profile */}
+          {/* Account */}
           <button
-            onClick={() => setSelectedPanel('profile')}
+            onClick={() => setSelectedPanel('account')}
             className={`flex items-center gap-2 px-4 py-2 text-xs font-bold transition-colors ${
-              selectedPanel === 'profile'
+              selectedPanel === 'account'
                 ? 'text-blue-700 bg-blue-50 border-r-2 border-blue-600'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <UserCircle size={14} /> Profile
+            <ShieldCheck size={14} /> Account
           </button>
 
           <div className="mx-4 my-2 h-px bg-slate-200" />
@@ -255,7 +243,7 @@ export default function UserDetail({ userId, onBack }: Props) {
                     const next = new Set(localModules);
                     if (enabled) {
                       next.delete(modId);
-                      if (selectedPanel === modId) setSelectedPanel('profile');
+                      if (selectedPanel === modId) setSelectedPanel('account');
                     } else {
                       next.add(modId);
                     }
@@ -281,54 +269,9 @@ export default function UserDetail({ userId, onBack }: Props) {
 
         {/* Right panel */}
         <main className="flex-1 overflow-y-auto p-8">
-          {selectedPanel === 'profile' ? (
+          {selectedPanel === 'account' ? (
             <div className="max-w-lg space-y-6">
-              {/* Profile fields */}
-              <div className="bg-white border border-slate-200 rounded-xl p-6">
-                <h3 className="text-sm font-bold text-slate-900 mb-4">Profile Information</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Full Name</label>
-                    <input
-                      value={profileEdits.full_name}
-                      onChange={e => setProfileEdits(p => ({ ...p, full_name: e.target.value }))}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Email</label>
-                    <input
-                      value={user.email}
-                      disabled
-                      className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-400 cursor-not-allowed"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Department</label>
-                    <input
-                      value={profileEdits.department}
-                      onChange={e => setProfileEdits(p => ({ ...p, department: e.target.value }))}
-                      placeholder="e.g. Finance"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Manager</label>
-                    <select
-                      value={profileEdits.manager_id}
-                      onChange={e => setProfileEdits(p => ({ ...p, manager_id: e.target.value }))}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">No manager</option>
-                      {allUsers.map(u => (
-                        <option key={u.id} value={u.id}>{u.full_name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Deactivate */}
+              {/* Account Status */}
               <div className="bg-white border border-slate-200 rounded-xl p-6">
                 <h3 className="text-sm font-bold text-slate-900 mb-1">Account Status</h3>
                 <p className="text-xs text-slate-500 mb-4">

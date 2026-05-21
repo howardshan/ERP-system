@@ -122,7 +122,7 @@ export default function UserManagement({ onHome }: Props) {
               <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    {['Name', 'Email', 'Department', 'Manager', 'Module Access', 'Status'].map(h => (
+                    {['Name', 'Role', 'Department', 'Manager', 'Module Access', 'Status'].map(h => (
                       <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
@@ -135,7 +135,7 @@ export default function UserManagement({ onHome }: Props) {
                       className="hover:bg-blue-50 cursor-pointer transition-colors"
                     >
                       <td className="px-5 py-3.5 font-semibold text-slate-900 text-sm">{u.full_name}</td>
-                      <td className="px-5 py-3.5 text-slate-500 text-sm">{u.email}</td>
+                      <td className="px-5 py-3.5 text-slate-500 text-sm">{u.role ?? '—'}</td>
                       <td className="px-5 py-3.5 text-slate-500 text-sm">{u.department ?? '—'}</td>
                       <td className="px-5 py-3.5 text-slate-500 text-sm">{(u.manager as any)?.full_name ?? '—'}</td>
                       <td className="px-5 py-3.5">

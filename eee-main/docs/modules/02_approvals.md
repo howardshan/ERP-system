@@ -97,11 +97,16 @@ interface UserProfile {
 
 ### 功能
 - 展示所有 `status = 'pending_approval'` 的凭证
-- 顶部显示当前用户的审批层级及金额上限
+- 顶部显示当前系统内已配置的审批层级及金额上限
 - 每条记录显示：JE 编号、日期、摘要、金额、所需层级
 - 操作按钮：
   - **Approve** — 调用 `approveJournalEntry()`，凭证变为 `posted`
   - **Reject** — 弹出拒绝理由输入框，调用 `rejectJournalEntry(id, reason)`
+
+### 权限控制
+- **整个页面**：需要 `finance.journal_entry.approve`。无权限时显示 `ShieldOff` 拒绝画面（不跳转，原地显示提示）
+- **Approve 按钮**：若当前用户的 `approval_limit` 不为 null 且凭证金额超过上限，按钮变为禁用状态，标注 "Over Limit ($X,XXX)"
+- **Sidebar 中的 Approvals 导航项**：需要 `finance.journal_entry.view`（任何能查看 JE 的用户均可访问审批队列）
 
 ### 侧边栏徽章
 `Sidebar` 从 `DashboardLayout` 接收 `pendingApprovalCount`，在 Approvals 导航项右侧显示琥珀色数字徽章，每次导航切换时刷新计数。
@@ -202,8 +207,23 @@ upsertUserProfile(profile): Promise<void>
 
 ---
 
+## 权限与审批限额关系
+
+审批权限通过 `user_permission_grant` 的 `approval_limit` 字段实现，与旧 `approval_tier` / `user_profile` 体系并存：
+
+| 方式 | 说明 |
+|------|------|
+| `approval_tier`（旧） | 预定义层级（Manager/Director/CFO/CEO），在 `approve_journal_entry` RPC 中通过 `user_profile.approval_tier_id` 检查 |
+| `user_permission_grant.approval_limit`（新） | 在 `PermissionContext` 中读取，前端在 ApprovalsQueue 中显示/禁用 Approve 按钮 |
+
+前端判断逻辑（`ApprovalsQueue.tsx`）：
+```tsx
+const myLimit = approvalLimit('finance', 'journal_entry', 'approve'); // null = 无限
+const overLimit = myLimit !== null && entryAmount > myLimit;
+// overLimit 为 true 时按钮禁用，显示 "Over Limit ($X,XXX)"
+```
+
 ## 待开发
 
-- [ ] **用户登录页**：目前无 Auth UI，`auth.uid()` 在匿名会话下返回 null（审批限额检查跳过）
-- [ ] **审批权限 RLS**：只有 tier >= required_tier 的用户才能看到审批按钮（目前前端无拦截）
 - [ ] **邮件/站内通知**：凭证提交/审批/拒绝后向相关人员发送通知
+- [ ] **RLS 数据库层拦截**：目前后端 `approve_journal_entry` RPC 使用 `user_profile.approval_tier_id` 检查，可考虑统一到 `user_permission_grant` 体系

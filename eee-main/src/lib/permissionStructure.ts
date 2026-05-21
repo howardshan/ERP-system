@@ -37,6 +37,12 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'open',  label: 'Open',  prereq: 'view' },
         ],
       },
+      audit_log: {
+        label: 'Audit Log',
+        permissions: [
+          { id: 'view', label: 'View Audit Log', prereq: null },
+        ],
+      },
     },
   },
   workflow: {
@@ -117,6 +123,94 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'create',   label: 'Create',   prereq: 'view' },
           { id: 'release',  label: 'Release',  prereq: 'view' },
           { id: 'complete', label: 'Complete', prereq: 'view' },
+        ],
+      },
+    },
+  },
+  hr: {
+    label: 'Human Resources',
+    resources: {
+      module_permissions: {
+        label: 'Module Permissions',
+        permissions: [
+          { id: 'manage', label: 'Manage User Permissions', prereq: null },
+        ],
+      },
+      employees: {
+        label: 'Employee Profiles',
+        permissions: [
+          { id: 'view',   label: 'View',         prereq: null },
+          { id: 'edit',   label: 'Edit Profile', prereq: 'view' },
+          { id: 'export', label: 'Export CSV',   prereq: 'view' },
+        ],
+      },
+      departments: {
+        label: 'Departments',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'create', label: 'Create', prereq: 'view' },
+          { id: 'edit',   label: 'Edit',   prereq: 'view' },
+        ],
+      },
+      recruitment: {
+        label: 'Recruitment & Interviews',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'create', label: 'Create', prereq: 'view' },
+          { id: 'edit',   label: 'Edit',   prereq: 'view' },
+          { id: 'delete', label: 'Delete', prereq: 'edit' },
+        ],
+      },
+      onboarding: {
+        label: 'Onboarding',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'manage', label: 'Manage', prereq: 'view' },
+        ],
+      },
+      leave: {
+        label: 'Leave Management',
+        permissions: [
+          { id: 'view',     label: 'View All Requests', prereq: null },
+          { id: 'view_own', label: 'View Own Leave',    prereq: null },
+          { id: 'approve',  label: 'Approve/Reject',    prereq: 'view' },
+          { id: 'manage',   label: 'Manage Leave Types', prereq: 'view' },
+        ],
+      },
+      payroll: {
+        label: 'Payroll',
+        permissions: [
+          { id: 'view',    label: 'View',          prereq: null },
+          { id: 'create',  label: 'Create Pay Run', prereq: 'view' },
+          { id: 'approve', label: 'Approve',        prereq: 'view' },
+          { id: 'manage',  label: 'Manage',         prereq: 'view' },
+        ],
+      },
+      benefits: {
+        label: 'Benefits',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'manage', label: 'Manage', prereq: 'view' },
+        ],
+      },
+      performance: {
+        label: 'Performance Management',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'manage', label: 'Manage', prereq: 'view' },
+        ],
+      },
+      training: {
+        label: 'Training & Development',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'manage', label: 'Manage', prereq: 'view' },
+        ],
+      },
+      audit_log: {
+        label: 'HR Audit Log',
+        permissions: [
+          { id: 'view', label: 'View HR Audit Log', prereq: null },
         ],
       },
     },
