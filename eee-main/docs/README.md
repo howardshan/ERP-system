@@ -91,7 +91,8 @@ eee-main/
     │   ├── 05_workflow-studio.md    # Workflow Studio
     │   ├── 06_users-auth.md         # 用户管理与权限系统
     │   ├── 07_hr.md                 # HR 模块：员工目录 + 档案编辑
-    │   └── 08_finance-audit-log.md  # Finance 审计日志
+    │   ├── 08_finance-audit-log.md  # Finance 审计日志
+    │   └── 09_qc.md                 # Quality Control：烘干后检验闭环
     └── database/
         ├── 01_schema.md             # 完整数据库表结构
         ├── 02_rpc-functions.md      # 所有 RPC / View
@@ -119,6 +120,7 @@ eee-main/
 | `production` | `ModulePlaceholder` | `src/App.tsx`（内联） | 🔲 规划中 |
 | `auth` | `UserManagement` | `src/pages/auth/UserManagement.tsx` | ✅ 已完成 |
 | `hr` | `HRModule` | `src/pages/hr/HRModule.tsx` | ✅ 已完成 |
+| `qc` | `QualityControlModule` | `src/pages/qc/QualityControlModule.tsx` | ✅ 已完成（Phase 1 MVP，移植自 qc-demo） |
 | `docs` | `DocsPage` | `src/pages/DocsPage.tsx` | ✅ 已完成 |
 
 ### Workflow 模块内子路由
@@ -295,6 +297,7 @@ App（正常渲染）  ←──────────────────
 | **Users & Authentication** | ✅ 完成 | → modules/06_users-auth.md |
 | **HR 模块** | ✅ 完成 | → modules/07_hr.md |
 | **Finance Audit Log** | ✅ 完成 | → modules/08_finance-audit-log.md |
+| **Quality Control (QC)** | ✅ 完成（Phase 1 MVP） | → modules/09_qc.md |
 | P&L / 资产负债表 | 🔲 未开始 | — |
 | **Workflow Studio** | ✅ 完成（执行引擎待开发） | → modules/05_workflow-studio.md |
 

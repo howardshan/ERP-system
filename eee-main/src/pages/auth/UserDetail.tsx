@@ -93,6 +93,58 @@ export default function UserDetail({ userId, onBack }: Props) {
     setRemovedGrants(prev => { const s = new Set(prev); s.delete(key); return s; });
   }
 
+  function toggleAllInScope(keys: string[]) {
+    if (keys.length === 0) return;
+    const allGranted = keys.every(k => {
+      if (removedGrants.has(k)) return false;
+      if (localGrants.has(k)) return true;
+      const [m, r, p] = k.split('|');
+      return grants.some(g => g.module_id === m && g.resource === r && g.permission === p);
+    });
+    if (allGranted) {
+      setRemovedGrants(prev => new Set([...prev, ...keys]));
+      setLocalGrants(prev => { const m = new Map(prev); for (const k of keys) m.delete(k); return m; });
+    } else {
+      setLocalGrants(prev => {
+        const m = new Map(prev);
+        for (const k of keys) if (!m.has(k)) m.set(k, null);
+        return m;
+      });
+      setRemovedGrants(prev => {
+        const s = new Set(prev);
+        for (const k of keys) s.delete(k);
+        return s;
+      });
+    }
+  }
+
+  function moduleKeys(moduleId: string): string[] {
+    const def = PERMISSION_STRUCTURE[moduleId];
+    if (!def) return [];
+    const keys: string[] = [];
+    for (const [resId, resDef] of Object.entries(def.resources)) {
+      for (const p of resDef.permissions) keys.push(grantKey(moduleId, resId, p.id));
+    }
+    return keys;
+  }
+
+  function resourceKeys(moduleId: string, resId: string): string[] {
+    const def = PERMISSION_STRUCTURE[moduleId];
+    const resDef = def?.resources[resId];
+    if (!resDef) return [];
+    return resDef.permissions.map(p => grantKey(moduleId, resId, p.id));
+  }
+
+  function allKeysGranted(keys: string[]): boolean {
+    if (keys.length === 0) return false;
+    return keys.every(k => {
+      if (removedGrants.has(k)) return false;
+      if (localGrants.has(k)) return true;
+      const [m, r, p] = k.split('|');
+      return grants.some(g => g.module_id === m && g.resource === r && g.permission === p);
+    });
+  }
+
   // ── Save (module access + permissions only) ───────────────────────────
 
   async function handleSave() {
@@ -233,7 +285,24 @@ export default function UserDetail({ userId, onBack }: Props) {
 
           <div className="mx-4 my-2 h-px bg-slate-200" />
 
-          <p className="px-4 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Module Access</p>
+          <div className="px-4 mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Module Access</p>
+            <button
+              type="button"
+              onClick={() => {
+                const allOn = localModules.size === Object.keys(PERMISSION_STRUCTURE).length;
+                if (allOn) {
+                  setLocalModules(new Set());
+                  if (selectedPanel !== 'account') setSelectedPanel('account');
+                } else {
+                  setLocalModules(new Set(Object.keys(PERMISSION_STRUCTURE)));
+                }
+              }}
+              className="text-[9px] font-bold px-2 py-0.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-500 uppercase tracking-widest transition-colors"
+            >
+              {localModules.size === Object.keys(PERMISSION_STRUCTURE).length ? 'None' : 'All'}
+            </button>
+          </div>
           {Object.entries(PERMISSION_STRUCTURE).map(([modId, mod]) => {
             const enabled = localModules.has(modId);
             return (
@@ -360,11 +429,27 @@ export default function UserDetail({ userId, onBack }: Props) {
             </div>
           ) : (
             <div className="max-w-3xl space-y-6">
-              <h3 className="text-base font-bold text-slate-900">{moduleDef.label} Permissions</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-slate-900">{moduleDef.label} Permissions</h3>
+                <button
+                  type="button"
+                  onClick={() => toggleAllInScope(moduleKeys(selectedPanel))}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700 transition-colors"
+                >
+                  {allKeysGranted(moduleKeys(selectedPanel)) ? 'Deselect all in module' : 'Select all in module'}
+                </button>
+              </div>
               {Object.entries(moduleDef.resources).map(([resId, resDef]) => (
                 <div key={resId} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                     <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">{resDef.label}</p>
+                    <button
+                      type="button"
+                      onClick={() => toggleAllInScope(resourceKeys(selectedPanel, resId))}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-500 uppercase tracking-wider transition-colors"
+                    >
+                      {allKeysGranted(resourceKeys(selectedPanel, resId)) ? 'Deselect all' : 'Select all'}
+                    </button>
                   </div>
                   <div className="divide-y divide-slate-100">
                     {resDef.permissions.map(permDef => {

@@ -18,6 +18,7 @@ import WorkflowBuilder from './pages/WorkflowBuilder';
 import DocsPage from './pages/DocsPage';
 import UserManagement from './pages/auth/UserManagement';
 import HRModule from './pages/hr/HRModule';
+import QualityControlModule from './pages/qc/QualityControlModule';
 import AuditLog from './pages/finance/AuditLog';
 
 export default function App() {
@@ -138,6 +139,10 @@ function AppShell({
 
   if (activeModule === 'hr') {
     return <HRModule onHome={() => setActiveModule('home')} />;
+  }
+
+  if (activeModule === 'qc') {
+    return <QualityControlModule onHome={() => setActiveModule('home')} />;
   }
 
   return <ModulePlaceholder name={activeModule} onHome={() => setActiveModule('home')} />;
