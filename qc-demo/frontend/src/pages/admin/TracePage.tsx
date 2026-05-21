@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, SubLot } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
+import { RowActionsMenu } from '../../components/RowActionsMenu';
 import { StatusBadge } from '../../components/StatusBadge';
 import { cn, formatDateTime, STATUS_LABEL, toLocalInputValue } from '../../lib/utils';
 
@@ -296,22 +297,13 @@ export function TracePage() {
                     <span className="font-medium text-lg">{s.sub_lot_code}</span>
                     <div className="flex gap-2 shrink-0 items-center">
                       <StatusBadge status={s.status} />
-                      <button
-                        type="button"
-                        className="text-blue-600 min-h-[44px] px-2"
+                      <RowActionsMenu
                         disabled={editingSubId !== null}
-                        onClick={() => startEditSub(s)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="text-red-600 min-h-[44px] px-2"
-                        disabled={editingSubId !== null}
-                        onClick={() => removeSub(s)}
-                      >
-                        Delete
-                      </button>
+                        actions={[
+                          { label: 'Edit', onClick: () => startEditSub(s) },
+                          { label: 'Delete', variant: 'danger', onClick: () => removeSub(s) },
+                        ]}
+                      />
                     </div>
                   </div>
                   <p className="text-sm text-slate-600">

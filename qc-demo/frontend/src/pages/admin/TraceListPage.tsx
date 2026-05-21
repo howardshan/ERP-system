@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, ProductionLot } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
 import { LotSubLotSummary } from '../../components/LotSubLotSummary';
+import { RowActionsMenu } from '../../components/RowActionsMenu';
 import { cn } from '../../lib/utils';
 
 type LotForm = {
@@ -249,24 +250,13 @@ export function TraceListPage() {
                         {lot.sku_name} · {lot.lot_barcode}
                       </p>
                     </Link>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        type="button"
-                        className="text-blue-600 min-h-[44px] px-2 disabled:opacity-40"
-                        disabled={isBusy}
-                        onClick={() => startEdit(lot)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="text-red-600 min-h-[44px] px-2 disabled:opacity-40"
-                        disabled={isBusy}
-                        onClick={() => remove(lot)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <RowActionsMenu
+                      disabled={isBusy}
+                      actions={[
+                        { label: 'Edit', onClick: () => startEdit(lot) },
+                        { label: 'Delete', variant: 'danger', onClick: () => remove(lot) },
+                      ]}
+                    />
                   </div>
                   <Link to={`/admin/trace/${lot.id}`} className="block mt-2">
                     <LotSubLotSummary counts={lot.sub_lot_counts} />

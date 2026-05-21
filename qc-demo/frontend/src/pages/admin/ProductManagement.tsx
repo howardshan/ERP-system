@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api, Product, ProductInput } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
+import { RowActionsMenu } from '../../components/RowActionsMenu';
 import { cn } from '../../lib/utils';
 
 const emptyForm = (): ProductInput => ({
@@ -265,24 +266,13 @@ export function ProductManagement() {
                       <div className="font-semibold text-lg">{p.name}</div>
                       <div className="text-sm text-slate-500">{p.code}</div>
                     </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        type="button"
-                        className="text-blue-600 min-h-[44px] px-2 disabled:opacity-40"
-                        disabled={isBusy}
-                        onClick={() => startEdit(p)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="text-red-600 min-h-[44px] px-2 disabled:opacity-40"
-                        disabled={isBusy}
-                        onClick={() => remove(p.id, p.code)}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <RowActionsMenu
+                      disabled={isBusy}
+                      actions={[
+                        { label: 'Edit', onClick: () => startEdit(p) },
+                        { label: 'Delete', variant: 'danger', onClick: () => remove(p.id, p.code) },
+                      ]}
+                    />
                   </div>
                   <dl className="mt-3 grid sm:grid-cols-2 gap-2 text-sm">
                     <div>
