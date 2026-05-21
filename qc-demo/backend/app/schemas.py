@@ -74,6 +74,31 @@ class ProductionLotCreate(BaseModel):
     sku_id: UUID
 
 
+class ProductionLotUpdate(BaseModel):
+    lot_number: str | None = None
+    lot_barcode: str | None = None
+    work_order_barcode: str | None = None
+    sku_id: UUID | None = None
+
+
+class DryingSubLotUpdate(BaseModel):
+    sub_lot_code: str | None = None
+    location_id: UUID | None = None
+    in_time: datetime | None = None
+    out_time: datetime | None = None
+    status: str | None = None
+
+
+class SubLotStatusCounts(BaseModel):
+    total: int = 0
+    drying: int = 0
+    pending: int = 0
+    passed: int = 0
+    hold: int = 0
+    disposing: int = 0
+    closed: int = 0
+
+
 class ProductionLotOut(BaseModel):
     id: UUID
     lot_number: str
@@ -83,6 +108,7 @@ class ProductionLotOut(BaseModel):
     sku_code: str | None = None
     sku_name: str | None = None
     created_at: datetime
+    sub_lot_counts: SubLotStatusCounts = Field(default_factory=SubLotStatusCounts)
 
     model_config = {"from_attributes": True}
 

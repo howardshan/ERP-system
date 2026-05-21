@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { ChevronRight, Package } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api, ProductionLot } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
-
+import { LotSubLotSummary } from '../../components/LotSubLotSummary';
+import { Alert, Button, Card, EmptyState, Field, Input, PageHeader, Select } from '../../components/ui';
 export function LotsList() {
   const [lots, setLots] = useState<ProductionLot[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -44,60 +46,83 @@ export function LotsList() {
   };
 
   return (
-    <AppShell variant="qc" title="Production Lots">
-      <div className="flex justify-end mb-4">
-        <button
-          type="button"
-          onClick={() => setShowForm(!showForm)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-xl min-h-[44px] font-medium"
-        >
-          New
-        </button>
-      </div>
-      {error && <p className="text-red-600 mb-2">{error}</p>}
-      {showForm && (
-        <div className="bg-white rounded-xl border p-4 mb-4 space-y-3">
-          <button type="button" onClick={fillDemo} className="text-sm text-blue-600 underline min-h-[44px]">
-            Fill DEMO barcodes (simulate scan)
-          </button>
-          <input
-            placeholder="Lot barcode"
-            className="w-full border rounded-lg px-3 py-3"
-            value={lotBarcode}
-            onChange={(e) => setLotBarcode(e.target.value)}
-          />
-          <input
-            placeholder="Work order barcode"
-            className="w-full border rounded-lg px-3 py-3"
-            value={woBarcode}
-            onChange={(e) => setWoBarcode(e.target.value)}
-          />
-          <select className="w-full border rounded-lg px-3 py-3" value={skuId} onChange={(e) => setSkuId(e.target.value)}>
-            {skus.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <button type="button" onClick={create} className="w-full bg-emerald-600 text-white py-3 rounded-xl min-h-[48px]">
-            Save
-          </button>
+    <AppShell variant="qc">
+      <PageHeader
+        title="Production Lots"
+        action={
+          <Button variant={showForm ? 'secondary' : 'primary'} tone="qc" onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Cancel' : 'New lot'}
+          </Button>
+        }
+      />
+      {error && (
+        <div className="mb-4">
+          <Alert variant="error">{error}</Alert>
         </div>
+      )}
+      {showForm && (
+        <Card variant="elevated" className="p-4 mb-4 space-y-3 border-2 border-teal-200">
+          <Button type="button" variant="ghost" tone="qc" onClick={fillDemo} className="!min-h-[36px] text-sm">
+            Fill DEMO barcodes (simulate scan)
+          </Button>
+          <Field label="Lot barcode">
+            <Input
+              className="font-mono"
+              placeholder="Lot barcode"
+              value={lotBarcode}
+              onChange={(e) => setLotBarcode(e.target.value)}
+            />
+          </Field>
+          <Field label="Work order barcode">
+            <Input
+              className="font-mono"
+              placeholder="Work order barcode"
+              value={woBarcode}
+              onChange={(e) => setWoBarcode(e.target.value)}
+            />
+          </Field>
+          <Field label="Product (SKU)">
+            <Select value={skuId} onChange={(e) => setSkuId(e.target.value)}>
+              {skus.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Button type="button" variant="primary" tone="qc" fullWidth size="lg" onClick={create}>
+            Save
+          </Button>
+        </Card>
       )}
       <ul className="space-y-3">
         {lots.map((lot) => (
           <li key={lot.id}>
-            <Link
-              to={`/qc/lots/${lot.id}`}
-              className="block bg-white rounded-xl border p-4 hover:border-blue-400 min-h-[44px]"
-            >
-              <div className="font-semibold">{lot.lot_number}</div>
-              <p className="text-sm text-slate-600">
-                {lot.sku_name} · {lot.lot_barcode}
-              </p>
+            <Link to={`/qc/lots/${lot.id}`} className="block group">
+              <Card variant="interactive" className="p-4 min-h-[44px] hover:border-teal-200">
+                <div className="flex justify-between items-start gap-2">
+                  <div>
+                    <div className="font-semibold text-lg text-slate-900 group-hover:text-teal-800">
+                      {lot.lot_number}
+                    </div>
+                    <p className="text-sm text-slate-600">
+                      {lot.sku_name} · {lot.lot_barcode}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-slate-300 group-hover:text-teal-600 transition-colors" />
+                </div>
+                <LotSubLotSummary counts={lot.sub_lot_counts} />
+              </Card>
             </Link>
           </li>
         ))}
+        {lots.length === 0 && !showForm && (
+          <EmptyState
+            icon={Package}
+            title="No production lots"
+            description="Register a new lot to begin sub-lot check-in."
+          />
+        )}
       </ul>
     </AppShell>
   );

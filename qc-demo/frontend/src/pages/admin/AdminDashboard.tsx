@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { Inbox } from 'lucide-react';
 import { api, DashboardSummary, SubLot, TodayInspectionItem } from '../../api/client';
 import { AppShell } from '../../components/AppShell';
 import { StatusBadge } from '../../components/StatusBadge';
+import { Alert, Button, Card, EmptyState, Field, PageHeader, PageSkeleton, Select, Textarea } from '../../components/ui';
 import { usePolling } from '../../hooks/usePolling';
 import { cn, formatDateTime } from '../../lib/utils';
 
@@ -65,13 +67,17 @@ export function AdminDashboard() {
   };
 
   return (
-    <AppShell variant="admin" title="Dashboard">
-      <p className="text-xs text-slate-500 mb-4">
-        Click a metric card for details · auto-refresh every 4s
-        {!pollingEnabled ? ' (paused while disposing)' : ''}
-      </p>
-      {msg && <p className="text-emerald-700 bg-emerald-50 p-3 rounded-lg mb-4">{msg}</p>}
-      {error && <p className="text-red-600 mb-4">{error}</p>}
+    <AppShell variant="admin">
+      <PageHeader
+        title="Dashboard"
+        description={`Click a metric card for details · auto-refresh every 4s${!pollingEnabled ? ' (paused while disposing)' : ''}`}
+      />
+      <div className="space-y-4 mb-4">
+        {msg && <Alert variant="success">{msg}</Alert>}
+        {error && <Alert variant="error">{error}</Alert>}
+      </div>
+
+      {!data && <PageSkeleton />}
 
       {data && (
         <>
@@ -124,10 +130,10 @@ export function AdminDashboard() {
           {panel === 'hold' && (
             <DetailPanel title="Hold sub-lots · dispose here">
               {data.holds.length === 0 ? (
-                <p className="text-slate-500">No holds</p>
+                <EmptyState icon={Inbox} title="No holds" description="Failed inspections awaiting disposition will appear here." />
               ) : (
-                <>
-                  <ul className="space-y-2 mb-4">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <ul className="space-y-2">
                     {data.holds.map((h) => (
                       <li key={h.id}>
                         <button
@@ -137,8 +143,10 @@ export function AdminDashboard() {
                             setMsg('');
                           }}
                           className={cn(
-                            'w-full text-left bg-white rounded-xl border-2 p-4 min-h-[44px]',
-                            selectedHold?.id === h.id ? 'border-blue-500' : 'border-red-200'
+                            'w-full text-left rounded-xl border-2 p-4 min-h-[44px] transition-shadow shadow-sm',
+                            selectedHold?.id === h.id
+                              ? 'border-indigo-500 ring-2 ring-indigo-100 bg-white'
+                              : 'border-red-200 bg-white hover:border-red-300'
                           )}
                         >
                           <div className="flex justify-between items-start gap-2">
@@ -160,50 +168,43 @@ export function AdminDashboard() {
                       </li>
                     ))}
                   </ul>
-                  {selectedHold && (
-                    <div className="bg-white rounded-xl border p-4 space-y-3">
-                      <p className="font-medium">Dispose: {selectedHold.sub_lot_code}</p>
+                  {selectedHold ? (
+                    <Card variant="outline" className="p-4 space-y-3 h-fit border-indigo-200">
+                      <p className="font-medium text-slate-900">Dispose: {selectedHold.sub_lot_code}</p>
                       {selectedHold.hold_reason && (
-                        <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3">
-                          {selectedHold.hold_reason}
-                        </p>
+                        <Alert variant="error">{selectedHold.hold_reason}</Alert>
                       )}
-                      <select
-                        className="w-full border rounded-lg px-3 py-3 min-h-[44px]"
-                        value={dispType}
-                        onChange={(e) => setDispType(e.target.value)}
-                      >
-                        {DISP_TYPES.map((d) => (
-                          <option key={d.value} value={d.value}>
-                            {d.label}
-                          </option>
-                        ))}
-                      </select>
-                      <textarea
-                        className="w-full border rounded-lg px-3 py-3 min-h-[80px]"
-                        placeholder="Remarks"
-                        value={dispRemark}
-                        onChange={(e) => setDispRemark(e.target.value)}
-                      />
+                      <Field label="Disposition type">
+                        <Select value={dispType} onChange={(e) => setDispType(e.target.value)}>
+                          {DISP_TYPES.map((d) => (
+                            <option key={d.value} value={d.value}>
+                              {d.label}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field label="Remarks">
+                        <Textarea
+                          placeholder="Optional remarks"
+                          value={dispRemark}
+                          onChange={(e) => setDispRemark(e.target.value)}
+                        />
+                      </Field>
                       <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={submitDisposition}
-                          className="flex-1 bg-red-600 text-white py-3 rounded-xl min-h-[48px] font-medium"
-                        >
+                        <Button variant="danger" fullWidth onClick={submitDisposition}>
                           Confirm disposition
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedHold(null)}
-                          className="px-4 py-3 rounded-xl border min-h-[48px]"
-                        >
+                        </Button>
+                        <Button variant="secondary" onClick={() => setSelectedHold(null)}>
                           Cancel
-                        </button>
+                        </Button>
                       </div>
-                    </div>
+                    </Card>
+                  ) : (
+                    <p className="text-sm text-slate-500 hidden lg:flex items-center justify-center p-8 border border-dashed border-slate-200 rounded-xl">
+                      Select a hold sub-lot to dispose
+                    </p>
                   )}
-                </>
+                </div>
               )}
             </DetailPanel>
           )}
@@ -225,9 +226,9 @@ export function AdminDashboard() {
                   <p className="text-slate-600">Failed</p>
                   <p className="text-2xl font-bold text-red-800">{data.today_failed}</p>
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
                   <p className="text-slate-600">Pass rate</p>
-                  <p className="text-2xl font-bold text-blue-800">
+                  <p className="text-2xl font-bold text-indigo-800">
                     {data.pass_rate != null ? `${data.pass_rate}%` : '—'}
                   </p>
                 </div>
@@ -239,7 +240,7 @@ export function AdminDashboard() {
                 </>
               )}
               {data.today_passed === 0 && data.today_failed === 0 && (
-                <p className="text-slate-500">No inspections recorded today</p>
+                <EmptyState title="No inspections recorded today" />
               )}
             </DetailPanel>
           )}
@@ -266,7 +267,7 @@ function StatCard({
     amber: 'bg-amber-50 border-amber-200 hover:border-amber-400',
     red: 'bg-red-50 border-red-200 hover:border-red-400',
     emerald: 'bg-emerald-50 border-emerald-200 hover:border-emerald-400',
-    blue: 'bg-blue-50 border-blue-200 hover:border-blue-400',
+    blue: 'bg-indigo-50 border-indigo-200 hover:border-indigo-400',
   };
   return (
     <button
@@ -275,7 +276,7 @@ function StatCard({
       className={cn(
         'rounded-xl border-2 p-4 text-left min-h-[44px] transition-shadow',
         colors[accent],
-        active && 'ring-2 ring-blue-500 border-blue-500 shadow-md'
+        active && 'ring-2 ring-indigo-500 border-indigo-500 shadow-md'
       )}
     >
       <p className="text-xs text-slate-600">{label}</p>
@@ -286,10 +287,10 @@ function StatCard({
 
 function DetailPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="bg-white border rounded-xl p-4 mb-4">
-      <h2 className="font-semibold text-lg mb-3">{title}</h2>
+    <Card variant="elevated" className="p-4 mb-4">
+      <h2 className="font-semibold text-lg mb-3 text-slate-900">{title}</h2>
       {children}
-    </section>
+    </Card>
   );
 }
 
@@ -302,11 +303,11 @@ function SubLotList({
   emptyText: string;
   showWait?: boolean;
 }) {
-  if (items.length === 0) return <p className="text-slate-500">{emptyText}</p>;
+  if (items.length === 0) return <EmptyState title={emptyText} />;
   return (
     <ul className="space-y-2">
       {items.map((s) => (
-        <li key={s.id} className="border rounded-lg p-3 flex justify-between items-start gap-2">
+        <li key={s.id} className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 flex justify-between items-start gap-2">
           <div>
             <div className="font-medium">{s.sub_lot_code}</div>
             <p className="text-sm text-slate-600">
@@ -328,12 +329,12 @@ function SubLotList({
 
 function TodayInspectionList({ items, emptyText }: { items: TodayInspectionItem[]; emptyText: string }) {
   if (items.length === 0) {
-    return emptyText ? <p className="text-slate-500">{emptyText}</p> : null;
+    return emptyText ? <EmptyState title={emptyText} /> : null;
   }
   return (
     <ul className="space-y-2">
       {items.map((item) => (
-        <li key={`${item.sub_lot_id}-${item.submitted_at}`} className="border rounded-lg p-3">
+        <li key={`${item.sub_lot_id}-${item.submitted_at}`} className="rounded-lg border border-slate-200 p-3 bg-white">
           <div className="flex justify-between items-start gap-2">
             <div>
               <div className="font-medium">{item.sub_lot_code}</div>
