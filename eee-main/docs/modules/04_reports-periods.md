@@ -43,6 +43,132 @@ interface GlAccount {
 
 ---
 
+## 1B. 利润表（Profit & Loss / Income Statement）
+
+**路由**: `pnl`
+**文件**: `src/pages/finance/ProfitLoss.tsx`
+**完整路径**: `eee-main/src/pages/finance/ProfitLoss.tsx`
+**状态**: ✅ 已上线 — M-044 落地(2026-05-22)
+
+### 功能
+
+- 按会计期间或自定义日期范围聚合 revenue / expense 科目
+- 顶部 `PeriodSelector`:`Period` mode(下拉 accounting_period) / `Custom` mode(date range 双 input)
+- 两段渲染:**Revenue**(绿色)+ **Expense**(红色),各自行点击可跳到 drill-down(P0 #5 落地后真过滤)
+- Footer:`Net Income = Total Revenue - Total Expense`,正负颜色化(emerald / rose)
+- Export 按钮占位,真实实现并入 P0 #4 TB 导出
+- 默认期间:当前自然月对应的 accounting_period;若无,fallback 到最近 `status='open'` 期间
+
+### 数据来源
+
+```ts
+getPnL(startDate: string, endDate: string): Promise<PnLRow[]>
+// 调 RPC gl_pnl(p_start_date, p_end_date),返回 revenue + expense 全量行
+```
+
+### 关键字段
+
+```ts
+interface PnLRow {
+  id: number;
+  account_code: string;
+  name: string;
+  account_type: 'revenue' | 'expense';
+  parent_id: number | null;
+  is_postable: boolean;
+  is_active: boolean;
+  total_debit: number;
+  total_credit: number;
+  net_amount: number;   // 已经按 account_type 算好正向值
+}
+```
+
+### 业务规则
+
+- **BR-F9** P&L 只统计 `journal_entry.status='posted'` 的行;draft / pending_approval / rejected 不计入,reversed 原单也不计(跟 TB 口径一致)
+- **BR-F10** 期间过滤使用 `journal_entry.entry_date`(凭证业务日期),不是 `posted_at`(过账时间)
+- **判定方向**:
+  - revenue: `net_amount = SUM(credit) - SUM(debit)` (贷方正)
+  - expense: `net_amount = SUM(debit) - SUM(credit)` (借方正)
+
+### 权限
+
+MVP 复用 `finance.journal_entry.view`(看 JE 等于看 P&L 数据源);后续 P2 拆 `finance.reports.view` / `finance.reports.export`。
+
+### 待开发(下一轮)
+
+- [ ] CSV / Excel 导出(并入 P0 #4 一起做)
+- [ ] Period Comparison(YoY / MoM 列)— P1
+- [ ] Drill-down:行点击 → JE list 过滤(目前只 emit deep-link `pnl-drill:<account>:<start>:<end>`,P0 #5 实施)
+- [ ] 非 postable 父科目层级 roll-up 渲染(目前只展示 postable 行)
+- [ ] 维度过滤(Department / Cost Center)— P1 维度报表一起做
+
+---
+
+## 1C. 资产负债表（Balance Sheet）
+
+**路由**: `bs`
+**文件**: `src/pages/finance/BalanceSheet.tsx`
+**完整路径**: `eee-main/src/pages/finance/BalanceSheet.tsx`
+**状态**: ✅ 已上线 — M-045 落地(2026-05-22)
+
+### 功能
+
+- 按 as-of 日期展示 Asset / Liability / Equity 余额
+- `AsOfDateSelector`:`Period End` mode(下拉 accounting_period,用 `end_date`) / `Custom` mode(单日 date picker)
+- 三段渲染:Assets / Liabilities / Equity,各自行点击 emit drill-down deep-link
+- **合成 Retained Earnings 行**(BR-F11):前端调 `gl_pnl('1900-01-01', as_of)` 累计 net income,在 Equity 段下显示一行斜体 italic 标识"computed"
+- 顶部 badge:`In Balance` / `OUT OF BALANCE`(Assets vs Liab+Equity 容差 0.01)
+- 底部 footer:Liab+Equity 总和;若不平衡,额外一行红色差额提示
+- 点 Retained Earnings 行 → 跳到 P&L 页(看 RE 的源头)
+
+### 数据来源
+
+```ts
+getBalanceSheet(asOfDate: string): Promise<BalanceSheetRow[]>
+// 调 RPC gl_balance_sheet(p_as_of_date),返回 asset/liability/equity 全量行
+
+// Retained Earnings 用 P&L RPC 累计算:
+getPnL('1900-01-01', asOfDate)  // sum(revenue.net) - sum(expense.net) = RE
+```
+
+### 关键字段
+
+```ts
+interface BalanceSheetRow {
+  id: number;
+  account_code: string;
+  name: string;
+  account_type: 'asset' | 'liability' | 'equity';
+  parent_id: number | null;
+  is_postable: boolean;
+  is_active: boolean;
+  balance: number;     // 已按 account_type 算好正向值
+}
+```
+
+### 业务规则
+
+- **BR-F9** 同 TB/P&L,只统计 `journal_entry.status='posted'` 的行
+- **BR-F11** Retained Earnings 由前端**累计 P&L** 计算(`gl_pnl('1900-01-01', as_of)` 的 revenue - expense),不在 BS RPC 里重复算;单一数据源,保证 P&L 与 BS 的 RE 永远一致
+- **判定方向**:
+  - asset: `balance = SUM(debit) - SUM(credit)`(借方正)
+  - liability/equity: `balance = SUM(credit) - SUM(debit)`(贷方正)
+
+### 权限
+
+MVP 复用 `finance.journal_entry.view`(同 P&L)。
+
+### 待开发(下一轮)
+
+- [ ] CSV / Excel 导出(并入 P0 #4)
+- [ ] Comparative BS(本期 / 上期 / 同期 columns)— P1
+- [ ] Drill-down:emit `bs-drill:<account_id>:1900-01-01:<as_of>` deep-link 留给 P0 #5 实施
+- [ ] 父科目层级 roll-up
+- [ ] 跟某个真实 equity 科目(`3000 Retained Earnings`)挂钩,做年末结转把 RE 落地为真实凭证(P2 年结流程)
+
+---
+
 ## 2. 会计期间管理（Accounting Periods）
 
 **路由**: `periods`（`reports` 也路由到此）  

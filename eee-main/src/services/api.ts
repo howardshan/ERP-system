@@ -603,6 +603,27 @@ export async function getTrialBalance(): Promise<GlAccount[]> {
   return data as GlAccount[];
 }
 
+// Profit & Loss — aggregates posted JE lines per revenue/expense account
+// within [startDate, endDate]. Filter is on journal_entry.entry_date (BR-F10).
+export async function getPnL(startDate: string, endDate: string): Promise<import('../types').PnLRow[]> {
+  const { data, error } = await supabase.rpc('gl_pnl', {
+    p_start_date: startDate,
+    p_end_date: endDate,
+  });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as import('../types').PnLRow[];
+}
+
+// Balance Sheet — aggregates posted JE lines per asset/liability/equity account
+// as of the given date. Retained Earnings is computed separately via gl_pnl.
+export async function getBalanceSheet(asOfDate: string): Promise<import('../types').BalanceSheetRow[]> {
+  const { data, error } = await supabase.rpc('gl_balance_sheet', {
+    p_as_of_date: asOfDate,
+  });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as import('../types').BalanceSheetRow[];
+}
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   const [accountsRes, recentRes] = await Promise.all([
     supabase.from('account_balance').select('account_type, balance, is_postable'),

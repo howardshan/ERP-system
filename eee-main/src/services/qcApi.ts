@@ -671,6 +671,15 @@ export async function releasePassedSubLot(subLotId: string): Promise<SubLot> {
   return rpc<SubLot>('qc_release_passed_sub_lot', { p_sub_lot_id: subLotId });
 }
 
+// Look up a sub-lot by its scanned QR / barcode code (M-043).
+// Accepts raw code or URL where the last path segment is the code.
+// Returns null if no match.
+export async function findSubLotByCode(code: string): Promise<SubLot | null> {
+  const { data, error } = await supabase.rpc('qc_find_sub_lot_by_code', { p_code: code });
+  if (error) throw new Error(error.message);
+  return (data ?? null) as SubLot | null;
+}
+
 // ── Demo seed ─────────────────────────────────────────────────────────────────
 
 export async function seedDemoData(): Promise<{ skus: number; locations: number; production_lots: number; drying_sub_lots: number }> {
