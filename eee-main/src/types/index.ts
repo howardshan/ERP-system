@@ -123,3 +123,35 @@ export interface DashboardStats {
   draftEntryCount: number;
   recentEntries: JournalEntry[];
 }
+
+// P&L row returned by gl_pnl(p_start_date, p_end_date) RPC (M-044).
+// One row per revenue/expense account in the chart of accounts;
+// totals reflect only journal_entry.status='posted' lines with
+// entry_date in the requested range (BR-F9/F10).
+export interface PnLRow {
+  id: number;
+  account_code: string;
+  name: string;
+  account_type: 'revenue' | 'expense';
+  parent_id: number | null;
+  is_postable: boolean;
+  is_active: boolean;
+  total_debit: number;
+  total_credit: number;
+  net_amount: number;
+}
+
+// Balance Sheet row returned by gl_balance_sheet(p_as_of_date) RPC (M-045).
+// One row per asset / liability / equity account; balance reflects only
+// posted journal lines with entry_date <= as-of date. Retained Earnings
+// is computed separately on the frontend via gl_pnl (BR-F11).
+export interface BalanceSheetRow {
+  id: number;
+  account_code: string;
+  name: string;
+  account_type: 'asset' | 'liability' | 'equity';
+  parent_id: number | null;
+  is_postable: boolean;
+  is_active: boolean;
+  balance: number;
+}

@@ -700,6 +700,84 @@ HR 模块的 11 个 migration（`20260519000001` ~ `20260519000011`）以及 `hr
 
 ---
 
+### M-043 `20260521000004_qc_find_by_code.sql`
+**用途**: 给 Dry Room 详情页的 "Scan QR" 按钮提供 sub-lot 编码反查 RPC。操作工扫码或手打 sub-lot code,前端调 `qc_find_sub_lot_by_code(text)` 拿到完整 SubLot json,然后按 status 分流(`created`/`awaiting_recheck` → 进 place mode;`drying` 在本 dryer → 弹 cell detail;其他 → 提示去 Testing/其他 dryer)。
+
+**变更**:
+
+| 对象 | 操作 |
+|------|------|
+| `qc_find_sub_lot_by_code(p_code text)` | CREATE STABLE,返回 jsonb 或 NULL |
+
+**输入容错**:
+- 直接 sub_lot_code 精确匹配
+- 若失败,尝试把输入按 URL 解析,取最后一段路径(支持 QR 编码 URL)
+- 自动 trim whitespace
+
+**业务规则**:
+- **BR-Q22** Scan QR 是 stateless 反查:不修改任何数据,只查;后续动作由前端按 status 决定(place / move / view-only)。
+- **BR-Q23** 工业 USB 扫描枪触发 keydown + Enter,前端用 `<form onSubmit>` 拦截 Enter 即可,不需要 camera 库。
+
+**依赖**: M-033
+
+---
+
+### M-044 `20260522000001_finance_pnl.sql`
+**用途**: 给财务报表 P&L 提供按期间聚合的 RPC,补全 Finance P0 缺口里的"利润表"。数据全部来自现有的 posted journal lines,加 `entry_date` 区间过滤(VIEW 不能传参数,所以用 SQL function)。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `gl_pnl(p_start_date date, p_end_date date)` | CREATE STABLE SQL function | 返回 `(id, account_code, name, account_type, parent_id, is_postable, is_active, total_debit, total_credit, net_amount)`,仅 revenue + expense 科目;按 `account_type DESC, account_code` 排序让 revenue 先出 |
+
+**判定逻辑**:
+- `account_type='revenue'` → `net_amount = SUM(credit) - SUM(debit)`(贷方为正)
+- `account_type='expense'` → `net_amount = SUM(debit) - SUM(credit)`(借方为正)
+- 只统计 `journal_entry.status='posted'` 且 `entry_date BETWEEN p_start_date AND p_end_date` 的行
+- 包含 non-postable 父科目(前端按需做层级 roll-up)+ inactive 科目(前端按需过滤)
+
+**业务规则**:
+- **BR-F9** P&L 只统计 `journal_entry.status='posted'` 的行;draft / pending_approval / rejected 都不计入,reversed 的原单也不计(跟 TB 口径一致)
+- **BR-F10** P&L 期间过滤使用 `journal_entry.entry_date`(凭证业务日期),不是 `posted_at`(过账时间)
+
+**前端配套**:
+- [types/index.ts](../../src/types/index.ts) 新增 `PnLRow` interface
+- [services/api.ts](../../src/services/api.ts) 新增 `getPnL(startDate, endDate)`
+- 新页 [pages/finance/ProfitLoss.tsx](../../src/pages/finance/ProfitLoss.tsx) 含 PeriodSelector(period dropdown + custom date range)、两段(Revenue / Expense)、Net Income footer、行点击预留 drill-down hook(`pnl-drill:<account_id>:<start>:<end>` deep-link 格式,真过滤在 P0 #5 实现)
+- Sidebar Reports 区加 `Profit & Loss` NavItem,权限点 `finance.journal_entry.view`(MVP 复用)
+
+**依赖**: M-001(`gl_account` + `journal_entry` + `journal_entry_line` 基础表)
+
+---
+
+### M-045 `20260522000002_finance_balance_sheet.sql`
+**用途**: 给财务报表 Balance Sheet 提供 as-of 日期聚合 RPC。仅返回 asset / liability / equity 三类科目的余额;Retained Earnings 不在 RPC 里算,前端通过调 `gl_pnl('1900-01-01', as_of)` 累计 net income 得到(BR-F11),复用现有 P&L 逻辑不重复 SQL。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `gl_balance_sheet(p_as_of_date date)` | CREATE STABLE SQL function | 返回 `(id, account_code, name, account_type, parent_id, is_postable, is_active, balance)`,过滤 `entry_date <= p_as_of_date AND status='posted'` |
+
+**判定逻辑**:
+- `account_type='asset'` → `balance = SUM(debit) - SUM(credit)`(借方正)
+- `account_type IN ('liability', 'equity')` → `balance = SUM(credit) - SUM(debit)`(贷方正)
+- 不包含 revenue / expense(由前端通过 P&L 累计 → 合成 Retained Earnings 行)
+
+**业务规则**:
+- **BR-F11** Balance Sheet 的 Retained Earnings(留存收益)= 前端调 `gl_pnl('1900-01-01', as_of_date)` 累计的 net income;不在 BS RPC 里重复算,保持单一数据源。BS 页底部的 balance check(Assets = Liabilities + Equity)依赖这个计算正确。
+
+**前端配套**:
+- [types/index.ts](../../src/types/index.ts) 新增 `BalanceSheetRow` interface
+- [services/api.ts](../../src/services/api.ts) 新增 `getBalanceSheet(asOfDate)`
+- 新页 [pages/finance/BalanceSheet.tsx](../../src/pages/finance/BalanceSheet.tsx) 含 `AsOfDateSelector`(Period End mode / Custom date mode)、三段(Assets / Liabilities / Equity)、合成 Retained Earnings 行、底部 "In Balance / OUT OF BALANCE" badge + 差额提示
+- Sidebar Reports 区在 P&L 后加 `Balance Sheet` NavItem(Scale icon)
+
+**依赖**: M-001(基础表)、M-044(`gl_pnl` 用于 RE 计算)
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -733,7 +811,10 @@ HR 模块的 11 个 migration（`20260519000001` ~ `20260519000011`）以及 `hr
 | M-040 | 20260521000001_qc_permission_granularity.sql |
 | M-041 | 20260521000002_qc_overview_and_release.sql |
 | M-042 | 20260521000003_qc_drop_batches_permissions.sql |
-| **M-043** | _(下一个)_ |
+| M-043 | 20260521000004_qc_find_by_code.sql |
+| M-044 | 20260522000001_finance_pnl.sql |
+| M-045 | 20260522000002_finance_balance_sheet.sql |
+| **M-046** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
