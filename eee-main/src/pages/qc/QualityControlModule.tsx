@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   HelpCircle,
   ArrowLeft,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -21,6 +22,7 @@ import AdminDashboard from './AdminDashboard';
 import TraceListPage from './TraceListPage';
 import TracePage from './TracePage';
 import ProductManagement from './ProductManagement';
+import AnalysisPage from './AnalysisPage';
 import Production from './Production';
 import DryRoomsList from './DryRoomsList';
 import DryRoomDetail from './DryRoomDetail';
@@ -71,6 +73,10 @@ export default function QualityControlModule({ onHome }: Props) {
   const canViewTesting    = can('qc', 'testing', 'view_status');
   const canViewTrace      = can('qc', 'trace', 'view');
   const canManageProducts = can('qc', 'products', 'view');
+  // Analysis is a read-only reporting page — visible to anyone who can access
+  // the QC dashboard (dashboard.view) or has the explicit analysis.view grant.
+  const canViewDashboard  = can('qc', 'dashboard', 'view');
+  const canViewAnalysis   = can('qc', 'analysis', 'view') || canViewDashboard;
 
   const isActive = (id: string) => screen === id || screen.startsWith(id + ':');
 
@@ -178,6 +184,9 @@ export default function QualityControlModule({ onHome }: Props) {
     if (screen === 'products') {
       return <ProductManagement />;
     }
+    if (screen === 'analysis') {
+      return <AnalysisPage />;
+    }
     return <QcHome onNavigate={navigate} />;
   }
 
@@ -204,6 +213,11 @@ export default function QualityControlModule({ onHome }: Props) {
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 pb-4">
           <NavItem icon={ClipboardCheck} label="QC Home" isActive={isActive('home')} onClick={() => navigate('home')} />
+          {canViewAnalysis && (
+            <NavItem icon={BarChart3} label="Analysis"
+                     isActive={isActive('analysis')}
+                     onClick={() => navigate('analysis')} />
+          )}
 
           {(canCreateProduction || canViewDryRooms || canViewTesting) && <NavSection title="Floor" />}
           {canCreateProduction && (

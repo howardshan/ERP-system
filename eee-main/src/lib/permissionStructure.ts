@@ -243,11 +243,12 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
         label: 'Testing & Dispositions',
         permissions: [
           { id: 'view_status',              label: 'View Testing Queue',                  prereq: null },
-          { id: 'take_sample',              label: 'Take Sample (取样)',                  prereq: 'view_status' },
+          { id: 'take_sample',              label: 'Take Sample',                         prereq: 'view_status' },
           { id: 'submit_inspection',        label: 'Submit Inspection (input WA)',        prereq: 'view_status' },
           { id: 'dispose_redry',            label: 'Dispose: Re-dry in dryer',            prereq: 'view_status' },
           { id: 'dispose_room_temp',        label: 'Dispose: Room temp dry',              prereq: 'view_status' },
-          { id: 'dispose_scrap_concession', label: 'Dispose: Scrap / Concession / Other', prereq: 'view_status' },
+          { id: 'dispose_retest',           label: 'Dispose: Retest (no re-dry)',         prereq: 'view_status' },
+          { id: 'dispose_scrap_concession', label: 'Dispose: Scrap / Discard',            prereq: 'view_status' },
           { id: 'stop_room_temp',           label: 'Stop Room-temp Dry Session',          prereq: 'view_status' },
         ],
       },
@@ -280,6 +281,12 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'release_pass', label: 'Release Passed Sub-lot (assign next)', prereq: 'view' },
         ],
       },
+      analysis: {
+        label: 'Analysis',
+        permissions: [
+          { id: 'view', label: 'View Analysis', prereq: null },
+        ],
+      },
       trace: {
         label: 'Batch Trace',
         permissions: [
@@ -290,6 +297,18 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
         label: 'QC Audit Log',
         permissions: [
           { id: 'view', label: 'View QC Audit Log', prereq: null },
+        ],
+      },
+    },
+  },
+  packaging: {
+    label: 'Packaging',
+    resources: {
+      outbound: {
+        label: 'Outbound Dispatch',
+        permissions: [
+          { id: 'view',     label: 'View Packaging Queue', prereq: null },
+          { id: 'dispatch', label: 'Dispatch Carts',       prereq: 'view' },
         ],
       },
     },

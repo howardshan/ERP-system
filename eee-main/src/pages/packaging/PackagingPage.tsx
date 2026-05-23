@@ -1,0 +1,417 @@
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  CheckSquare,
+  Square,
+  RefreshCw,
+  Package,
+  ScanLine,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  SendHorizonal,
+} from 'lucide-react';
+import {
+  getSkusWithStock,
+  getAvailableCarts,
+  dispatchCarts,
+  PkgCart,
+  PkgSku,
+} from '../../services/pkgApi';
+import { cn } from '../../lib/utils';
+
+function DaysInStockBadge({ days }: { days: number }) {
+  if (days < 10) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+        {days}d
+      </span>
+    );
+  }
+  if (days <= 14) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+        {days}d
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">
+      {days}d
+    </span>
+  );
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+export default function PackagingPage() {
+  const [skus, setSkus] = useState<PkgSku[]>([]);
+  const [skusLoading, setSkusLoading] = useState(true);
+  const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
+
+  const [carts, setCarts] = useState<PkgCart[]>([]);
+  const [cartsLoading, setCartsLoading] = useState(false);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [note, setNote] = useState('');
+  const [dispatching, setDispatching] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const [scanInput, setScanInput] = useState('');
+  const [scanError, setScanError] = useState('');
+  const scanRef = useRef<HTMLInputElement>(null);
+
+  const loadSkus = async () => {
+    setSkusLoading(true);
+    try {
+      const data = await getSkusWithStock();
+      setSkus(data);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'Failed to load SKUs');
+    }
+    setSkusLoading(false);
+  };
+
+  const loadCarts = async (skuId: string) => {
+    setCartsLoading(true);
+    setSelectedIds(new Set());
+    setScanError('');
+    try {
+      const data = await getAvailableCarts(skuId);
+      setCarts(data);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'Failed to load carts');
+    }
+    setCartsLoading(false);
+  };
+
+  useEffect(() => {
+    loadSkus();
+  }, []);
+
+  useEffect(() => {
+    if (selectedSkuId) {
+      loadCarts(selectedSkuId);
+    } else {
+      setCarts([]);
+      setSelectedIds(new Set());
+    }
+  }, [selectedSkuId]);
+
+  const handleSkuSelect = (skuId: string) => {
+    setSelectedSkuId(skuId);
+    setSuccessMsg('');
+    setErrorMsg('');
+    setScanError('');
+    setTimeout(() => scanRef.current?.focus(), 100);
+  };
+
+  const toggleCart = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === carts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(carts.map(c => c.id)));
+    }
+  };
+
+  const handleScanKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    const code = scanInput.trim();
+    setScanInput('');
+    if (!code) return;
+
+    const cart = carts.find(c => c.sub_lot_code === code);
+    if (!cart) {
+      setScanError(`Cart "${code}" not found or not available`);
+      return;
+    }
+    setScanError('');
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.add(cart.id);
+      return next;
+    });
+  };
+
+  const handleDispatch = async () => {
+    if (selectedIds.size === 0) return;
+    setDispatching(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const result = await dispatchCarts(Array.from(selectedIds), note || undefined);
+      setSuccessMsg(
+        `Dispatched ${result.cart_count} cart${result.cart_count !== 1 ? 's' : ''} (outbound #${result.outbound_id})`
+      );
+      setNote('');
+      setSelectedIds(new Set());
+      await Promise.all([loadSkus(), selectedSkuId ? loadCarts(selectedSkuId) : Promise.resolve()]);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'Dispatch failed');
+    }
+    setDispatching(false);
+  };
+
+  const allSelected = carts.length > 0 && selectedIds.size === carts.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < carts.length;
+
+  return (
+    <div className="flex h-full min-h-0" style={{ minHeight: 'calc(100vh - 56px)' }}>
+      {/* Left panel — SKU list */}
+      <aside className="w-80 shrink-0 border-r border-slate-200 bg-white flex flex-col">
+        <div className="p-4 border-b border-slate-100">
+          <div className="flex items-center justify-between mb-0.5">
+            <h2 className="text-sm font-bold text-slate-900">Products in Stock</h2>
+            <button
+              onClick={loadSkus}
+              disabled={skusLoading}
+              className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-40 transition-colors"
+            >
+              <RefreshCw size={13} className={skusLoading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-400">Select a product to view available carts</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {skusLoading && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 size={20} className="animate-spin text-slate-400" />
+            </div>
+          )}
+          {!skusLoading && skus.length === 0 && (
+            <div className="text-center py-10">
+              <Package size={28} className="text-slate-300 mx-auto mb-2" />
+              <p className="text-xs text-slate-500">No released carts in packaging queue.</p>
+            </div>
+          )}
+          {skus.map(sku => {
+            const isSelected = selectedSkuId === sku.sku_id;
+            return (
+              <button
+                key={sku.sku_id}
+                onClick={() => handleSkuSelect(sku.sku_id)}
+                className={cn(
+                  'w-full text-left rounded-xl border-2 p-3 transition-all',
+                  isSelected
+                    ? 'border-orange-400 bg-orange-50'
+                    : 'border-slate-200 bg-white hover:border-orange-200 hover:bg-orange-50/40',
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
+                      {sku.sku_code}
+                    </p>
+                    <p className="text-sm font-bold text-slate-900 truncate mt-0.5">{sku.sku_name}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className={cn(
+                      'text-2xl font-bold tabular-nums',
+                      isSelected ? 'text-orange-700' : 'text-slate-700',
+                    )}>
+                      {sku.cart_count}
+                    </p>
+                    <p className="text-[10px] text-slate-400">carts</p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
+
+      {/* Right panel — Cart table */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[#faf8f5]">
+        {/* Scan input bar */}
+        <div className="px-6 pt-5 pb-3">
+          {selectedSkuId ? (
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 max-w-sm">
+                <ScanLine size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  ref={scanRef}
+                  type="text"
+                  value={scanInput}
+                  onChange={e => { setScanInput(e.target.value); setScanError(''); }}
+                  onKeyDown={handleScanKeyDown}
+                  placeholder="Scan cart QR code..."
+                  className="w-full pl-9 pr-4 py-2 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white"
+                />
+              </div>
+              {scanError && (
+                <p className="flex items-center gap-1.5 text-xs font-bold text-red-600">
+                  <AlertCircle size={13} />
+                  {scanError}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="h-9 flex items-center">
+              <p className="text-sm text-slate-400">Select a product from the left to begin.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Toast messages */}
+        <div className="px-6">
+          {successMsg && (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 text-sm text-emerald-800 font-medium mb-3">
+              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+              {successMsg}
+            </div>
+          )}
+          {errorMsg && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm text-red-700 font-medium mb-3">
+              <AlertCircle size={15} className="text-red-500 shrink-0" />
+              {errorMsg}
+            </div>
+          )}
+        </div>
+
+        {/* Cart table */}
+        <div className="flex-1 px-6 overflow-auto">
+          {!selectedSkuId && (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <Package size={40} className="text-slate-300 mb-3" />
+              <p className="text-slate-500 font-medium">No product selected</p>
+              <p className="text-xs text-slate-400 mt-1">Choose a product on the left to view available carts</p>
+            </div>
+          )}
+
+          {selectedSkuId && cartsLoading && (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 size={24} className="animate-spin text-slate-400" />
+            </div>
+          )}
+
+          {selectedSkuId && !cartsLoading && carts.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Package size={36} className="text-slate-300 mb-3" />
+              <p className="text-slate-500 font-medium">No carts available</p>
+              <p className="text-xs text-slate-400 mt-1">
+                All carts for this product have been dispatched or none are released yet.
+              </p>
+            </div>
+          )}
+
+          {selectedSkuId && !cartsLoading && carts.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="w-10 px-4 py-3">
+                      <button onClick={toggleAll} className="text-slate-500 hover:text-slate-800 transition-colors">
+                        {allSelected ? (
+                          <CheckSquare size={16} className="text-orange-600" />
+                        ) : someSelected ? (
+                          <CheckSquare size={16} className="text-orange-400" />
+                        ) : (
+                          <Square size={16} />
+                        )}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Cart Code
+                    </th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Work Order
+                    </th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Released At
+                    </th>
+                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Days in Stock
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {carts.map(cart => {
+                    const checked = selectedIds.has(cart.id);
+                    return (
+                      <tr
+                        key={cart.id}
+                        onClick={() => toggleCart(cart.id)}
+                        className={cn(
+                          'cursor-pointer transition-colors',
+                          checked ? 'bg-orange-50' : 'hover:bg-slate-50',
+                        )}
+                      >
+                        <td className="px-4 py-3">
+                          {checked ? (
+                            <CheckSquare size={16} className="text-orange-600" />
+                          ) : (
+                            <Square size={16} className="text-slate-300" />
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-mono font-bold text-slate-900">{cart.sub_lot_code}</span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">
+                          {cart.work_order_barcode ?? cart.lot_number ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs">
+                          {formatDate(cart.released_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <DaysInStockBadge days={cart.days_in_stock} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Action bar */}
+        {selectedSkuId && !cartsLoading && carts.length > 0 && (
+          <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center gap-4">
+            <p className="text-sm font-bold text-slate-700 shrink-0">
+              {selectedIds.size} cart{selectedIds.size !== 1 ? 's' : ''} selected
+            </p>
+            <input
+              type="text"
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="Optional dispatch note..."
+              className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400"
+            />
+            <button
+              onClick={handleDispatch}
+              disabled={selectedIds.size === 0 || dispatching}
+              className="flex items-center gap-2 px-5 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors shrink-0"
+            >
+              {dispatching ? (
+                <><Loader2 size={14} className="animate-spin" /> Dispatching…</>
+              ) : (
+                <><SendHorizonal size={14} /> Dispatch</>
+              )}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
