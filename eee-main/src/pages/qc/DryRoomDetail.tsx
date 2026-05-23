@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { ArrowLeft, CheckCircle2, Clock, LogOut, Move, X, AlertTriangle, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, LogOut, Move, X, AlertTriangle, RotateCcw, QrCode } from 'lucide-react';
 import {
   listAwaitingCheckIn,
   listAwaitingRecheck,
@@ -14,6 +14,7 @@ import {
 } from '../../services/qcApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { QcStatusBadge } from './components/QcStatusBadge';
+import { ScanQrDialog } from './components/ScanQrDialog';
 import { cn } from '../../lib/utils';
 
 interface Props {
@@ -69,6 +70,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [pendingDisplace, setPendingDisplace] = useState<null | { targetCell: number; targetLoc: DryingLocation; occupant: SubLot }>(null);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const load = async () => {
     try {
@@ -202,6 +204,39 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
     setOpenCell(null);
   };
 
+  // QR scan → decide what to do based on the scanned sub-lot's status & location.
+  const handleScanned = (sl: SubLot) => {
+    setScanOpen(false);
+    setError('');
+    // (a) Not in any dryer yet → enter place mode
+    if (sl.status === 'created' || sl.status === 'awaiting_recheck') {
+      setMode({
+        kind: 'place',
+        subLotId: sl.id,
+        source: sl.status === 'awaiting_recheck' ? 'recheck' : 'created',
+      });
+      setMsg(`${sl.sub_lot_code} ready to place — click a green cell`);
+      // Make sure the appropriate side panel will include the scanned sub-lot;
+      // load() will pick it up shortly. Until then we already have setMode pointing
+      // at the right id.
+      load();
+      return;
+    }
+    // (b) Already in this dryer → pop the cell detail card
+    if (sl.status === 'drying' && sl.dryer_number === dryerNumber && sl.cell_number != null) {
+      setOpenCell(sl.cell_number);
+      setMsg(`Showing cell ${String(sl.cell_number).padStart(2, '0')} (${sl.sub_lot_code})`);
+      return;
+    }
+    // (c) In a different dryer
+    if (sl.status === 'drying' && sl.dryer_number != null && sl.dryer_number !== dryerNumber) {
+      setError(`${sl.sub_lot_code} is in Dryer ${sl.dryer_number} cell ${String(sl.cell_number ?? '').padStart(2, '0')} — switch dryer to act on it.`);
+      return;
+    }
+    // (d) Other status (pending / inspecting / passed / hold / room_temp / closed)
+    setError(`${sl.sub_lot_code} status is "${sl.status}" — no action available in Dry Rooms. (Try Testing or History.)`);
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <button
@@ -211,9 +246,19 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
         <ArrowLeft size={14} /> All dry rooms
       </button>
 
-      <div className="flex items-baseline gap-3 mb-1">
-        <h1 className="text-2xl font-bold text-slate-900">Dryer {dryerNumber}</h1>
-        <span className="text-sm text-slate-500">{inDryer.length}/100 cells occupied</span>
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-bold text-slate-900">Dryer {dryerNumber}</h1>
+          <span className="text-sm text-slate-500">{inDryer.length}/100 cells occupied</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setScanOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-700 text-white"
+          title="Scan a sub-lot QR or barcode to act on it"
+        >
+          <QrCode size={13} /> Scan QR
+        </button>
       </div>
 
       {msg && (
@@ -237,6 +282,13 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
           onCancel={() => setMode({ kind: 'idle' })}
         />
       )}
+
+      <ScanQrDialog
+        open={scanOpen}
+        dryerNumber={dryerNumber}
+        onClose={() => setScanOpen(false)}
+        onFound={handleScanned}
+      />
 
       {/* Confirm-displace dialog */}
       {pendingDisplace && mode.kind === 'move' && (

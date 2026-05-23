@@ -7,6 +7,7 @@ import {
   Wallet,
   Receipt,
   Scale,
+  TrendingUp,
   CalendarDays,
   ShieldCheck,
   HelpCircle,
@@ -118,6 +119,12 @@ export function Sidebar({ activeScreen, setActiveScreen, pendingApprovalCount = 
         {(canViewJE || canViewPeriods) && <NavSection title="Reports" />}
         {canViewJE && (
           <NavItem icon={Scale} label="Trial Balance" isActive={isActive('trial-balance')} onClick={() => setActiveScreen('trial-balance')} />
+        )}
+        {canViewJE && (
+          <NavItem icon={TrendingUp} label="Profit &amp; Loss" isActive={isActive('pnl')} onClick={() => setActiveScreen('pnl')} />
+        )}
+        {canViewJE && (
+          <NavItem icon={Scale} label="Balance Sheet" isActive={isActive('bs')} onClick={() => setActiveScreen('bs')} />
         )}
         {canViewPeriods && (
           <NavItem icon={CalendarDays} label="Accounting Periods" isActive={isActive('periods')} onClick={() => setActiveScreen('periods')} />
