@@ -2,17 +2,23 @@ import React, { useEffect, useState } from 'react';
 import {
   Flame, Hourglass, FlaskConical, ListChecks,
   CheckCircle2, XCircle, Thermometer, Clock,
-  ChevronRight, RefreshCw,
+  ChevronRight, ChevronDown, RefreshCw, TrendingUp, X, Package,
 } from 'lucide-react';
 import {
   getQcOverview,
-  releasePassedSubLot,
+  releasePassedSubLotsGroup,
+  dashboardPassRateForecast,
+  getRecentFailedInspections,
   formatQcDateTime,
   QcOverview,
   NeedsAttentionItem,
+  PassRateForecastItem,
+  RecentFailItem,
 } from '../../services/qcApi';
+import { getInventorySummary, getAvailableCarts, PkgInventorySku, PkgCart } from '../../services/pkgApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn } from '../../lib/utils';
+import { DisposeDialog } from './components/DisposeDialog';
 
 interface Props {
   onNavigate: (screen: string) => void;
@@ -23,22 +29,43 @@ interface Props {
 export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Props) {
   const { can } = usePermissions();
   const canRelease = can('qc', 'dashboard', 'release_pass');
+  const dispositionPerms = {
+    redry: can('qc', 'testing', 'dispose_redry'),
+    room_temp: can('qc', 'testing', 'dispose_room_temp'),
+    retest: can('qc', 'testing', 'dispose_retest'),
+    scrap: can('qc', 'testing', 'dispose_scrap_concession'),
+  };
   const canDisposeAny =
-    can('qc', 'testing', 'dispose_redry') ||
-    can('qc', 'testing', 'dispose_room_temp') ||
-    can('qc', 'testing', 'dispose_scrap_concession');
+    dispositionPerms.redry || dispositionPerms.room_temp ||
+    dispositionPerms.retest || dispositionPerms.scrap;
 
   const [overview, setOverview] = useState<QcOverview | null>(null);
+  const [forecast, setForecast] = useState<PassRateForecastItem[]>([]);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [disposeTarget, setDisposeTarget] = useState<NeedsAttentionItem | null>(null);
+  const [showFailPanel, setShowFailPanel] = useState(false);
+  const [recentFails, setRecentFails] = useState<RecentFailItem[]>([]);
+  const [failsLoading, setFailsLoading] = useState(false);
+  const [inventory, setInventory] = useState<PkgInventorySku[]>([]);
+  const [expandedSkus, setExpandedSkus] = useState<Set<string>>(new Set());
+  const [bucketDetail, setBucketDetail] = useState<{
+    sku_code: string; sku_name: string; days: number; carts: PkgCart[];
+  } | null>(null);
 
   const load = async () => {
     setRefreshing(true);
     try {
-      const d = await getQcOverview();
+      const [d, fc, inv] = await Promise.all([
+        getQcOverview(),
+        dashboardPassRateForecast().catch(() => [] as PassRateForecastItem[]),
+        getInventorySummary().catch(() => [] as PkgInventorySku[]),
+      ]);
       setOverview(d);
+      setForecast(fc);
+      setInventory(inv);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Load failed');
     }
@@ -51,14 +78,27 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
     return () => clearInterval(t);
   }, []);
 
+  /** Immediately remove an item from needs_attention, then refresh in background. */
+  const removeAttentionItem = (inspectionId: string) => {
+    setOverview(prev => prev ? {
+      ...prev,
+      needs_attention: prev.needs_attention.filter(i => i.inspection_id !== inspectionId),
+    } : prev);
+    load();
+  };
+
   const handleRelease = async (item: NeedsAttentionItem) => {
     if (!canRelease) return;
     setBusyId(item.drying_sub_lot_id);
     setError('');
     try {
-      await releasePassedSubLot(item.drying_sub_lot_id);
-      setMsg(`${item.sub_lot_code} released to next process`);
-      await load();
+      await releasePassedSubLotsGroup(item.group_sub_lot_ids);
+      const label = item.group_size > 1 ? `${item.group_size} carts` : item.sub_lot_code;
+      setMsg(`${label} released to next process`);
+      removeAttentionItem(item.inspection_id);
+      // Reload so the Released Inventory section picks up the cart immediately,
+      // not after the next 15s auto-refresh tick.
+      load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Release failed');
     }
@@ -66,11 +106,18 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
   };
 
   const handleDispose = (item: NeedsAttentionItem) => {
-    // Navigate to Testing and pre-select this sub-lot — the disposition picker
-    // lives on the workflow there. (TestingPage will auto-pop the picker since
-    // the sub-lot is in 'hold' status.)
-    if (onOpenSubLot) onOpenSubLot(item.drying_sub_lot_id);
-    else onNavigate('testing');
+    setDisposeTarget(item);
+  };
+
+  const onDisposed = () => {
+    const label = disposeTarget
+      ? disposeTarget.group_size > 1 ? `${disposeTarget.group_size} carts` : disposeTarget.sub_lot_code
+      : '—';
+    setMsg(`${label} disposed`);
+    const id = disposeTarget?.inspection_id;
+    setDisposeTarget(null);
+    if (id) removeAttentionItem(id);
+    else load();
   };
 
   return (
@@ -100,7 +147,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
 
       {/* ── Stat cards ───────────────────────────────────────────────── */}
       {overview && (
-        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-5">
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mt-5">
           <StatCard
             label="Expected finish today" value={overview.stats.expected_finish_today}
             icon={Clock} accent="slate"
@@ -125,11 +172,86 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
             icon={FlaskConical} accent="blue"
             onClick={() => onNavigate('testing')}
           />
+          {/* Pass card */}
           <StatCard
-            label={`Passed / Failed today (${overview.stats.pass_rate_pct ?? '—'}%)`}
-            value={`${overview.stats.passed_today} / ${overview.stats.failed_today}`}
-            icon={ListChecks} accent="emerald"
+            label={`Passed today (${overview.stats.pass_rate_pct ?? '—'}%)`}
+            value={overview.stats.passed_today}
+            icon={CheckCircle2} accent="emerald"
           />
+          {/* Fail card — clickable, opens detail panel */}
+          <StatCard
+            label="Failed today"
+            value={overview.stats.failed_today}
+            icon={XCircle} accent="red"
+            onClick={() => {
+              setShowFailPanel(v => !v);
+              if (!showFailPanel) {
+                setFailsLoading(true);
+                getRecentFailedInspections(2)
+                  .then(setRecentFails)
+                  .catch(() => {})
+                  .finally(() => setFailsLoading(false));
+              }
+            }}
+          />
+        </section>
+      )}
+
+      {/* ── Fail detail panel ────────────────────────────────────────── */}
+      {showFailPanel && (
+        <FailDetailPanel
+          items={recentFails}
+          loading={failsLoading}
+          onClose={() => setShowFailPanel(false)}
+          onOpenHistory={onOpenHistory}
+        />
+      )}
+
+      {/* ── Pass-rate forecast per SKU (M-050) ───────────────────────── */}
+      {forecast.length > 0 && (
+        <section className="mt-6">
+          <div className="flex items-baseline justify-between mb-2">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+              <TrendingUp size={14} className="text-emerald-600" />
+              Predicted passes (in-flight × today's pass rate)
+            </h2>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
+              per product
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {forecast.map(f => {
+              const rate = f.today_pass_rate;
+              const ratePct = rate != null ? Math.round(rate * 100) : null;
+              return (
+                <div key={f.sku_id} className="bg-white border-2 border-slate-200 rounded-xl p-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold font-mono">
+                        {f.sku_code}
+                      </p>
+                      <p className="text-sm font-bold text-slate-900 truncate">{f.sku_name}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-3xl font-bold tabular-nums text-emerald-700">
+                        {f.forecast_passes}
+                      </p>
+                      <p className="text-[10px] text-slate-400">est. passes</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-600">
+                    <span className="font-mono">{f.in_progress}</span>
+                    <span className="text-slate-400">in flight ·</span>
+                    {ratePct != null ? (
+                      <span className="font-mono">{ratePct}% today</span>
+                    ) : (
+                      <span className="text-slate-400">no tests today (assumes 100%)</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
 
@@ -168,6 +290,62 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
         </section>
       )}
 
+      {/* ── Released Inventory (packaging queue) ─────────────────────── */}
+      <section className="mt-6">
+        <div className="flex items-baseline justify-between mb-2">
+          <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+            <Package size={14} className="text-orange-600" />
+            Released Inventory
+          </h2>
+          <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
+            awaiting packaging dispatch
+          </span>
+        </div>
+
+        {inventory.length === 0 ? (
+          <p className="text-xs text-slate-400 py-2">No released carts in packaging.</p>
+        ) : (
+          <ul className="space-y-2">
+            {inventory.map(item => (
+              <InventoryRow
+                key={item.sku_id}
+                item={item}
+                isExpanded={expandedSkus.has(item.sku_id)}
+                onToggle={() => setExpandedSkus(prev => {
+                  const next = new Set(prev);
+                  if (next.has(item.sku_id)) next.delete(item.sku_id);
+                  else next.add(item.sku_id);
+                  return next;
+                })}
+                onBarClick={(days, carts) => setBucketDetail({
+                  sku_code: item.sku_code,
+                  sku_name: item.sku_name,
+                  days,
+                  carts,
+                })}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <CartBucketModal bucket={bucketDetail} onClose={() => setBucketDetail(null)} />
+
+      <DisposeDialog
+        open={disposeTarget !== null}
+        subLot={disposeTarget ? {
+          id: disposeTarget.drying_sub_lot_id,
+          sub_lot_code: disposeTarget.sub_lot_code,
+          sku_name: disposeTarget.sku_name,
+          expected_dry_minutes: null,
+          hold_reason: null,
+        } : null}
+        subLotIds={disposeTarget?.group_sub_lot_ids}
+        subLotCodes={disposeTarget?.group_sub_lot_codes}
+        permissions={dispositionPerms}
+        onClose={() => setDisposeTarget(null)}
+        onDisposed={onDisposed}
+      />
     </div>
   );
 }
@@ -219,84 +397,460 @@ function NeedsAttentionRow({
   onDispose: () => void;
   onOpenHistory?: () => void;
 }) {
-  const isPass = item.result === 'pass';
-  const isReleased = item.current_status === 'closed';
-  const isDisposed = item.current_status !== 'hold' && item.current_status !== 'passed';
+  const [expanded, setExpanded] = useState(false);
+  const isPass    = item.result === 'pass';
+  // If a PASS item is in needs_attention, it is ALWAYS still actionable
+  // (M-066 filter guarantees at least one group member is still 'passed').
+  // isReleased is no longer used to gate the Release button — the item
+  // disappears once all members are released.
+  const isDisposed = item.current_status !== 'hold' && item.current_status !== 'passed'
+                     && item.current_status !== 'awaiting_group_result';
+  const isGroup   = item.group_size > 1;
 
   return (
     <li className={cn(
-      'flex items-center gap-3 border-2 rounded-xl p-3',
+      'border-2 rounded-xl overflow-hidden',
       isPass ? 'border-emerald-200 bg-emerald-50/30' : 'border-red-200 bg-red-50/30',
     )}>
-      {isPass
-        ? <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
-        : <XCircle size={20} className="text-red-600 shrink-0" />
-      }
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={onOpenHistory}
-            disabled={!onOpenHistory}
-            className={cn(
-              'font-mono font-bold text-sm',
-              onOpenHistory ? 'text-blue-700 hover:underline' : 'text-slate-900',
+      {/* Main row */}
+      <div className="flex items-start gap-3 p-3">
+        {isPass
+          ? <CheckCircle2 size={20} className="text-emerald-600 shrink-0 mt-0.5" />
+          : <XCircle     size={20} className="text-red-600 shrink-0 mt-0.5" />
+        }
+
+        <div className="flex-1 min-w-0">
+          {/* Sample ID + result badge + Aw */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {item.sample_id ? (
+              <button
+                type="button"
+                onClick={onOpenHistory}
+                disabled={!onOpenHistory}
+                className={cn(
+                  'font-mono font-bold text-sm',
+                  onOpenHistory ? 'text-blue-700 hover:underline' : 'text-slate-900',
+                )}
+              >
+                {item.sample_id}
+              </button>
+            ) : (
+              <span className="font-mono font-bold text-sm text-slate-900">{item.sub_lot_code}</span>
             )}
-          >
-            {item.sub_lot_code}
-          </button>
-          <span className={cn(
-            'text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded',
-            isPass ? 'bg-emerald-200 text-emerald-900' : 'bg-red-200 text-red-900',
-          )}>
-            {item.result}
-          </span>
-          {item.sample_id && (
-            <span className="text-[11px] text-slate-500">
-              sample <code className="font-mono font-bold">{item.sample_id}</code>
+            <span className={cn(
+              'text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded',
+              isPass ? 'bg-emerald-200 text-emerald-900' : 'bg-red-200 text-red-900',
+            )}>
+              {item.result}
+            </span>
+            {item.aw != null && (
+              <span className="text-[11px] text-slate-500">
+                Aw <span className="font-mono font-bold">{item.aw}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Cart badges */}
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {item.group_sub_lot_codes.map(code => (
+              <span
+                key={code}
+                className={cn(
+                  'font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border',
+                  code === item.sub_lot_code
+                    ? isPass ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                               : 'bg-red-100 text-red-800 border-red-300'
+                    : 'bg-white text-slate-600 border-slate-300',
+                )}
+                title={code === item.sub_lot_code ? 'tested cart' : 'group member'}
+              >
+                {code}
+              </span>
+            ))}
+          </div>
+
+          {/* Sub-line: SKU · lot · time */}
+          <p className="text-[11px] text-slate-500 mt-1">
+            {item.sku_name ?? '—'}
+            {item.work_order_barcode ? ` · ${item.work_order_barcode}` : item.lot_number ? ` · ${item.lot_number}` : ''}
+            {' · '}{formatQcDateTime(item.submitted_at)}
+            {isGroup && (
+              <button
+                type="button"
+                onClick={() => setExpanded(v => !v)}
+                className="ml-2 text-blue-600 hover:underline inline-flex items-center gap-0.5"
+              >
+                {expanded ? 'hide details' : `see ${item.group_size} carts`}
+                {expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+              </button>
+            )}
+          </p>
+        </div>
+
+        {/* Right-side action */}
+        <div className="shrink-0 flex items-center gap-2 ml-1">
+          {isPass && (
+            <button
+              type="button"
+              onClick={onRelease}
+              disabled={!canRelease || busy}
+              title={canRelease ? `Release ${isGroup ? `all ${item.group_size} carts` : 'cart'} (passed → closed)` : 'Missing qc.testing.release_pass permission'}
+              className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {busy ? 'Releasing…' : isGroup ? `Release all ${item.group_size}` : 'Release'}
+              <ChevronRight size={11} />
+            </button>
+          )}
+          {!isPass && !isDisposed && (
+            <button
+              type="button"
+              onClick={onDispose}
+              disabled={!canDispose}
+              className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold bg-red-600 hover:bg-red-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isGroup ? `Dispose all ${item.group_size}` : 'Dispose'}
+              <ChevronRight size={11} />
+            </button>
+          )}
+          {!isPass && isDisposed && (
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              {item.current_status}
             </span>
           )}
-          {item.aw != null && (
-            <span className="text-[11px] text-slate-500">Aw <span className="font-mono font-bold">{item.aw}</span></span>
-          )}
         </div>
-        <p className="text-[11px] text-slate-500 mt-0.5">
-          {item.sku_name ?? '—'}{item.lot_number ? ` · ${item.lot_number}` : ''} · {formatQcDateTime(item.submitted_at)}
-        </p>
       </div>
 
-      {/* Right side action */}
-      {isPass && !isReleased && (
-        <button
-          type="button"
-          onClick={onRelease}
-          disabled={!canRelease || busy}
-          title={canRelease ? 'Release to next process (status: passed → closed)' : 'Missing qc.dashboard.release_pass permission'}
-          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-        >
-          {busy ? 'Releasing…' : 'Release'} <ChevronRight size={11} />
-        </button>
-      )}
-      {isPass && isReleased && (
-        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 px-2">Released</span>
-      )}
-      {!isPass && !isDisposed && (
-        <button
-          type="button"
-          onClick={onDispose}
-          disabled={!canDispose}
-          title={canDispose ? 'Open Testing → choose disposition' : 'Missing qc.testing.dispose_* permission'}
-          className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold bg-red-600 hover:bg-red-500 text-white disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-        >
-          Dispose <ChevronRight size={11} />
-        </button>
-      )}
-      {!isPass && isDisposed && (
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 px-2">
-          {item.current_status}
-        </span>
+      {/* Expandable group detail */}
+      {expanded && isGroup && (
+        <div className="border-t border-red-100 bg-white/60 px-4 py-3">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">
+            Carts in this group
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {item.group_sub_lot_codes.map(code => (
+              <span
+                key={code}
+                className={cn(
+                  'font-mono text-xs font-semibold px-2 py-1 rounded border',
+                  code === item.sub_lot_code
+                    ? 'bg-red-100 text-red-800 border-red-300'
+                    : 'bg-slate-50 text-slate-700 border-slate-200',
+                )}
+              >
+                {code}
+                {code === item.sub_lot_code && (
+                  <span className="ml-1 text-[9px] text-red-600 font-bold">tested</span>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
     </li>
   );
 }
 
+// ── Fail detail panel ──────────────────────────────────────────────────────
+
+const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
+  passed:                { label: 'Pass',                 cls: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+  closed:                { label: 'Closed',                cls: 'bg-slate-100 text-slate-600 border-slate-300' },
+  dispatched:            { label: 'Packaged',              cls: 'bg-teal-100 text-teal-800 border-teal-300' },
+  hold:                  { label: 'On hold',               cls: 'bg-red-100 text-red-800 border-red-300' },
+  awaiting_group_result: { label: 'Awaiting group result', cls: 'bg-slate-100 text-slate-600 border-slate-300' },
+  drying:                { label: 'Re-drying',             cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+  room_temp_drying:      { label: 'Room temp dry',         cls: 'bg-orange-100 text-orange-800 border-orange-300' },
+  pending:               { label: 'Pending',               cls: 'bg-slate-100 text-slate-700 border-slate-300' },
+  inspecting:            { label: 'Inspecting',            cls: 'bg-blue-100 text-blue-800 border-blue-300' },
+  awaiting_recheck:      { label: 'Awaiting recheck',      cls: 'bg-purple-100 text-purple-800 border-purple-300' },
+  disposing:             { label: 'Disposing',             cls: 'bg-slate-200 text-slate-700 border-slate-300' },
+};
+
+function statusBadge(status: string) {
+  const s = STATUS_LABEL[status] ?? { label: status, cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+  return (
+    <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded border font-mono', s.cls)}>
+      {s.label}
+    </span>
+  );
+}
+
+function dayLabel(isoStr: string): string {
+  const d = new Date(isoStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function FailDetailPanel({ items, loading, onClose, onOpenHistory }: {
+  items: RecentFailItem[];
+  loading: boolean;
+  onClose: () => void;
+  onOpenHistory?: (subLotId: string) => void;
+}) {
+  // Group by day label, preserving chronological order within each group
+  const groups = React.useMemo(() => {
+    const map = new Map<string, RecentFailItem[]>();
+    for (const item of items) {
+      const key = dayLabel(item.submitted_at);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(item);
+    }
+    return Array.from(map.entries());
+  }, [items]);
+
+  return (
+    <div className="mt-3 bg-white border-2 border-red-200 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-red-50 border-b border-red-200">
+        <h3 className="text-sm font-bold text-red-900 flex items-center gap-1.5">
+          <XCircle size={14} className="text-red-600" /> Failed inspections (last 2 days)
+        </h3>
+        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-red-100">
+          <X size={14} className="text-red-600" />
+        </button>
+      </div>
+
+      {loading && (
+        <p className="text-xs text-slate-400 p-4 animate-pulse">Loading…</p>
+      )}
+      {!loading && items.length === 0 && (
+        <p className="text-xs text-slate-500 p-4">No failed inspections in the last 2 days.</p>
+      )}
+      {!loading && groups.map(([day, dayItems]) => (
+        <div key={day}>
+          <div className="px-4 py-1.5 bg-slate-50 border-b border-slate-100">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{day}</span>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {dayItems.map(item => (
+              <li key={item.inspection_id} className="px-4 py-3">
+                {/* Row header: sample ID + Aw + time */}
+                <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+                  <span className="font-mono font-bold text-sm text-red-700">
+                    {item.sample_id ?? item.champion_code}
+                  </span>
+                  {item.aw != null && (
+                    <span className="text-xs text-slate-500">
+                      Aw <span className="font-mono font-bold text-slate-800">{item.aw}</span>
+                    </span>
+                  )}
+                  <span className="text-[11px] text-slate-400 ml-auto">
+                    {formatQcDateTime(item.submitted_at)}
+                  </span>
+                </div>
+                {/* Sub-line */}
+                <p className="text-[11px] text-slate-500 mb-2">
+                  {item.sku_name ?? '—'}
+                  {item.work_order_barcode ? ` · ${item.work_order_barcode}` : item.lot_number ? ` · ${item.lot_number}` : ''}
+                </p>
+                {/* Cart list — one row per cart, clickable to open history */}
+                <ul className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-200 overflow-hidden">
+                  {item.group_members.map(m => (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenHistory?.(m.id)}
+                        disabled={!onOpenHistory}
+                        className={cn(
+                          'w-full flex items-center gap-2 px-3 py-2 text-left transition-colors',
+                          onOpenHistory ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default',
+                          m.is_champion ? 'bg-red-50' : 'bg-white',
+                        )}
+                      >
+                        {/* Champion marker */}
+                        {m.is_champion && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-red-500 shrink-0">
+                            Sample
+                          </span>
+                        )}
+                        {/* Cart code */}
+                        <span className={cn(
+                          'font-mono text-xs font-semibold flex-1 text-left',
+                          m.is_champion ? 'text-red-800' : 'text-slate-700',
+                        )}>
+                          {m.sub_lot_code}
+                        </span>
+                        {/* Status badge */}
+                        {statusBadge(m.status)}
+                        {/* Chevron */}
+                        {onOpenHistory && (
+                          <ChevronRight size={12} className="text-slate-400 shrink-0" />
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Released-inventory row ────────────────────────────────────────────────
+// Collapsed: SKU + name + total count. Expanded: bar chart of carts grouped
+// by days-since-release. Each bar is clickable and bubbles its bucket up so
+// QcHome can show a detail modal.
+function InventoryRow({ item, isExpanded, onToggle, onBarClick }: {
+  item: PkgInventorySku;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onBarClick: (days: number, carts: PkgCart[]) => void;
+}) {
+  const [carts, setCarts] = useState<PkgCart[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    if (carts) return;  // cached
+    setLoading(true);
+    getAvailableCarts(item.sku_id)
+      .then(setCarts)
+      .catch(() => setCarts([]))
+      .finally(() => setLoading(false));
+  }, [isExpanded, item.sku_id, carts]);
+
+  // Group carts by integer days-in-stock and sort ascending.
+  const buckets = React.useMemo(() => {
+    if (!carts) return [] as Array<{ days: number; carts: PkgCart[] }>;
+    const map = new Map<number, PkgCart[]>();
+    for (const c of carts) {
+      const k = c.days_in_stock ?? 0;
+      const list = map.get(k);
+      if (list) list.push(c);
+      else map.set(k, [c]);
+    }
+    return Array.from(map.entries())
+      .map(([days, list]) => ({ days, carts: list }))
+      .sort((a, b) => a.days - b.days);
+  }, [carts]);
+
+  const maxCount = Math.max(1, ...buckets.map(b => b.carts.length));
+
+  const barColor = (days: number) =>
+    days < 10 ? 'bg-emerald-500 hover:bg-emerald-600'
+    : days <= 14 ? 'bg-amber-400 hover:bg-amber-500'
+    : 'bg-red-500 hover:bg-red-600';
+
+  return (
+    <li className="bg-white border-2 border-slate-200 rounded-xl">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-slate-50 rounded-xl"
+      >
+        {isExpanded
+          ? <ChevronDown size={16} className="text-slate-400 shrink-0" />
+          : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold font-mono">
+            {item.sku_code}
+          </p>
+          <p className="text-sm font-bold text-slate-900 truncate">{item.sku_name}</p>
+        </div>
+        <p className="text-2xl font-bold tabular-nums text-orange-700 shrink-0">{item.total}</p>
+      </button>
+
+      {isExpanded && (
+        <div className="px-4 pb-4 border-t border-slate-100 pt-3">
+          {loading ? (
+            <p className="text-xs text-slate-400 italic text-center py-4">Loading carts…</p>
+          ) : buckets.length === 0 ? (
+            <p className="text-xs text-slate-400 italic text-center py-4">No carts available.</p>
+          ) : (
+            <>
+              <div className="flex items-end gap-2 h-32 px-1">
+                {buckets.map(b => {
+                  const heightPct = Math.max(8, Math.round((b.carts.length / maxCount) * 100));
+                  return (
+                    <button
+                      key={b.days}
+                      type="button"
+                      onClick={() => onBarClick(b.days, b.carts)}
+                      className="flex-1 h-full flex flex-col items-center gap-1 group min-w-[28px]"
+                      title={`${b.carts.length} cart${b.carts.length === 1 ? '' : 's'} at ${b.days} day(s) — click for details`}
+                    >
+                      <span className="text-[10px] font-bold tabular-nums text-slate-700">
+                        {b.carts.length}
+                      </span>
+                      <div className="w-full flex-1 min-h-0 flex items-end">
+                        <div
+                          className={cn('w-full rounded-t transition-colors cursor-pointer', barColor(b.days))}
+                          style={{ height: `${heightPct}%`, minHeight: '6px' }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500 group-hover:text-slate-900">
+                        {b.days}d
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-3 text-center">
+                Days since release · click a bar for cart-level detail
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+// ─── Modal: list of carts in a single days-since-release bucket ────────────
+function CartBucketModal({ bucket, onClose }: {
+  bucket: { sku_code: string; sku_name: string; days: number; carts: PkgCart[] } | null;
+  onClose: () => void;
+}) {
+  if (!bucket) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+        aria-label="Close"
+      />
+      <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl max-h-[80vh] flex flex-col">
+        <header className="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center shrink-0">
+              <Package size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold font-mono">
+                {bucket.sku_code} · {bucket.days} day{bucket.days === 1 ? '' : 's'} in stock
+              </p>
+              <h2 className="text-base font-bold text-slate-900 truncate">{bucket.sku_name}</h2>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 shrink-0" aria-label="Close">
+            <X size={16} />
+          </button>
+        </header>
+        <div className="px-5 py-3 overflow-auto">
+          <p className="text-xs text-slate-500 mb-2">
+            {bucket.carts.length} cart{bucket.carts.length === 1 ? '' : 's'}
+          </p>
+          <ul className="divide-y divide-slate-100">
+            {bucket.carts.map(c => (
+              <li key={c.id} className="py-2 flex items-center gap-3 text-xs">
+                <span className="font-mono font-bold text-slate-900">{c.sub_lot_code}</span>
+                <span className="text-slate-400">·</span>
+                <span className="font-mono text-slate-600">{c.work_order_barcode ?? c.lot_number ?? '—'}</span>
+                <span className="flex-1" />
+                <span className="text-slate-500">released</span>
+                <span className="font-mono text-slate-700">{formatQcDateTime(c.released_at)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}

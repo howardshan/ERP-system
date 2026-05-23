@@ -19,6 +19,7 @@ import DocsPage from './pages/DocsPage';
 import UserManagement from './pages/auth/UserManagement';
 import HRModule from './pages/hr/HRModule';
 import QualityControlModule from './pages/qc/QualityControlModule';
+import PackagingModule from './pages/packaging/PackagingModule';
 import AuditLog from './pages/finance/AuditLog';
 import ProfitLoss from './pages/finance/ProfitLoss';
 import BalanceSheet from './pages/finance/BalanceSheet';
@@ -149,6 +150,10 @@ function AppShell({
 
   if (activeModule === 'qc') {
     return <QualityControlModule onHome={() => setActiveModule('home')} />;
+  }
+
+  if (activeModule === 'packaging') {
+    return <PackagingModule onHome={() => setActiveModule('home')} />;
   }
 
   return <ModulePlaceholder name={activeModule} onHome={() => setActiveModule('home')} />;

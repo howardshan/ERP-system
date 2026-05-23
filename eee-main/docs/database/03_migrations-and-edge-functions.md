@@ -778,6 +778,401 @@ HR 模块的 11 个 migration（`20260519000001` ~ `20260519000011`）以及 `hr
 
 ---
 
+### M-046 `20260522000003_qc_disposition_retest.sql`
+**用途**: 给 hold sub-lot 加第 4 种处置方式 `retest`(重新取样测试,不重烘)。同时修复 QcHome 上 "Dispose" 按钮跳到 Testing 后找不到 hold sub-lot 的问题(改成直接在 Dashboard 弹 modal)。
+
+**变更**:
+
+| 对象 | 操作 |
+|------|------|
+| `qc_disposition.type` CHECK | 替换 — 加入 `'retest'`(共 7 种) |
+| `qc_create_disposition` | REPLACE — `retest` 分支让 sub-lot 状态从 `hold` → `pending`(回 Testing 队列,等重新取样) |
+| `user_permission_grant` | INSERT `qc.testing.dispose_retest` for ysha@smu.edu |
+
+**4 种处置方式 UI 标签(用户业务术语)**:
+1. **再次进入 Dry Room** → `redry_dryer`(回烘干房,设新预计时长)
+2. **进入 Room Temp Dry** → `room_temp_dry`(室温干,正计时)
+3. **重新取样测试** → `retest`(回 Testing,不重烘)
+4. **报废** → `scrap`(终结)
+
+**业务规则**:
+- **BR-Q24** `retest` disposition 让 sub-lot 回 `pending` 状态,旧 sample 已 `inspected/fail`,不会再被复用;操作工要去 Testing 取一个新 sample_id 才能继续录 WA。所有旧数据(spot_history / inspection_record / 旧 sample)全部保留 — append-only(BR-Q18)。
+
+**前端配套**:
+- 新组件 [components/DisposeDialog.tsx](../../src/pages/qc/components/DisposeDialog.tsx) — modal 形式的 4 选项处置面板,接受 sub-lot 概要,内部调 `createDisposition`
+- [QcHome.tsx](../../src/pages/qc/QcHome.tsx) "Dispose" 按钮改成直接打开此 modal(修原本跳 Testing 找不到 hold 车的 bug)
+- [TestingPage.tsx](../../src/pages/qc/TestingPage.tsx) DispositionPicker 也加 Retest 选项,UI 标签同步改成中英混排
+- `PERMISSION_STRUCTURE` 加 `qc.testing.dispose_retest` 权限点
+- `DispositionType` 类型加 `'retest'`
+
+**依赖**: M-039
+
+---
+
+### M-047 `20260522000004_qc_spot_selection_toggle.sql`
+**用途**: 加 runtime feature flag 控制是否启用 cell-level spot 选择,加无格子的批量 check-in 流程。grid UI 保留代码但默认隐藏(flag 为 `false`)。
+
+**变更**:
+
+| 对象 | 操作 |
+|------|------|
+| `app_settings(key, value, description, updated_at, updated_by)` | CREATE TABLE — 通用 key/value 配置表 |
+| `get_app_setting(p_key)` | CREATE — 读单个 setting,返回 jsonb |
+| Seed `qc.spot_selection_enabled = false` | INSERT |
+| `qc_drying_sub_lot.dryer_number int` | ADD COLUMN — CHECK(1..5 或 NULL),让 sub-lot 不通过 location_id 也能挂到 dryer 上 |
+| Backfill `dryer_number` from existing `location.dryer_number` | UPDATE |
+| `qc_sub_lot_to_json` | REPLACE — `dryer_number` 优先取 column,fallback 到 location;同时输出 `sku_id` / `sku_code` 供前端按 SKU 分组 |
+| `qc_register_sub_lots_in_dryer_bulk(p_sub_lot_ids[], p_dryer_number, p_in_time)` | CREATE — 批量入烘干,无 cell;返回 `{requested, succeeded, failed}` jsonb,逐个校验状态,容量超 100 整批拒绝 |
+| `qc_list_sub_lots_by_dryer` | REPLACE — 用 `COALESCE(s.dryer_number, l.dryer_number)` 过滤,兼容两种模式 |
+| `qc_dry_room_summary` | REPLACE — 同上,occupancy 统计能 mix-mode 工作 |
+
+**业务规则**:
+- **BR-Q25** spot_selection_enabled = false 时,sub-lot 入烘干房只设 `dryer_number` 而不设 `location_id`(cell);capacity 模型仍然每车占 100 容量中的 1 个槽。flag 切回 true 后,新检入会要求 cell,但已有不带 cell 的车不受影响(共存)。
+- **BR-Q26** 批量 check-in 时,任何 sub-lot 的 status ∉ (`created`, `awaiting_recheck`) 都被跳过,记入 result.failed 数组,前端展示为"断码 / ineligible"警告;成功的进 result.succeeded。
+
+**前端配套**:
+- `useQcSpotSelectionEnabled()` hook,60s 内存缓存
+- `DryRoomDetail` 根据 flag 在 Grid 模式 / List 模式间切换,grid 代码完整保留(P2 重启 spot 选择时无需重写)
+- 新组件 `DryRoomListMode` — 按 Product/SKU → Work Order → carts 分层,sub-lot 按 remaining time 升序排;每个 work order 顶部显示 finish bucket 摘要
+- 新组件 `BulkCheckInDialog` — 确认 modal,显示选中 cart 总数 + 断码警告
+- `qcApi.ts` 新增 `getAppSetting` / `registerSubLotsBulk`,`SubLot` 类型加 `sku_id` / `sku_code`
+
+**翻转开关方式**(暂无 UI):
+```sql
+UPDATE app_settings
+SET value = 'true'::jsonb, updated_at = now()
+WHERE key = 'qc.spot_selection_enabled';
+```
+前端有 60s 缓存,改完后下次访问 Dry Room 详情页或刷新一次会生效。
+
+**依赖**: M-036(`qc_drying_location.dryer_number`)、M-038(`qc_sub_lot_spot_history`)
+
+---
+
+### M-048 `20260522000005_qc_sampling_groups.sql`
+**用途**: 引入 sampling group(批量抽样组)机制 — 出库时按 work order 把 N 辆车一组,随机挑 champion 进 Testing,组内其他车进 `awaiting_group_result` 暂存;PASS 时整组放行,FAIL 时仅 champion 入 hold;champion 走 retest disposition 时同组自动 re-roll 下一辆。
+
+**变更**:
+
+| 对象 | 操作 |
+|------|------|
+| `qc_product_sku.sample_every_n_carts int DEFAULT 1` | ADD COLUMN — 每多少辆取 1 个 sample(SKU 维度);1 = 全检,2 = 每 2 辆抽 1 ... |
+| `qc_test_group(id uuid pk, production_lot_id, group_sequence int, member_count int, status, created_at)` | CREATE TABLE — 一次批量出库针对某 work order 形成的抽样组 |
+| `qc_drying_sub_lot.test_group_id uuid REFERENCES qc_test_group(id)` | ADD COLUMN |
+| `qc_drying_sub_lot.is_test_champion boolean DEFAULT false` | ADD COLUMN |
+| `qc_drying_sub_lot_status` enum 加 `awaiting_group_result` | ALTER TYPE |
+| `qc_check_out_sub_lots_bulk(p_sub_lot_ids[], p_out_time)` | CREATE — 一次性出库 + 按 production_lot 拆组(`ceil(N/sample_every_n_carts)` 组)+ 随机挑 champion + 写 `test_group_*` 字段;返回 `{requested, succeeded, failed, groups[]}` jsonb |
+| `qc_submit_inspection` | REPLACE — champion PASS 时整组成员 → `passed`,FAIL 仅 champion 入 `hold`,其余成员保持 `awaiting_group_result` |
+| `qc_create_disposition` | REPLACE — champion 选 `retest` 时,从同组 `awaiting_group_result` 成员中随机选一个新 champion 提升为 `pending`(member_count > 1 时),保持组 ID 不变 |
+| `qc_sub_lot_to_json` | REPLACE — 新增 `sku_id` / `sku_code` / `sample_every_n_carts` / `test_group_id` / `test_group_sequence` / `test_group_member_count` / `test_group_status` / `is_test_champion` |
+
+**业务规则**:
+- **BR-Q27** 每次 `qc_check_out_sub_lots_bulk` 调用内部按 `production_lot_id` 分桶,每桶按各车所在 SKU 的 `sample_every_n_carts` 切片 — 最后一段不足 N 的也单独成组(roundup),保证至少出一个 champion。
+- **BR-Q28** Champion 在 Testing 阶段:PASS → 同组 `awaiting_group_result` 兄弟车批量晋升 `passed`(自动放行);FAIL → 仅 champion 转 `hold`,兄弟车仍 `awaiting_group_result` 等下一轮处置。Disposition = `retest` 是唯一能 re-roll champion 的路径 — 调用时同组 `awaiting_group_result` 成员随机选一个晋升 `pending` 成为新 champion,旧 champion 进 closed。
+
+**前端配套**:
+- `qcApi.ts`:`SubLot` 类型加 group/champion 字段;`SubLotStatus` 联合补 `awaiting_group_result`;`checkOutSubLotsBulk` 改为 `(input: { sub_lot_ids, out_time? })` 签名,返回 `BulkCheckOutResult { requested, succeeded, failed, groups[] }`
+- `Product` / `ProductInput` 加 `sample_every_n_carts`,create/update 一并写入
+- 新组件 `BulkCheckOutDialog` — 出库前 preview,按 work order 显示 carts → groups 摘要
+- `DryRoomListMode` 右侧改为多选 drying carts → "Check out (N)" 走 bulk RPC;移除单车 check-out 按钮
+- `TestingPage` champion 在 pending queue 显示 `Users ×N` 紫色 badge;选中后页头加紫色 banner 提示"PASS 整组放行 / FAIL 仅 champion"
+- `ProductManagement` 表单新增 sample rate 输入字段
+- `LotDetail` 老的 bulk check-out 调用同步换签名
+
+**依赖**: M-035(`qc_product_sku`)、M-039(`qc_sub_lot_status` enum、`qc_submit_inspection`)、M-046(`qc_create_disposition` retest 分支)
+
+---
+
+### M-049 `20260522000006_qc_list_products_with_sample_n.sql`
+**用途**: `qc_list_products()` 输出补上 `sample_every_n_carts`(M-048 follow-up),让 ProductManagement 能展示/编辑 sample rate。
+
+**变更**:
+
+| 对象 | 操作 |
+|------|------|
+| `qc_list_products()` | REPLACE — 输出 jsonb 中新增 `sample_every_n_carts` 字段 |
+
+**依赖**: M-048
+
+---
+
+### M-050 `20260522000007_qc_wo_dry_days_and_analysis.sql`
+**用途**: Work order 创建强制要求 expected dry time(分钟,UI 输入用天);sub-lot 改成按 min/max 范围批量创建(代码 `<lot_barcode>-NNN`);新增 add-to-existing / move-dryer / forecast / analysis RPCs;auto-gen SKU code helper。
+
+**变更**:
+
+| 对象 | 操作 |
+|------|------|
+| `qc_production_lot.expected_dry_minutes int NOT NULL` | ADD COLUMN — 先 backfill(子批 max → SKU SOP → 1440 fallback)再设 NOT NULL,加 CHECK > 0 (BR-Q29) |
+| `qc_create_production_lot_with_sub_lots(p_lot_number, p_lot_barcode, p_work_order_barcode, p_sku_id, p_expected_dry_minutes, p_sub_lot_start_seq, p_sub_lot_end_seq)` | CREATE — 一次性创建 lot + 范围内所有 sub-lots,代码 `<lot_barcode>-NNN`(3 位填充);校验 expected dry > 0 (BR-Q29/Q30) |
+| `qc_add_sub_lots_to_lot(p_production_lot_id, p_start_seq?, p_end_seq?, p_count?)` | CREATE — 给已有 work order 补车,默认从现有最大序号 + 1 续,继承 lot 的 expected_dry_minutes |
+| `qc_move_sub_lots_dryer(p_sub_lot_ids[], p_new_dryer_number)` | CREATE — 批量把 drying 状态的 sub-lot 移到另一个 dryer (1..5);拒绝 `same_dryer` / `wrong_status` / `not_found`;清掉 `location_id` 走 list-mode;写 `move_dryer` event (BR-Q31) |
+| `qc_dashboard_pass_rate_forecast()` | CREATE — 按 SKU 聚合"在制车 × 今日通过率"为预测通过数;无今日测试默认按 100% |
+| `qc_analysis_metrics(p_sku_id?, p_from_date?, p_to_date?, p_dryer_number?, p_production_lot_id?)` | CREATE — Analysis 页指标:总车数 / 平均干燥时间 / 首检通过率 / 各 disposition 路径(retest / redry / room_temp)的次数+平均 dwell+下一次通过率 / 报废数 (BR-Q32) |
+| `qc_next_sku_code()` | CREATE — 返回下一个 `SKU-NNNN`(BR-Q33),被前端 `createProduct` 在无 code 输入时调用 |
+
+**业务规则**:
+- **BR-Q29** Work order 创建时必须指定 `expected_dry_minutes > 0`;空值或 0 会被 RPC 抛异常拒绝。前端在 Production 表单上将其设为必填(以"天"为输入单位,1 day = 1440 min)。
+- **BR-Q30** Sub-lot 编号规范统一为 `<lot_barcode>-NNN`(3 位零填充)。Production 表单要求输入 min/max 两个数字而非每车 code 列表;Add-carts 对话框默认从现有最大序号 + 1 续。
+- **BR-Q31** Move-dryer 仅对 `drying` 状态 sub-lot 生效;移到同一 dryer 会被拒(`same_dryer`)。move 不改 in_time / total_dried,只换 dryer 归属 + 清掉 location_id。
+- **BR-Q32** Analysis "next pass rate" 取 disposition `created_at` 之后第一条 inspection_record 的 result;dwell 时间 = `next_inspection_submitted_at - disposition.created_at`。
+- **BR-Q33** SKU code 由 `qc_next_sku_code()` 自动生成为 `SKU-NNNN`;ProductManagement 表单不再暴露 code 输入。
+
+**前端配套**:
+- `qcApi.ts`:`ProductionLot.expected_dry_minutes` 必填;`createProductionLot` 改用新 RPC,签名加 `expected_dry_minutes` + `sub_lot_start/end_seq`;新增 `addSubLotsToLot` / `moveSubLotsDryer` / `dashboardPassRateForecast` / `analysisMetrics`;`ProductInput.code` 改为可选(无值时调 `qc_next_sku_code`)
+- `lib/utils.ts`:新增 `MINUTES_PER_DAY` / `minutesToDays` / `daysToMinutes` / `fmtDays` / `fmtDuration` — 所有干燥时间 UI 显示统一用"天"为主单位
+- `lib/audio.ts`:Web Audio `beep()` + `warnBeep()`(双音报警)— 用于 DuplicateScanDialog
+- 新组件:`AddCartsDialog` / `MoveDryerDialog` / `DuplicateScanDialog`
+- 新页面:`AnalysisPage`(BarChart3 图标进 sidebar Management 区,权限 `qc.trace.view`)
+- `Production` 表单大改:移除每车 code 列表 → 只输 min/max;expected dry 改成"天"必填
+- `ProductManagement`:移除 SKU code 输入,只输 product name(code 后端自动生成);days 输入
+- `LotDetail`:页头加"Add carts"按钮 + AddCartsDialog;头部 metadata 显示 expected dry(天)
+- `DryRoomListMode`:右侧 action bar 加 "Move ({N})" 紫色按钮 → MoveDryerDialog;scan 时同代码二次扫描触发 DuplicateScanDialog(蜂鸣 + Confirm 才进选择)
+- `QcHome`:stats 下方新增"Predicted passes"卡片网格 — 每个 in-flight SKU 一张
+
+**依赖**: M-033(`qc_drying_sub_lot`/`qc_production_lot`)、M-046(disposition retest)、M-047(`dryer_number` 列 + `app_settings`)、M-048(`awaiting_group_result` 状态)
+
+---
+
+### M-051 `20260522000008_qc_analysis_metrics_fix.sql`
+**用途**: 修 `qc_analysis_metrics` 调用时报 `column reference "result" is ambiguous`。
+
+**根因**: M-050 把 plpgsql 局部变量命名为 `result`,与 `qc_inspection_record.result` / `first_insp.result` / `disp_with_next.next_result` 在同一作用域里。Postgres 在子查询里看到无前缀的 `result` 引用时无法判断该用哪个,直接报 ambiguous。
+
+**修复**:
+- 局部变量改名 `out_json`
+- 每个内部子查询的表加别名(`fi` / `dw` / `d2`),并把 `result` / `type` / `next_result` 等所有列引用都加前缀
+
+**依赖**: M-050(`qc_analysis_metrics` 原定义)
+
+---
+
+### M-052 `20260522000009_qc_analysis_count_group_siblings.sql`
+**用途**: Analysis 页"First time test"漏算 sampling group 中的 sibling 车。
+
+**根因**: M-048 的 champion-propagation 让 sibling 车 status 升 `passed`,但**不写** `qc_inspection_record`。M-050/M-051 的 `qc_analysis_metrics` 只统计 inspection_record 行,所以 1 champion + 1 sibling 的组只算 1 次测试,与操作员"我刚刚做了 2 个测试"的直觉不符。
+
+**修复**: 把 `first_insp` 拆成 `direct_insp`(本车的 inspection)+ `sibling_insp`(本车没 record,但同组 champion 有 → 继承 champion 的 result/submitted_at)两段 UNION ALL,再供下游 pass_rate / fail_count 等计算。`disp_with_next` 不动 — disposition 自带 record。
+
+**业务规则**:
+- **BR-Q35** Analysis 指标里,test_group 中没有自己 inspection_record 的 sibling 车,按 champion 的首次 inspection result 计入 first-time test 统计(BR-Q28 的 propagation 在分析口径上对齐操作员心智)。
+
+**依赖**: M-048(`is_test_champion` / `test_group_id`)、M-051(`qc_analysis_metrics` 上一版)
+
+---
+
+### M-053 `20260522000010_qc_sub_lot_code_use_work_order.sql`
+**用途**: 新建 sub-lot 的 code 前缀从 `lot_barcode` 改成 `work_order_barcode`,目标格式 `<work_order>-NNN`。
+
+**变更**:
+- `qc_create_production_lot_with_sub_lots` REPLACE — 内部 code 拼接改用 `p_work_order_barcode`
+- `qc_add_sub_lots_to_lot` REPLACE — 改用 `lot.work_order_barcode`
+- `qc_sub_lot_to_json` REPLACE — 输出新增 `work_order_barcode` 字段供前端展示
+
+**注**: 已存在的 sub-lots(沿用 lot_barcode 前缀)保持原样,只对新建的生效;前缀混用不影响 RPC 的 regex `-\d{3}$` 序号解析。
+
+**依赖**: M-050
+
+---
+
+### M-054 `20260522000011_qc_analysis_scope_by_any_activity.sql`
+**用途**: Analysis 日期过滤改为 "any activity in range" — 一辆车只要在日期区间内有 check-in / inspection / disposition 任一活动,就计入 scope。
+
+**根因**: 之前只看 `s.in_time`,昨天 check-in 但今天 test 的车在 "Today" 视图被排除;与操作员"今天的测试报告"心智不符。
+
+**修复**: scope CTE 的 date 条件改成 OR 三项:`s.in_time`、`qc_inspection_record.submitted_at`、`qc_disposition.created_at` 任一落在 `[from, to+1day)`。`p_from_date` 和 `p_to_date` 同时为 NULL(All time)时跳过过滤。
+
+**业务规则**:
+- **BR-Q36** Analysis 日期 filter 按"活动"过滤而非"创建":区间内有任意 check-in / inspection / disposition 的 sub-lot 都计入。
+
+**依赖**: M-052
+
+---
+
+### M-055 `20260522000012_fix_checkout_bulk_ambiguous_alias.sql`
+**用途**: 修复 `qc_check_out_sub_lots_bulk` 函数中 SQL 别名歧义导致的运行时报错。
+
+**根因**: Step 2 的 FOR 循环中用了别名 `s`,与 PL/pgSQL 局部变量 `s qc_drying_sub_lot%ROWTYPE` 在同一作用域内冲突,Postgres 无法消歧义。
+
+**修复**: 把 Step 2 FOR 循环内部的 SQL 别名 `s` 重命名为 `sl`,消除与 PL/pgSQL 变量的歧义。
+
+**依赖**: M-048
+
+---
+
+### M-056 `20260522000013_qc_group_fail_propagates_to_siblings.sql`
+**用途**: Champion FAIL 时,同组所有处于 `awaiting_group_result` 状态的兄弟车一并转入 `hold`(原逻辑只处理 champion 本身)。
+
+**变更**:
+- `qc_submit_inspection` REPLACE — FAIL 分支新增:把同组所有 `awaiting_group_result` 成员 batch UPDATE 为 `hold`,写 `inspection_failed_hold` 事件
+
+**业务规则**:
+- **BR-Q28 更新** Champion FAIL → champion 入 `hold`,**同组所有 `awaiting_group_result` 兄弟车也同时入 `hold`**;后续统一走 disposition 流程。
+
+**依赖**: M-048, M-055
+
+---
+
+### M-057 `20260522000014_qc_overview_add_group_info.sql`
+**用途**: `qc_overview()` 的 `needs_attention` 行补充 sampling group 字段,让 QC Home 的每一行能展示组信息。
+
+**变更**:
+- `qc_overview()` REPLACE — `needs_attention` 每行新增字段:`test_group_id`、`group_size`、`group_sub_lot_ids`、`group_sub_lot_codes`、`work_order_barcode`
+
+**依赖**: M-041, M-048
+
+---
+
+### M-058 `20260522000015_qc_analysis_grant_all_qc_users.sql`
+**用途**: 将 `qc.analysis.view` 权限授予所有已拥有任意 QC 权限的用户,修复侧边栏 Analysis 入口对部分用户不可见的问题。
+
+**变更**:
+- `user_permission_grant` INSERT — 对所有在 `user_module_access` 中有 `qc` 模块访问记录的用户,批量补录 `qc.analysis.view`
+
+**依赖**: M-040, M-050
+
+---
+
+### M-059 `20260522000016_qc_recent_failed_inspections.sql`
+**用途**: 新增 RPC `qc_recent_failed_inspections(p_days int DEFAULT 2)`,为 QC Home FAIL 统计卡片的详情面板提供数据。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `qc_recent_failed_inspections(p_days int DEFAULT 2)` | CREATE | 返回最近 N 天的失败检验记录,含 group 成员明细 |
+
+**返回字段**:
+- 失败 inspection 的基础信息(sub_lot_code, sku_name, work_order_barcode, submitted_at, aw_value)
+- `group_member_codes`、`group_size` — 方便展示整组受影响的车
+
+**依赖**: M-048, M-057
+
+---
+
+### M-060 `20260522000017_qc_disposition_accept_awaiting_group.sql`
+**用途**: `qc_create_disposition` 新增接受 `awaiting_group_result` 作为合法入口状态(与 `hold` 同等处理)。
+
+**根因**: M-056 之前创建的组,兄弟车仍处于 `awaiting_group_result`(未被迁移到 `hold`),在 M-056 上线后这些车执行 disposition 时会抛 "Sub-lot not in disposition flow" 异常。
+
+**修复**: `qc_create_disposition` REPLACE — 入口状态检查允许 `hold` 或 `awaiting_group_result`
+
+**依赖**: M-039, M-056
+
+---
+
+### M-061 `20260522000018_qc_disposition_skip_already_processed.sql`
+**用途**: `qc_create_disposition` 对已处理状态的子批静默跳过(no-op),不再抛异常。
+
+**根因**: 对整组批量 re-dispatch 处置时,部分车已进入 `closed` / `awaiting_recheck` / `room_temp_drying` / `pending` 状态;原函数对这些状态抛异常,导致批量操作中途失败。
+
+**修复**: `qc_create_disposition` REPLACE — 检测到 `closed` / `awaiting_recheck` / `room_temp_drying` / `pending` 状态时直接 RETURN(静默 no-op),不影响本次 batch 中其他车
+
+**依赖**: M-060
+
+---
+
+### M-062 `20260522000019_qc_checkout_group_by_sub_lot_code.sql`
+**用途**: 修复抽样组分配顺序,确保 sub-lot 按代码顺序(而非创建时间)编组。
+
+**根因**: M-048 中 `array_agg` 按 `created_at` 排序,若多车在同一毫秒创建则顺序不确定,导致组的分配不稳定(非 001-002-003 / 004-005-006 的直觉顺序)。
+
+**修复**: `qc_check_out_sub_lots_bulk` REPLACE — `array_agg(ORDER BY sub_lot_code)` 替换 `ORDER BY created_at`,保证编组按代码字典序确定性排列
+
+**依赖**: M-048, M-055
+
+---
+
+### M-063 `20260523000001_qc_checkout_regroup_redry_carts.sql`
+**用途**: 已重新烘干的车(曾有 `test_group_id`)在再次出库时,重新分配到新的 `qc_test_group`。
+
+**根因**: 原逻辑跳过已有 `test_group_id` 的车,导致重烘车走 re-dispatch 后无法进入新一轮 champion 抽样流程。
+
+**变更**:
+- Step 1:clear `is_test_champion = false`(确保旧 champion 标记不干扰新一轮)
+- Step 2b(新增):对已有 `test_group_id` 的 `awaiting_recheck` 状态车,创建新的 `qc_test_group` 行,并按 `sample_every_n_carts` 重新拆组、挑 champion
+
+**依赖**: M-048, M-062
+
+---
+
+### M-064 `20260523000002_qc_full_permissions_gmail_user.sql`
+**用途**: 为 `shayiqing16@gmail.com` 授予完整 QC 权限集 + 模块访问(原先只有 `ysha@smu.edu` 有种子权限)。
+
+**变更**:
+- `user_module_access` INSERT — `qc` 模块访问给 `shayiqing16@gmail.com`
+- `user_permission_grant` INSERT — 全套 QC 权限(与 M-040/M-041 给 ysha 的一致)
+
+**依赖**: M-040, M-041
+
+---
+
+### M-065 `20260523000003_qc_overview_needs_attention_active_only.sql`
+**用途**: `qc_overview` 的 `needs_attention` 列表只展示组内仍有活跃车的条目(避免已处理完毕的旧 FAIL 记录一直残留)。
+
+**变更**:
+- `qc_overview()` REPLACE — `needs_attention` FAIL 结果增加过滤条件:组内仍有车处于 `hold` 或 `awaiting_group_result` 才纳入;PASS 结果过滤:组内仍有车处于 `passed`(等待 release)才纳入
+
+**业务逻辑**:之前 `needs_attention` 会展示所有 24h 内的 pass/fail 检验结果(无论现状如何);改后只显示仍需人工干预的条目,操作完毕后自动从列表消失。
+
+**依赖**: M-057
+
+---
+
+### M-066 `20260523000004_qc_overview_needs_attention_pass_and_fail.sql`
+**用途**: 修复 M-065 的过度过滤——PASS 结果(status=`passed`,等待 release)被错误排除。
+
+**根因**: M-065 的 PASS 过滤条件过严,导致 passed 状态的车不再出现在 `needs_attention` 列表,操作员看不到需要 Release 的车。
+
+**修复**: `qc_overview()` REPLACE — 恢复 PASS 结果(status=`passed`,需 release)与 FAIL 结果并列展示;FAIL 过滤条件(组内有 `hold`/`awaiting_group_result`)保持 M-065 的逻辑不变
+
+**依赖**: M-065
+
+---
+
+### M-067 `20260523000005_packaging_module.sql`
+**用途**: 新增 Packaging(打包)模块。引入 `released_at` 时间戳、`dispatched` 状态、出库表及全套打包 RPC。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `qc_drying_sub_lot.released_at timestamptz` | ADD COLUMN | QC release 时刻,`qc_release_passed_sub_lot()` 执行时写入;供 FIFO 排序和在库天数计算 |
+| `qc_drying_sub_lot.status` CHECK | 替换 | 加入 `'dispatched'` 状态(打包出库后,终态) |
+| `qc_release_passed_sub_lot` | REPLACE | 执行 `passed → closed` 时同步写入 `released_at = now()` |
+| `pkg_outbound` | CREATE TABLE | 每次打包出库事件:`sku_id`、`cart_count`、`note`、`dispatched_by`、`dispatched_at` |
+| `pkg_outbound_item` | CREATE TABLE | 出库明细:`outbound_id`、`sub_lot_id`、`sub_lot_code`、`days_in_stock` |
+| `pkg_available_carts(p_sku_id uuid)` | CREATE | 返回指定 SKU 的 `closed` 车辆列表,按 `released_at` ASC(FIFO) |
+| `pkg_skus_with_stock()` | CREATE | 返回有库存(`closed` 车)的 SKU 列表及各自数量 |
+| `pkg_dispatch_carts(p_sub_lot_ids uuid[], p_note text)` | CREATE | 原子出库:cart 状态 `closed → dispatched`,写 `pkg_outbound` + `pkg_outbound_item` 记录 |
+| `pkg_inventory_summary()` | CREATE | 按 SKU 统计 green(`<10d`) / yellow(`10-14d`) / red(`≥15d`) 分桶数,供 QC Home 横向堆叠色条图使用 |
+| `user_permission_grant` | INSERT | 为 `ysha@smu.edu` 和 `shayiqing16@gmail.com` 授予 `packaging.outbound.view` + `packaging.outbound.dispatch` |
+| `user_module_access` | INSERT | 为两个开发用户新增 `packaging` 模块访问 |
+
+**新增状态机转移**:
+```
+closed → dispatched   (pkg_dispatch_carts)
+```
+
+**业务规则**:
+- **BR-P1** FIFO 排序以 `released_at`(QC release 时刻)为准,早释放的车优先出库。
+- **BR-P2** `pkg_dispatch_carts` 是原子操作:写 `pkg_outbound` + `pkg_outbound_item` + batch UPDATE sub-lot 状态在同一事务内完成;任一失败则整批回滚。
+- **BR-P3** 在库天数 = `now() - released_at`(天数,向下取整);≥0 且 <10 为 green,10-14 为 yellow,≥15 为 red。
+- **BR-P4** 只有 `closed` 状态的车才出现在打包队列;`dispatched` 是 Packaging 模块的终态。
+
+**前端配套**:
+- 新文件 `src/services/pkgApi.ts` — 类型化 wrapper:`getSkusWithStock()` / `getAvailableCarts(skuId?)` / `dispatchCarts(ids, note?)` / `getInventorySummary()`
+- 新页面 `src/pages/packaging/PackagingPage.tsx` — 两栏:左 SKU 卡片列表 + 右 FIFO 车辆表格,支持扫码/checkbox 选车,顶部在库天数 badge(绿/黄/红),底部出库操作栏
+- 新文件 `src/pages/packaging/PackagingModule.tsx` — 模块 shell,含返回按钮
+- `src/App.tsx` — 新增 `packaging` 模块路由分支
+- `src/pages/HomePage.tsx` — 新增 Packaging 橙色主题卡片
+- `src/lib/permissionStructure.ts` — 新增 `packaging.outbound.{view,dispatch}`
+- `src/pages/qc/QcHome.tsx` — 新增 Released Inventory 板块:调 `pkg_inventory_summary()`,按 SKU 渲染横向堆叠色条(green/amber/red 分桶)
+
+**依赖**: M-041(`qc_release_passed_sub_lot`)、M-064(开发用户权限)
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -814,7 +1209,29 @@ HR 模块的 11 个 migration（`20260519000001` ~ `20260519000011`）以及 `hr
 | M-043 | 20260521000004_qc_find_by_code.sql |
 | M-044 | 20260522000001_finance_pnl.sql |
 | M-045 | 20260522000002_finance_balance_sheet.sql |
-| **M-046** | _(下一个)_ |
+| M-046 | 20260522000003_qc_disposition_retest.sql |
+| M-047 | 20260522000004_qc_spot_selection_toggle.sql |
+| M-048 | 20260522000005_qc_sampling_groups.sql |
+| M-049 | 20260522000006_qc_list_products_with_sample_n.sql |
+| M-050 | 20260522000007_qc_wo_dry_days_and_analysis.sql |
+| M-051 | 20260522000008_qc_analysis_metrics_fix.sql |
+| M-052 | 20260522000009_qc_analysis_count_group_siblings.sql |
+| M-053 | 20260522000010_qc_sub_lot_code_use_work_order.sql |
+| M-054 | 20260522000011_qc_analysis_scope_by_any_activity.sql |
+| M-055 | 20260522000012_fix_checkout_bulk_ambiguous_alias.sql |
+| M-056 | 20260522000013_qc_group_fail_propagates_to_siblings.sql |
+| M-057 | 20260522000014_qc_overview_add_group_info.sql |
+| M-058 | 20260522000015_qc_analysis_grant_all_qc_users.sql |
+| M-059 | 20260522000016_qc_recent_failed_inspections.sql |
+| M-060 | 20260522000017_qc_disposition_accept_awaiting_group.sql |
+| M-061 | 20260522000018_qc_disposition_skip_already_processed.sql |
+| M-062 | 20260522000019_qc_checkout_group_by_sub_lot_code.sql |
+| M-063 | 20260523000001_qc_checkout_regroup_redry_carts.sql |
+| M-064 | 20260523000002_qc_full_permissions_gmail_user.sql |
+| M-065 | 20260523000003_qc_overview_needs_attention_active_only.sql |
+| M-066 | 20260523000004_qc_overview_needs_attention_pass_and_fail.sql |
+| M-067 | 20260523000005_packaging_module.sql |
+| **M-068** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

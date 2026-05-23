@@ -1,19 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, XCircle, FlaskConical, History, RotateCcw, Hourglass } from 'lucide-react';
+import { CheckCircle2, XCircle, FlaskConical, History, RotateCcw, Hourglass, Users, LayoutDashboard, ListChecks } from 'lucide-react';
+import TestingDashboard from './TestingDashboard';
 import {
   listPendingInspections,
   inspectionTemplateForSubLot,
   takeSample,
   submitInspection,
-  createDisposition,
   listSamplesForSubLot,
+  getGroupMembers,
   formatQcDateTime,
   Sample,
   SubLot,
-  DispositionType,
 } from '../../services/qcApi';
 import { usePermissions } from '../../contexts/PermissionContext';
-import { QcStatusBadge } from './components/QcStatusBadge';
 import { NumericKeypad } from './components/NumericKeypad';
 import { cn } from '../../lib/utils';
 
@@ -23,22 +22,12 @@ interface Props {
 
 type Phase = 'idle' | 'sample' | 'measure' | 'done';
 
-const DISPOSITIONS: Array<{ value: DispositionType; label: string; description: string }> = [
-  { value: 'redry_dryer',  label: 'Re-dry in dryer', description: 'Send back to a dryer cell. You must set a new expected drying time.' },
-  { value: 'room_temp_dry', label: 'Room temp dry',   description: 'Move to the Room Temp Dry queue (count-up timer, no countdown).' },
-  { value: 'concession',   label: 'Concession',      description: 'Accept the cart as-is with a recorded reason.' },
-  { value: 'scrap',        label: 'Scrap',           description: 'Discard the cart.' },
-];
-
 export default function TestingPage({ onOpenHistory }: Props) {
   const { can } = usePermissions();
   const canSample = can('qc', 'testing', 'take_sample');
   const canSubmit = can('qc', 'testing', 'submit_inspection');
-  const canDisposeRedry        = can('qc', 'testing', 'dispose_redry');
-  const canDisposeRoomTemp     = can('qc', 'testing', 'dispose_room_temp');
-  const canDisposeScrapConcession = can('qc', 'testing', 'dispose_scrap_concession');
-  const canDispose = canDisposeRedry || canDisposeRoomTemp || canDisposeScrapConcession;
 
+  const [activeTab, setActiveTab] = useState<'queue' | 'dashboard'>('queue');
   const [pending, setPending] = useState<SubLot[]>([]);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -60,6 +49,33 @@ export default function TestingPage({ onOpenHistory }: Props) {
         Sub-lots checked out of the dryer · take a sample → enter WA → confirm Pass/Fail · auto-judged by SKU template (BR-Q1)
       </p>
 
+      {/* Tab toggle */}
+      <div className="flex gap-1 mb-5 bg-slate-100 rounded-lg p-1 w-fit">
+        <button
+          type="button"
+          onClick={() => setActiveTab('queue')}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
+            activeTab === 'queue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+          )}
+        >
+          <ListChecks size={12} /> Queue
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('dashboard')}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
+            activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+          )}
+        >
+          <LayoutDashboard size={12} /> Dashboard
+        </button>
+      </div>
+
+      {activeTab === 'dashboard' && <TestingDashboard />}
+
+      {activeTab === 'queue' && <>
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm flex items-center gap-2">
         <CheckCircle2 size={14} /> {msg}
       </p>}
@@ -92,31 +108,44 @@ export default function TestingPage({ onOpenHistory }: Props) {
                       )}
                     >
                       <div className="flex justify-between items-start gap-2">
-                        <div className="min-w-0">
-                          <div className="font-mono font-bold text-slate-900">{s.sub_lot_code}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-mono font-bold text-slate-900 flex items-center gap-1.5">
+                            {s.sub_lot_code}
+                            {s.is_test_champion && s.test_group_member_count && s.test_group_member_count > 1 && (
+                              <span
+                                className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200"
+                                title={`Champion · ${s.test_group_member_count - 1} sibling(s) waiting`}
+                              >
+                                <Users size={8} /> ×{s.test_group_member_count}
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[10px] text-slate-500 mt-0.5">
                             {s.sku_name ?? '—'} · checked out {formatQcDateTime(s.out_time)}
                           </div>
-                          {/* Sub-status: awaiting sample vs sample-taken-awaiting-WA */}
-                          <div className={cn(
-                            'text-[10px] mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold',
-                            awaitingSample
-                              ? 'bg-slate-200 text-slate-700'
-                              : 'bg-blue-100 text-blue-800',
-                          )}>
-                            {awaitingSample ? (
-                              <><Hourglass size={9} /> Awaiting sample</>
-                            ) : (
-                              <><FlaskConical size={9} /> Sample {s.latest_pending_sample_id} · awaiting WA</>
-                            )}
-                          </div>
+                          {!awaitingSample && s.latest_pending_sample_id && (
+                            <div className="text-[10px] text-blue-700 font-mono mt-0.5">
+                              Sample {s.latest_pending_sample_id} · awaiting WA
+                            </div>
+                          )}
                           {s.wait_minutes != null && (
                             <div className={cn('text-[10px] mt-0.5', overdue ? 'text-amber-700 font-bold' : 'text-slate-500')}>
                               Waiting {s.wait_minutes}m
                             </div>
                           )}
                         </div>
-                        <QcStatusBadge status={s.status} />
+                        {/* Sub-state badge replaces the generic "Pending" badge */}
+                        <span className={cn(
+                          'shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border',
+                          awaitingSample
+                            ? 'bg-slate-100 text-slate-600 border-slate-300'
+                            : 'bg-blue-100 text-blue-800 border-blue-300',
+                        )}>
+                          {awaitingSample
+                            ? <span className="flex items-center gap-1"><Hourglass size={9} /> No sample</span>
+                            : <span className="flex items-center gap-1"><FlaskConical size={9} /> Awaiting WA</span>
+                          }
+                        </span>
                       </div>
                     </button>
                   </li>
@@ -138,19 +167,15 @@ export default function TestingPage({ onOpenHistory }: Props) {
               subLot={selected}
               canSample={canSample}
               canSubmit={canSubmit}
-              canDispose={canDispose}
-              dispositionPerms={{
-                redry: canDisposeRedry,
-                room_temp: canDisposeRoomTemp,
-                scrap_concession: canDisposeScrapConcession,
-              }}
               onOpenHistory={() => onOpenHistory(selected.id)}
+              onSampleTaken={load}
               onDone={() => { setMsg('Test completed'); setSelectedId(null); load(); }}
               onError={(m) => setError(m)}
             />
           )}
         </section>
       </div>
+      </>}
     </div>
   );
 }
@@ -158,14 +183,13 @@ export default function TestingPage({ onOpenHistory }: Props) {
 // ─── Per-sub-lot workflow ──────────────────────────────────────────────────
 
 function TestWorkflow({
-  subLot, canSample, canSubmit, canDispose, dispositionPerms, onOpenHistory, onDone, onError,
+  subLot, canSample, canSubmit, onOpenHistory, onSampleTaken, onDone, onError,
 }: {
   subLot: SubLot;
   canSample: boolean;
   canSubmit: boolean;
-  canDispose: boolean;
-  dispositionPerms: { redry: boolean; room_temp: boolean; scrap_concession: boolean };
   onOpenHistory: () => void;
+  onSampleTaken: () => void;
   onDone: () => void;
   onError: (m: string) => void;
 }) {
@@ -177,7 +201,17 @@ function TestWorkflow({
   const [aw, setAw] = useState('');
   const [busy, setBusy] = useState(false);
   const [judged, setJudged] = useState<'pass' | 'fail' | null>(null);
-  const [showDisposition, setShowDisposition] = useState(false);
+  const [finalResult, setFinalResult] = useState<'pass' | 'fail' | null>(null);
+  const [groupMembers, setGroupMembers] = useState<Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>>([]);
+
+  // Load group members when this cart belongs to a test group
+  useEffect(() => {
+    if (subLot.test_group_id) {
+      getGroupMembers(subLot.test_group_id).then(setGroupMembers).catch(() => {});
+    } else {
+      setGroupMembers([]);
+    }
+  }, [subLot.test_group_id]);
 
   // Load template + existing samples
   useEffect(() => {
@@ -218,6 +252,8 @@ function TestWorkflow({
       setPhase('measure');
       const rows = await listSamplesForSubLot(subLot.id);
       setAllSamples(rows);
+      // Immediately refresh the sidebar list so the badge updates without waiting for the poll interval
+      onSampleTaken();
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Take sample failed');
     }
@@ -236,31 +272,10 @@ function TestWorkflow({
     try {
       const v = parseFloat(aw);
       const res = await submitInspection(subLot.id, v, activeSample.id);
-      if (res.result === 'pass') {
-        setPhase('done');
-        // Pass — done. Let user close out.
-      } else {
-        // Fail — open disposition picker. Sub-lot is now in 'hold' status.
-        setShowDisposition(true);
-      }
+      setFinalResult(res.result as 'pass' | 'fail');
+      setPhase('done');
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Confirm failed');
-    }
-    setBusy(false);
-  };
-
-  const handleDispose = async (type: DispositionType, remark: string, redryMin?: number | null) => {
-    setBusy(true);
-    try {
-      await createDisposition({
-        drying_sub_lot_id: subLot.id,
-        type,
-        remark: remark || null,
-        redry_expected_dry_minutes: type === 'redry_dryer' ? (redryMin ?? null) : null,
-      });
-      onDone();
-    } catch (e) {
-      onError(e instanceof Error ? e.message : 'Disposition failed');
     }
     setBusy(false);
   };
@@ -283,11 +298,47 @@ function TestWorkflow({
         </button>
       </div>
 
+      {/* Champion banner — only shown for multi-cart sampling groups */}
+      {subLot.is_test_champion && subLot.test_group_member_count && subLot.test_group_member_count > 1 && (
+        <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-3 space-y-2">
+          <div className="flex items-start gap-2.5">
+            <Users size={18} className="text-purple-700 shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <p className="font-bold text-purple-900">
+                Sampling group #{subLot.test_group_sequence ?? '—'} · {subLot.test_group_member_count} cart{subLot.test_group_member_count === 1 ? '' : 's'}
+              </p>
+              <p className="text-purple-700 mt-0.5">
+                This cart is the <strong>random champion</strong>. PASS releases all {subLot.test_group_member_count} cart{subLot.test_group_member_count === 1 ? '' : 's'}; FAIL puts all {subLot.test_group_member_count} carts on hold. Choosing <em>Retest</em> on a fail re-rolls a new champion within the same group.
+              </p>
+            </div>
+          </div>
+          {groupMembers.length > 0 && (
+            <div className="pl-7 flex flex-wrap gap-1.5">
+              {groupMembers.map(m => (
+                <span
+                  key={m.id}
+                  className={cn(
+                    'font-mono text-[11px] px-2 py-0.5 rounded-full border font-semibold',
+                    m.id === subLot.id
+                      ? 'bg-purple-700 text-white border-purple-700'          // this cart (champion)
+                      : 'bg-white text-purple-800 border-purple-300',          // sibling carts
+                  )}
+                  title={m.is_test_champion ? 'Champion' : `Status: ${m.status}`}
+                >
+                  {m.sub_lot_code}
+                  {m.is_test_champion && ' ★'}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Step 1: take sample */}
       {phase === 'sample' && (
         <Step number={1} title="Take sample">
           <p className="text-xs text-slate-500 mb-3">
-            Enter a sample ID (your numbering), then click 取样. This locks the sample to this sub-lot.
+            Enter a sample ID (your numbering), then click Take sample. This locks the sample to this sub-lot.
           </p>
           <div className="flex gap-2">
             <input
@@ -303,7 +354,7 @@ function TestWorkflow({
               disabled={busy || !canSample || !sampleIdInput.trim()}
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
             >
-              <FlaskConical size={13} /> 取样
+              <FlaskConical size={13} /> Take sample
             </button>
           </div>
         </Step>
@@ -373,8 +424,8 @@ function TestWorkflow({
         </Step>
       )}
 
-      {/* Step 3: pass result (closes) */}
-      {phase === 'done' && (
+      {/* Step 3: result screen */}
+      {phase === 'done' && finalResult === 'pass' && (
         <Step number={3} title="Passed">
           <div className="rounded-2xl bg-emerald-50 border-2 border-emerald-300 p-6 text-center">
             <CheckCircle2 size={32} className="text-emerald-600 mx-auto mb-2" />
@@ -391,16 +442,23 @@ function TestWorkflow({
         </Step>
       )}
 
-      {/* Step 3: failed → disposition */}
-      {showDisposition && (
-        <DispositionPicker
-          onCancel={() => { setShowDisposition(false); setPhase('measure'); }}
-          onConfirm={handleDispose}
-          busy={busy}
-          canDispose={canDispose}
-          dispositionPerms={dispositionPerms}
-          defaultRedryMin={subLot.expected_dry_minutes ?? 240}
-        />
+      {phase === 'done' && finalResult === 'fail' && (
+        <Step number={3} title="Failed">
+          <div className="rounded-2xl bg-red-50 border-2 border-red-300 p-6 text-center">
+            <XCircle size={32} className="text-red-600 mx-auto mb-2" />
+            <p className="text-2xl font-bold text-red-800">Failed — on hold</p>
+            <p className="text-xs text-red-700 mt-1">
+              Sub-lot is now <strong>on hold</strong>. Go to <strong>QC Home</strong> to choose the next action (re-dry, room temp, retest, or scrap).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onDone}
+            className="mt-3 w-full bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-lg text-sm font-bold"
+          >
+            Done
+          </button>
+        </Step>
       )}
 
       {/* Sample history for this sub-lot */}
@@ -460,111 +518,3 @@ function SampleResultBadge({ status, result }: { status: string; result: 'pass' 
   return null;
 }
 
-function DispositionPicker({
-  onCancel, onConfirm, busy, canDispose, dispositionPerms, defaultRedryMin,
-}: {
-  onCancel: () => void;
-  onConfirm: (type: DispositionType, remark: string, redryMin?: number | null) => void;
-  busy: boolean;
-  canDispose: boolean;
-  dispositionPerms: { redry: boolean; room_temp: boolean; scrap_concession: boolean };
-  defaultRedryMin: number;
-}) {
-  const allowedOptions = DISPOSITIONS.filter(d => {
-    if (d.value === 'redry_dryer')  return dispositionPerms.redry;
-    if (d.value === 'room_temp_dry') return dispositionPerms.room_temp;
-    return dispositionPerms.scrap_concession;  // scrap / concession / rework / grind
-  });
-  const [type, setType] = useState<DispositionType>(allowedOptions[0]?.value ?? 'redry_dryer');
-  const [remark, setRemark] = useState('');
-  const [redryMin, setRedryMin] = useState<string>(String(defaultRedryMin));
-
-  return (
-    <Step number={3} title="Failed — choose a disposition" active>
-      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3 flex items-start gap-2">
-        <XCircle size={16} className="text-red-600 mt-0.5 shrink-0" />
-        <div className="text-xs text-red-800">
-          Reading is outside spec. Sub-lot is now on <strong>Hold</strong>. Choose how to handle the cart.
-        </div>
-      </div>
-
-      {!canDispose && (
-        <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded mb-3">
-          You don't have <code>qc.dispositions.create</code> permission. Ask a manager to dispose this hold.
-        </p>
-      )}
-
-      <ul className="space-y-2 mb-3">
-        {allowedOptions.map(d => (
-          <li key={d.value}>
-            <label className={cn(
-              'flex items-start gap-2 p-2 rounded-lg border-2 cursor-pointer',
-              type === d.value ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300',
-            )}>
-              <input
-                type="radio"
-                checked={type === d.value}
-                onChange={() => setType(d.value)}
-                className="mt-0.5 accent-blue-600"
-              />
-              <div>
-                <div className="text-sm font-bold text-slate-900">{d.label}</div>
-                <div className="text-[11px] text-slate-500">{d.description}</div>
-              </div>
-            </label>
-          </li>
-        ))}
-        {allowedOptions.length === 0 && (
-          <li className="text-xs text-slate-500 italic">
-            You don't have permission to choose any disposition. Ask a manager.
-          </li>
-        )}
-      </ul>
-
-      {type === 'redry_dryer' && (
-        <label className="block mb-3">
-          <span className="text-xs font-medium text-slate-700">New expected drying time (minutes)</span>
-          <input
-            type="number"
-            min={1}
-            value={redryMin}
-            onChange={(e) => setRedryMin(e.target.value)}
-            className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-          />
-        </label>
-      )}
-
-      <label className="block mb-3">
-        <span className="text-xs font-medium text-slate-700">Remark (optional)</span>
-        <textarea
-          value={remark}
-          onChange={(e) => setRemark(e.target.value)}
-          className="mt-1 w-full border rounded-lg px-3 py-2 text-sm min-h-[60px]"
-          placeholder="Notes about this disposition decision…"
-        />
-      </label>
-
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2.5 rounded-lg text-sm font-bold border border-slate-300 text-slate-700"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const min = type === 'redry_dryer' ? parseInt(redryMin, 10) : null;
-            if (type === 'redry_dryer' && (!min || min <= 0)) { return; }
-            onConfirm(type, remark, min);
-          }}
-          disabled={busy || !canDispose}
-          className="px-4 py-2.5 rounded-lg text-sm font-bold bg-red-600 hover:bg-red-500 text-white disabled:opacity-50"
-        >
-          {busy ? 'Submitting…' : 'Confirm disposition'}
-        </button>
-      </div>
-    </Step>
-  );
-}
