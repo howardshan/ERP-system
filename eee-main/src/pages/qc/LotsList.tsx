@@ -51,8 +51,21 @@ export default function LotsList({ onSelectLot }: Props) {
   const create = async () => {
     setError('');
     setMsg('');
+    // M-050: work orders must be created via the Production wizard (it surfaces
+    // the required expected_dry_minutes + sub-lot range fields). Keep this
+    // minimal-arg path as a fallback so the legacy form still works — defaults
+    // to the SKU's standard drying time and a single placeholder cart.
+    const sku = skus.find(s => s.id === skuId);
+    const dryMin = sku?.standard_drying_minutes ?? 1440;
     try {
-      await createProductionLot({ lot_barcode: lotBarcode, work_order_barcode: woBarcode, sku_id: skuId });
+      await createProductionLot({
+        lot_barcode: lotBarcode,
+        work_order_barcode: woBarcode,
+        sku_id: skuId,
+        expected_dry_minutes: dryMin,
+        sub_lot_start_seq: 1,
+        sub_lot_end_seq: 1,
+      });
       setShowForm(false);
       setLotBarcode('');
       setWoBarcode('');

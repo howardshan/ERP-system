@@ -15,6 +15,8 @@ import {
 import { usePermissions } from '../../contexts/PermissionContext';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { ScanQrDialog } from './components/ScanQrDialog';
+import { DryRoomListMode } from './components/DryRoomListMode';
+import { useQcSpotSelectionEnabled } from './hooks/useQcSpotSelectionEnabled';
 import { cn } from '../../lib/utils';
 
 interface Props {
@@ -53,6 +55,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
   const canCheckIn = can('qc', 'dry_rooms', 'check_in');
   const canCheckOut = can('qc', 'dry_rooms', 'check_out');
   const canMove = can('qc', 'dry_rooms', 'move');
+  const { enabled: spotSelectionEnabled } = useQcSpotSelectionEnabled();
 
   const [, setNow] = useState(Date.now());
   useEffect(() => {
@@ -249,18 +252,28 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
       <div className="flex items-center justify-between gap-3 mb-1">
         <div className="flex items-baseline gap-3">
           <h1 className="text-2xl font-bold text-slate-900">Dryer {dryerNumber}</h1>
-          <span className="text-sm text-slate-500">{inDryer.length}/100 cells occupied</span>
+          <span className="text-sm text-slate-500">
+            {inDryer.length}/100 {spotSelectionEnabled ? 'cells' : 'slots'} occupied
+          </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setScanOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-700 text-white"
-          title="Scan a sub-lot QR or barcode to act on it"
-        >
-          <QrCode size={13} /> Scan QR
-        </button>
+        {spotSelectionEnabled && (
+          <button
+            type="button"
+            onClick={() => setScanOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-700 text-white"
+            title="Scan a sub-lot QR or barcode to act on it"
+          >
+            <QrCode size={13} /> Scan QR
+          </button>
+        )}
       </div>
 
+      {/* List mode (spot selection disabled) — separate UI; rest below is grid mode */}
+      {!spotSelectionEnabled && (
+        <DryRoomListMode dryerNumber={dryerNumber} onOpenHistory={onOpenHistory} />
+      )}
+
+      {!spotSelectionEnabled ? null : <>
       {msg && (
         <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm flex items-center gap-2">
           <CheckCircle2 size={14} /> {msg}
@@ -509,6 +522,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
           </section>
         </aside>
       </div>
+      </>}
     </div>
   );
 }

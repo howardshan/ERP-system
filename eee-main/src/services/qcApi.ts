@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type SubLotStatus =
-  | 'created' | 'drying' | 'awaiting_recheck'
-  | 'pending' | 'inspecting' | 'passed' | 'hold' | 'disposing' | 'closed';
+  | 'created' | 'drying' | 'awaiting_recheck' | 'room_temp_drying'
+  | 'pending' | 'inspecting' | 'passed' | 'hold' | 'disposing' | 'closed'
+  | 'awaiting_group_result';
 
 export interface SubLot {
   id: string;
@@ -22,9 +23,18 @@ export interface SubLot {
   total_dried_minutes: number | null;
   remaining_minutes: number | null;
   lot_number?: string | null;
+  sku_id?: string | null;
+  sku_code?: string | null;
   has_pending_sample?: boolean;
   latest_pending_sample_id?: string | null;
   latest_pending_sample_pk?: string | null;
+  // M-048: sampling groups
+  sample_every_n_carts?: number;
+  test_group_id?: string | null;
+  test_group_sequence?: number | null;
+  test_group_status?: 'sampling' | 'passed' | 'closed_failed' | null;
+  test_group_member_count?: number | null;
+  is_test_champion?: boolean;
   lot_barcode: string | null;
   sku_name: string | null;
   wait_minutes: number | null;
@@ -44,6 +54,7 @@ export interface ProductionLot {
   sku_id: string;
   sku_code: string | null;
   sku_name: string | null;
+  expected_dry_minutes: number;  // M-050: required at lot creation (BR-Q29)
   created_at: string;
 }
 
@@ -61,13 +72,15 @@ export interface Product {
   code: string;
   name: string;
   standard_drying_minutes: number | null;
+  sample_every_n_carts?: number;  // M-048
   templates: InspectionTemplate[];
 }
 
 export interface ProductInput {
-  code: string;
+  code?: string | null;  // M-050: auto-generated if absent (BR-Q33)
   name: string;
   standard_drying_minutes: number | null;
+  sample_every_n_carts?: number;  // M-048
   template: {
     item_name: string;
     unit: string | null;
@@ -154,14 +167,22 @@ export async function createProduct(input: ProductInput): Promise<Product> {
   if (input.template.lower_limit > input.template.upper_limit) {
     throw new Error('Lower limit cannot exceed upper limit');
   }
+
+  // M-050: auto-generate SKU code when client doesn't supply one (BR-Q33).
+  let code = input.code?.trim();
+  if (!code) {
+    code = await rpc<string>('qc_next_sku_code');
+  }
+
   const { data: sku, error } = await supabase
     .from('qc_product_sku')
     .insert({
-      code: input.code,
+      code,
       name: input.name,
       standard_drying_minutes: input.standard_drying_minutes,
+      sample_every_n_carts: input.sample_every_n_carts ?? 1,
     })
-    .select('id, code, name, standard_drying_minutes')
+    .select('id, code, name, standard_drying_minutes, sample_every_n_carts')
     .single();
   if (error) throw new Error(error.message);
 
@@ -189,6 +210,7 @@ export async function updateProduct(id: string, input: Partial<ProductInput>): P
   if (input.code !== undefined) skuPatch.code = input.code;
   if (input.name !== undefined) skuPatch.name = input.name;
   if (input.standard_drying_minutes !== undefined) skuPatch.standard_drying_minutes = input.standard_drying_minutes;
+  if (input.sample_every_n_carts !== undefined) skuPatch.sample_every_n_carts = input.sample_every_n_carts;
   if (Object.keys(skuPatch).length > 0) {
     const { error } = await supabase.from('qc_product_sku').update(skuPatch).eq('id', id);
     if (error) throw new Error(error.message);
@@ -245,29 +267,92 @@ export async function listProductionLots(): Promise<ProductionLot[]> {
   return rpc<ProductionLot[]>('qc_list_production_lots');
 }
 
+export async function findLotsByWorkOrder(workOrderBarcode: string): Promise<ProductionLot[]> {
+  const lots = await listProductionLots();
+  return lots.filter(l => l.work_order_barcode === workOrderBarcode);
+}
+
+export async function listSubLotsForLot(lotId: string): Promise<SubLot[]> {
+  const { data, error } = await supabase
+    .from('qc_drying_sub_lot')
+    .select('*')
+    .eq('production_lot_id', lotId)
+    .order('sub_lot_code', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as SubLot[];
+}
+
+// M-050: atomic lot + sub-lot range creation. expected_dry_minutes is required (BR-Q29).
+// Sub-lot codes are <lot_barcode>-NNN (3-digit padded, BR-Q30).
+export interface CreateProductionLotResult {
+  lot_id: string;
+  lot_number: string;
+  lot_barcode: string;
+  expected_dry_minutes: number;
+  sub_lot_count: number;
+  sub_lot_ids: string[];
+}
+
 export async function createProductionLot(input: {
   lot_barcode: string;
   work_order_barcode: string;
   sku_id: string;
+  expected_dry_minutes: number;
+  sub_lot_start_seq?: number;
+  sub_lot_end_seq: number;
   lot_number?: string;
-}): Promise<ProductionLot> {
-  const lot_number = input.lot_number ?? input.lot_barcode;
-  const { error } = await supabase.from('qc_production_lot').insert({
-    lot_number,
-    lot_barcode: input.lot_barcode,
-    work_order_barcode: input.work_order_barcode,
-    sku_id: input.sku_id,
-  });
-  if (error) {
-    if (error.message.toLowerCase().includes('duplicate')) {
-      throw new Error('Lot number already exists');
-    }
-    throw new Error(error.message);
+}): Promise<CreateProductionLotResult> {
+  if (!input.expected_dry_minutes || input.expected_dry_minutes <= 0) {
+    throw new Error('Expected dry time is required (BR-Q29)');
   }
-  const all = await listProductionLots();
-  const found = all.find(l => l.lot_number === lot_number);
-  if (!found) throw new Error('Lot created but not returned');
-  return found;
+  return rpc<CreateProductionLotResult>('qc_create_production_lot_with_sub_lots', {
+    p_lot_number: input.lot_number ?? input.lot_barcode,
+    p_lot_barcode: input.lot_barcode,
+    p_work_order_barcode: input.work_order_barcode,
+    p_sku_id: input.sku_id,
+    p_expected_dry_minutes: input.expected_dry_minutes,
+    p_sub_lot_start_seq: input.sub_lot_start_seq ?? 1,
+    p_sub_lot_end_seq: input.sub_lot_end_seq,
+  });
+}
+
+// Add more carts to an existing work order (continuing the 3-digit sequence).
+export interface AddSubLotsResult {
+  added_count: number;
+  start_seq: number;
+  end_seq: number;
+  sub_lot_ids: string[];
+}
+
+export async function addSubLotsToLot(input: {
+  production_lot_id: string;
+  start_seq?: number | null;   // if null, continues from existing max + 1
+  end_seq?: number | null;
+  count?: number | null;       // alternative to end_seq
+}): Promise<AddSubLotsResult> {
+  return rpc<AddSubLotsResult>('qc_add_sub_lots_to_lot', {
+    p_production_lot_id: input.production_lot_id,
+    p_start_seq: input.start_seq ?? null,
+    p_end_seq: input.end_seq ?? null,
+    p_count: input.count ?? null,
+  });
+}
+
+// M-050: move drying carts to a different dryer (BR-Q31).
+export interface MoveDryerResult {
+  requested: number;
+  succeeded: Array<{ sub_lot_id: string; sub_lot_code: string; old_dryer: number | null; new_dryer: number }>;
+  failed: Array<{ sub_lot_id: string; sub_lot_code?: string; reason: string; status?: string }>;
+}
+
+export async function moveSubLotsDryer(input: {
+  sub_lot_ids: string[];
+  new_dryer_number: number;
+}): Promise<MoveDryerResult> {
+  return rpc<MoveDryerResult>('qc_move_sub_lots_dryer', {
+    p_sub_lot_ids: input.sub_lot_ids,
+    p_new_dryer_number: input.new_dryer_number,
+  });
 }
 
 export async function productionLotDetail(lotId: string): Promise<ProductionLotDetail> {
@@ -281,49 +366,48 @@ export async function productionLotDetail(lotId: string): Promise<ProductionLotD
 // auto-generate a default code; everything ultimately lands in qc_production_lot
 // + qc_drying_sub_lot using the existing schema.
 
+// M-050: production wizard input — only min/max sub-lot sequence numbers
+// (no per-cart code list). `expected_dry_minutes` is required (BR-Q29).
 export interface ProductionBatchInput {
   production_date: string;          // YYYY-MM-DD
   shift: string;                    // early / late / night / other
   production_code: string;          // lot_number + lot_barcode
   work_order_barcode: string;
   sku_id: string;
-  expected_dry_minutes: number | null;  // applied to every sub-lot created in this batch
-  sub_lots: Array<{
-    sub_lot_code?: string | null;   // optional override; otherwise auto = <lot_barcode>-D##
-  }>;
+  expected_dry_minutes: number;     // required; days → minutes converted by caller
+  sub_lot_start_seq: number;        // inclusive, default 1
+  sub_lot_end_seq: number;          // inclusive
 }
 
 export interface ProductionBatchResult {
-  lot: ProductionLot;
-  sub_lots: SubLot[];
+  lot_id: string;
+  lot_number: string;
+  lot_barcode: string;
+  expected_dry_minutes: number;
+  sub_lot_count: number;
+  sub_lot_ids: string[];
 }
 
 export async function createProductionBatch(input: ProductionBatchInput): Promise<ProductionBatchResult> {
   if (!input.production_code) throw new Error('Production code is required');
   if (!input.work_order_barcode) throw new Error('Work order barcode is required');
   if (!input.sku_id) throw new Error('SKU is required');
-  if (input.sub_lots.length === 0) throw new Error('At least one sub-lot is required');
+  if (!input.expected_dry_minutes || input.expected_dry_minutes <= 0) {
+    throw new Error('Expected dry time is required (BR-Q29)');
+  }
+  if (input.sub_lot_end_seq < input.sub_lot_start_seq) {
+    throw new Error('Sub-lot max number must be >= min number');
+  }
 
-  const lot = await createProductionLot({
+  return createProductionLot({
     lot_number: input.production_code,
     lot_barcode: input.production_code,
     work_order_barcode: input.work_order_barcode,
     sku_id: input.sku_id,
+    expected_dry_minutes: input.expected_dry_minutes,
+    sub_lot_start_seq: input.sub_lot_start_seq,
+    sub_lot_end_seq: input.sub_lot_end_seq,
   });
-
-  // Sub-lots created here live in 'created' status; they enter the dryer later
-  // via the Check-in to Dryer page (qc_register_in_dryer).
-  const subLots: SubLot[] = [];
-  for (const sl of input.sub_lots) {
-    const created = await createSubLot({
-      production_lot_id: lot.id,
-      sub_lot_code: sl.sub_lot_code ?? null,
-      expected_dry_minutes: input.expected_dry_minutes,
-    });
-    subLots.push(created);
-  }
-
-  return { lot, sub_lots: subLots };
 }
 
 // ── Dry Room (physical dryer) summary & per-dryer sub-lot listing ───────────
@@ -393,6 +477,40 @@ export async function registerInDryer(input: {
   });
 }
 
+// Bulk check-in (no cell selection) — used when qc.spot_selection_enabled = false.
+// Each sub-lot occupies 1/100 of the dryer's capacity but has no cell_number.
+export interface BulkCheckInResult {
+  dryer_number: number;
+  requested: number;
+  succeeded: Array<{ sub_lot_id: string; sub_lot_code: string }>;
+  failed: Array<{
+    sub_lot_id: string;
+    sub_lot_code?: string;
+    reason: 'not_found' | 'wrong_status' | string;
+    status?: string;
+  }>;
+}
+
+export async function registerSubLotsBulk(input: {
+  sub_lot_ids: string[];
+  dryer_number: number;
+  in_time?: string | null;
+}): Promise<BulkCheckInResult> {
+  return rpc<BulkCheckInResult>('qc_register_sub_lots_in_dryer_bulk', {
+    p_sub_lot_ids: input.sub_lot_ids,
+    p_dryer_number: input.dryer_number,
+    p_in_time: input.in_time ?? null,
+  });
+}
+
+// ── App settings (feature flags) ─────────────────────────────────────────────
+
+export async function getAppSetting<T = unknown>(key: string): Promise<T | null> {
+  const { data, error } = await supabase.rpc('get_app_setting', { p_key: key });
+  if (error) throw new Error(error.message);
+  return (data ?? null) as T | null;
+}
+
 // List sub-lots awaiting check-in (status = 'created')
 export async function listAwaitingCheckIn(): Promise<SubLot[]> {
   const list = await rpc<SubLot[]>('qc_list_sub_lots');
@@ -423,10 +541,42 @@ export async function checkOutSubLot(subLotId: string, outTime?: string | null):
   });
 }
 
-export async function checkOutSubLotsBulk(subLotIds: string[], outTime?: string | null): Promise<void> {
+// Legacy per-cart bulk (kept for callers that don't need sampling groups).
+export async function checkOutSubLotsLegacy(subLotIds: string[], outTime?: string | null): Promise<void> {
   for (const id of subLotIds) {
     await checkOutSubLot(id, outTime ?? null);
   }
+}
+
+// M-048: Bulk check-out that also forms sampling groups + picks champions.
+export interface BulkCheckOutGroup {
+  test_group_id: string;
+  group_sequence: number;
+  production_lot_id: string;
+  member_count: number;
+  champion_id: string;
+  member_ids: string[];
+}
+export interface BulkCheckOutResult {
+  requested: number;
+  succeeded: Array<{ sub_lot_id: string; sub_lot_code: string }>;
+  failed: Array<{
+    sub_lot_id: string;
+    sub_lot_code?: string;
+    reason: 'not_found' | 'wrong_status' | string;
+    status?: string;
+  }>;
+  groups: BulkCheckOutGroup[];
+}
+
+export async function checkOutSubLotsBulk(input: {
+  sub_lot_ids: string[];
+  out_time?: string | null;
+}): Promise<BulkCheckOutResult> {
+  return rpc<BulkCheckOutResult>('qc_check_out_sub_lots_bulk', {
+    p_sub_lot_ids: input.sub_lot_ids,
+    p_out_time: input.out_time ?? null,
+  });
 }
 
 export async function listPendingInspections(): Promise<SubLot[]> {
@@ -533,7 +683,8 @@ export async function submitInspectionsBulk(items: Array<{ subLotId: string; aw:
 // ── Dispositions ──────────────────────────────────────────────────────────────
 
 export type DispositionType =
-  | 'rework' | 'grind' | 'scrap' | 'concession' | 'redry_dryer' | 'room_temp_dry';
+  | 'rework' | 'grind' | 'scrap' | 'concession'
+  | 'redry_dryer' | 'room_temp_dry' | 'retest';
 
 export async function createDisposition(input: {
   drying_sub_lot_id: string;
@@ -629,6 +780,195 @@ export async function dashboardSummary(): Promise<DashboardSummary> {
   return rpc<DashboardSummary>('qc_dashboard_summary');
 }
 
+// M-050: per-SKU pass-rate forecast.
+// Predicted passes = round(in_progress_carts × today_pass_rate). When the SKU
+// has no inspections today, the forecast assumes 100% rate.
+export interface PassRateForecastItem {
+  sku_id: string;
+  sku_code: string;
+  sku_name: string;
+  in_progress: number;
+  today_pass_rate: number | null;
+  today_inspections: number;
+  forecast_passes: number;
+}
+
+export async function dashboardPassRateForecast(): Promise<PassRateForecastItem[]> {
+  return rpc<PassRateForecastItem[]>('qc_dashboard_pass_rate_forecast');
+}
+
+// M-050: analysis page metrics with filters (BR-Q32).
+export interface AnalysisMetrics {
+  total_sub_lots: number;
+  avg_dry_minutes: number | null;
+  first_inspection_count: number;
+  first_pass_count: number;
+  first_fail_count: number;
+  pass_rate: number | null;
+  retest_count: number;
+  retest_pass_rate: number | null;
+  redry_count: number;
+  redry_avg_minutes: number | null;
+  redry_pass_rate: number | null;
+  room_temp_count: number;
+  room_temp_avg_minutes: number | null;
+  room_temp_pass_rate: number | null;
+  scrap_count: number;
+}
+
+export async function analysisMetrics(input: {
+  sku_id?: string | null;
+  from_date?: string | null;       // YYYY-MM-DD (inclusive)
+  to_date?: string | null;         // YYYY-MM-DD (inclusive)
+  dryer_number?: number | null;
+  production_lot_id?: string | null;
+}): Promise<AnalysisMetrics> {
+  return rpc<AnalysisMetrics>('qc_analysis_metrics', {
+    p_sku_id: input.sku_id ?? null,
+    p_from_date: input.from_date ?? null,
+    p_to_date: input.to_date ?? null,
+    p_dryer_number: input.dryer_number ?? null,
+    p_production_lot_id: input.production_lot_id ?? null,
+  });
+}
+
+// M-072: per-cart drill-down for a recovery path
+export interface RecoveryDetailItem {
+  disposition_id: string;
+  sub_lot_id: string;
+  sub_lot_code: string;
+  sku_name: string | null;
+  lot_number: string | null;
+  work_order_barcode: string | null;
+  disposition_type: 'retest' | 'redry_dryer' | 'room_temp_dry';
+  disposition_at: string;
+  dwell_minutes: number | null;
+  next_result: 'pass' | 'fail' | null;
+  next_aw: number | null;
+  remark: string | null;
+}
+
+export async function analysisRecoveryDetail(input: {
+  type: 'retest' | 'redry_dryer' | 'room_temp_dry';
+  sku_id?: string | null;
+  from_date?: string | null;
+  to_date?: string | null;
+  dryer_number?: number | null;
+  production_lot_id?: string | null;
+}): Promise<RecoveryDetailItem[]> {
+  return rpc<RecoveryDetailItem[]>('qc_analysis_recovery_detail', {
+    p_type: input.type,
+    p_sku_id: input.sku_id ?? null,
+    p_from_date: input.from_date ?? null,
+    p_to_date: input.to_date ?? null,
+    p_dryer_number: input.dryer_number ?? null,
+    p_production_lot_id: input.production_lot_id ?? null,
+  });
+}
+
+// ── Avg-dry-time drill-down (Analysis page) ─────────────────────────────────
+
+export interface AvgDryTimeDaily {
+  date: string;             // YYYY-MM-DD
+  sub_lot_count: number;
+  avg_dry_minutes: number;
+}
+
+export async function analysisAvgDryTimeDaily(input: {
+  sku_id?: string | null;
+  from_date?: string | null;
+  to_date?: string | null;
+  dryer_number?: number | null;
+  production_lot_id?: string | null;
+}): Promise<AvgDryTimeDaily[]> {
+  return rpc<AvgDryTimeDaily[]>('qc_analysis_avg_dry_time_daily', {
+    p_sku_id: input.sku_id ?? null,
+    p_from_date: input.from_date ?? null,
+    p_to_date: input.to_date ?? null,
+    p_dryer_number: input.dryer_number ?? null,
+    p_production_lot_id: input.production_lot_id ?? null,
+  });
+}
+
+export interface AvgDryTimeByWorkOrder {
+  production_lot_id: string;
+  lot_number: string;
+  work_order_barcode: string | null;
+  sku_code: string;
+  sku_name: string;
+  sub_lot_count: number;
+  min_dry_minutes: number;
+  max_dry_minutes: number;
+  avg_dry_minutes: number;
+  median_dry_minutes: number;
+}
+
+export async function analysisAvgDryTimeByWorkOrder(input: {
+  day: string;              // YYYY-MM-DD
+  sku_id?: string | null;
+  dryer_number?: number | null;
+  production_lot_id?: string | null;
+}): Promise<AvgDryTimeByWorkOrder[]> {
+  return rpc<AvgDryTimeByWorkOrder[]>('qc_analysis_avg_dry_time_by_work_order', {
+    p_day: input.day,
+    p_sku_id: input.sku_id ?? null,
+    p_dryer_number: input.dryer_number ?? null,
+    p_production_lot_id: input.production_lot_id ?? null,
+  });
+}
+
+// ── Pass / fail / pass-rate drill-down (Analysis page) ──────────────────────
+
+export interface OutcomesDaily {
+  date: string;             // YYYY-MM-DD
+  sub_lot_count: number;
+  pass_count: number;
+  fail_count: number;
+  pass_rate: number | null;
+}
+
+export async function analysisOutcomesDaily(input: {
+  sku_id?: string | null;
+  from_date?: string | null;
+  to_date?: string | null;
+  dryer_number?: number | null;
+  production_lot_id?: string | null;
+}): Promise<OutcomesDaily[]> {
+  return rpc<OutcomesDaily[]>('qc_analysis_outcomes_daily', {
+    p_sku_id: input.sku_id ?? null,
+    p_from_date: input.from_date ?? null,
+    p_to_date: input.to_date ?? null,
+    p_dryer_number: input.dryer_number ?? null,
+    p_production_lot_id: input.production_lot_id ?? null,
+  });
+}
+
+export interface OutcomesByWorkOrder {
+  production_lot_id: string;
+  lot_number: string;
+  work_order_barcode: string | null;
+  sku_code: string;
+  sku_name: string;
+  sub_lot_count: number;
+  pass_count: number;
+  fail_count: number;
+  pass_rate: number | null;
+}
+
+export async function analysisOutcomesByWorkOrder(input: {
+  day: string;
+  sku_id?: string | null;
+  dryer_number?: number | null;
+  production_lot_id?: string | null;
+}): Promise<OutcomesByWorkOrder[]> {
+  return rpc<OutcomesByWorkOrder[]>('qc_analysis_outcomes_by_work_order', {
+    p_day: input.day,
+    p_sku_id: input.sku_id ?? null,
+    p_dryer_number: input.dryer_number ?? null,
+    p_production_lot_id: input.production_lot_id ?? null,
+  });
+}
+
 // ── Unified QC Home + Dashboard overview ─────────────────────────────────────
 
 export interface QcOverviewStats {
@@ -645,15 +985,22 @@ export interface QcOverviewStats {
 
 export interface NeedsAttentionItem {
   inspection_id: string;
+  /** Champion / solo cart that was actually tested */
   drying_sub_lot_id: string;
   sub_lot_code: string;
   sku_name: string | null;
   lot_number: string | null;
+  work_order_barcode: string | null;
   aw: number | null;
   result: 'pass' | 'fail';
   submitted_at: string;
   current_status: SubLotStatus;
   sample_id: string | null;
+  /** Sampling-group fields (group_size=1 and arrays have one element for solo carts) */
+  test_group_id: string | null;
+  group_size: number;
+  group_sub_lot_ids: string[];
+  group_sub_lot_codes: string[];
 }
 
 export interface QcOverview {
@@ -671,6 +1018,30 @@ export async function releasePassedSubLot(subLotId: string): Promise<SubLot> {
   return rpc<SubLot>('qc_release_passed_sub_lot', { p_sub_lot_id: subLotId });
 }
 
+/** Release every cart in a sampling group (all are in 'passed' status). */
+export async function releasePassedSubLotsGroup(subLotIds: string[]): Promise<void> {
+  await Promise.all(subLotIds.map(id => releasePassedSubLot(id)));
+}
+
+/** Apply the same disposition to every cart in a sampling group. */
+export async function createDispositionGroup(input: {
+  sub_lot_ids: string[];
+  type: DispositionType;
+  remark: string | null;
+  redry_expected_dry_minutes: number | null;
+}): Promise<void> {
+  await Promise.all(
+    input.sub_lot_ids.map(id =>
+      createDisposition({
+        drying_sub_lot_id: id,
+        type: input.type,
+        remark: input.remark,
+        redry_expected_dry_minutes: input.redry_expected_dry_minutes,
+      }),
+    ),
+  );
+}
+
 // Look up a sub-lot by its scanned QR / barcode code (M-043).
 // Accepts raw code or URL where the last path segment is the code.
 // Returns null if no match.
@@ -686,6 +1057,117 @@ export async function seedDemoData(): Promise<{ skus: number; locations: number;
   return rpc('qc_seed_demo_data');
 }
 
+// ── Testing Dashboard ─────────────────────────────────────────────────────────
+
+export interface TestingDayForecast {
+  date: string;          // YYYY-MM-DD
+  label: string;         // "Today" | "Tomorrow" | "Day 3"
+  products: Array<{
+    sku_name: string;
+    sku_code: string | null;
+    count: number;          // number of carts expected to finish on that day
+    samples_needed: number; // ceil(count / sample_every_n_carts)
+  }>;
+  total: number;
+  total_samples: number;   // sum of samples_needed across all SKUs
+}
+
+export interface TestingDashboardData {
+  forecast: TestingDayForecast[];       // next 3 days
+  today_summary: {
+    awaiting_sample: number;            // pending sub-lots with no sample taken
+    sample_taken: number;               // pending sub-lots that have a sample
+    awaiting_result: number;            // samples taken but no result entered yet
+    completed_today: number;            // sub-lots with result submitted today
+  };
+}
+
+export async function getTestingDashboard(): Promise<TestingDashboardData> {
+  // Fetch currently drying sub-lots for forecast.
+  // expected_finish_at is a computed value (in_time + expected_dry_minutes), not a real column.
+  // sku_name / sku_code live on qc_product_sku via qc_production_lot join.
+  const { data: drying, error: dErr } = await supabase
+    .from('qc_drying_sub_lot')
+    .select(`
+      id, in_time, expected_dry_minutes, status,
+      qc_production_lot (
+        qc_product_sku ( name, code, sample_every_n_carts )
+      )
+    `)
+    .eq('status', 'drying')
+    .not('in_time', 'is', null)
+    .not('expected_dry_minutes', 'is', null);
+  if (dErr) throw new Error(dErr.message);
+
+  // Build 3-day forecast
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = [0,1,2].map(offset => {
+    const d = new Date(today); d.setDate(d.getDate() + offset);
+    return d.toISOString().split('T')[0];
+  });
+  const labels = ['Today', 'Tomorrow', 'Day 3'];
+
+  const forecast: TestingDayForecast[] = days.map((date, i) => {
+    const carts = (drying ?? []).filter(s => {
+      if (!s.in_time || !s.expected_dry_minutes) return false;
+      // Compute expected finish from in_time + expected_dry_minutes
+      const finishMs = new Date(s.in_time).getTime() + (s.expected_dry_minutes as number) * 60_000;
+      const d = new Date(finishMs).toISOString().split('T')[0];
+      return d === date;
+    });
+    // group by sku (sku data comes via the nested join)
+    const skuMap = new Map<string, { sku_name: string; sku_code: string | null; count: number; n: number }>();
+    for (const c of carts) {
+      const lot = c.qc_production_lot as { qc_product_sku?: { name?: string; code?: string; sample_every_n_carts?: number } } | null;
+      const skuName = lot?.qc_product_sku?.name ?? 'Unknown';
+      const skuCode = lot?.qc_product_sku?.code ?? null;
+      const n = lot?.qc_product_sku?.sample_every_n_carts ?? 1;
+      const existing = skuMap.get(skuName);
+      if (existing) existing.count++;
+      else skuMap.set(skuName, { sku_name: skuName, sku_code: skuCode, count: 1, n });
+    }
+    const products = Array.from(skuMap.values()).map(({ sku_name, sku_code, count, n }) => ({
+      sku_name,
+      sku_code,
+      count,
+      samples_needed: Math.ceil(count / Math.max(n, 1)),
+    }));
+    const total_samples = products.reduce((sum, p) => sum + p.samples_needed, 0);
+    return { date, label: labels[i], products, total: carts.length, total_samples };
+  });
+
+  // Fetch pending sub-lots (checked out, awaiting testing)
+  const pending = await listPendingInspections();
+  const awaiting_sample = pending.filter(s => !s.has_pending_sample).length;
+  const sample_taken = pending.filter(s => s.has_pending_sample).length;
+
+  // Fetch today's completed inspections count
+  const todayStr = days[0];
+  const nextStr = days[1] ?? new Date(new Date(todayStr).getTime() + 86400000).toISOString().split('T')[0];
+  const { count: completedCount } = await supabase
+    .from('qc_inspection_record')
+    .select('id', { count: 'exact', head: true })
+    .gte('submitted_at', todayStr + 'T00:00:00Z')
+    .lt('submitted_at', nextStr + 'T00:00:00Z');
+  const completed_today = completedCount ?? 0;
+
+  // awaiting_result = samples taken but not yet have result
+  const { count: awaitingCount } = await supabase
+    .from('qc_sample')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending');
+
+  return {
+    forecast,
+    today_summary: {
+      awaiting_sample,
+      sample_taken,
+      awaiting_result: awaitingCount ?? sample_taken,
+      completed_today,
+    },
+  };
+}
+
 // ── Display helpers ───────────────────────────────────────────────────────────
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -699,6 +1181,7 @@ export const STATUS_LABEL: Record<string, string> = {
   hold: 'Hold',
   disposing: 'Disposing',
   closed: 'Closed',
+  awaiting_group_result: 'Awaiting Group Result',
 };
 
 export const STATUS_COLOR: Record<string, string> = {
@@ -712,6 +1195,7 @@ export const STATUS_COLOR: Record<string, string> = {
   hold: 'bg-red-100 text-red-900 border-red-300',
   disposing: 'bg-purple-100 text-purple-900 border-purple-300',
   closed: 'bg-slate-100 text-slate-700 border-slate-300',
+  awaiting_group_result: 'bg-indigo-100 text-indigo-900 border-indigo-300',
 };
 
 export function formatQcDateTime(iso: string | null | undefined): string {
@@ -732,4 +1216,37 @@ export function toLocalInputValue(iso?: string | null): string {
   const d = iso ? new Date(iso) : new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export interface FailGroupMember {
+  id: string;
+  sub_lot_code: string;
+  status: string;
+  is_champion: boolean;
+}
+export interface RecentFailItem {
+  inspection_id: string;
+  sample_id: string | null;
+  aw: number | null;
+  submitted_at: string;
+  sku_name: string | null;
+  lot_number: string | null;
+  work_order_barcode: string | null;
+  champion_code: string;
+  test_group_id: string | null;
+  group_members: FailGroupMember[];
+}
+export async function getRecentFailedInspections(days = 2): Promise<RecentFailItem[]> {
+  return rpc<RecentFailItem[]>('qc_recent_failed_inspections', { p_days: days });
+}
+
+/** Fetch all sub-lots that belong to the same test group (by test_group_id). */
+export async function getGroupMembers(testGroupId: string): Promise<Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>> {
+  const { data, error } = await supabase
+    .from('qc_drying_sub_lot')
+    .select('id, sub_lot_code, is_test_champion, status')
+    .eq('test_group_id', testGroupId)
+    .order('sub_lot_code');
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>;
 }

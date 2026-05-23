@@ -1,5 +1,5 @@
-import React, { FormEvent, useEffect, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import React, { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import {
   productionLotDetail,
   listLocations,
@@ -15,7 +15,8 @@ import {
 import { usePermissions } from '../../contexts/PermissionContext';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { SelectAllCheckbox } from './components/SelectAllCheckbox';
-import { cn } from '../../lib/utils';
+import { AddCartsDialog } from './components/AddCartsDialog';
+import { cn, fmtDays } from '../../lib/utils';
 
 interface Props {
   lotId: string;
@@ -38,6 +39,8 @@ export default function LotDetail({ lotId, onBack, onInspectSubLot }: Props) {
   const [msg, setMsg] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [addCartsOpen, setAddCartsOpen] = useState(false);
+  const canCreateBatch = can('qc', 'production', 'create_batch');
 
   const load = () =>
     productionLotDetail(lotId)
@@ -83,6 +86,21 @@ export default function LotDetail({ lotId, onBack, onInspectSubLot }: Props) {
 
   const dryingSubLots = (detail?.sub_lots ?? []).filter(s => s.status === 'drying');
 
+  // Highest 3-digit suffix in existing sub-lot codes — defaults Add-carts dialog
+  // start_seq to existingMax + 1 so users continue the sequence (BR-Q30).
+  const existingMaxSeq = useMemo(() => {
+    const re = /-(\d{3})$/;
+    let max = 0;
+    for (const s of detail?.sub_lots ?? []) {
+      const m = s.sub_lot_code.match(re);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (n > max) max = n;
+      }
+    }
+    return max;
+  }, [detail?.sub_lots]);
+
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -100,8 +118,12 @@ export default function LotDetail({ lotId, onBack, onInspectSubLot }: Props) {
     setBusy(true);
     setError('');
     try {
-      await checkOutSubLotsBulk([...selected], new Date(outTimeLocal).toISOString());
-      setMsg(`Checked out ${selected.size} sub-lot(s)`);
+      const result = await checkOutSubLotsBulk({
+        sub_lot_ids: [...selected],
+        out_time: new Date(outTimeLocal).toISOString(),
+      });
+      const groupCount = result.groups?.length ?? 0;
+      setMsg(`Checked out ${result.succeeded?.length ?? selected.size} sub-lot(s) → ${groupCount} sampling group(s)`);
       setSelected(new Set());
       load();
     } catch (err) {
@@ -127,8 +149,25 @@ export default function LotDetail({ lotId, onBack, onInspectSubLot }: Props) {
         <ArrowLeft size={14} /> Back to Lots
       </button>
 
-      <h1 className="text-2xl font-bold text-slate-900">{detail.lot.lot_number}</h1>
-      <p className="text-slate-600 mt-1 text-sm">{detail.lot.sku_name} · {detail.lot.lot_barcode}</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">{detail.lot.lot_number}</h1>
+          <p className="text-slate-600 mt-1 text-sm">
+            {detail.lot.sku_name} · {detail.lot.lot_barcode}
+            {' · '}
+            <span className="font-mono">expected dry {fmtDays(detail.lot.expected_dry_minutes)}</span>
+          </p>
+        </div>
+        {canCreateBatch && (
+          <button
+            type="button"
+            onClick={() => setAddCartsOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white"
+          >
+            <Plus size={12} /> Add carts
+          </button>
+        )}
+      </div>
 
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg my-3 text-sm">{msg}</p>}
       {error && <p className="text-red-600 my-3 text-sm">{error}</p>}
@@ -220,7 +259,7 @@ export default function LotDetail({ lotId, onBack, onInspectSubLot }: Props) {
                 <p>Location: {s.location_name || '—'}</p>
                 <p>In: {formatQcDateTime(s.in_time)}</p>
                 <p>Out: {formatQcDateTime(s.out_time)}</p>
-                {s.wait_minutes != null && <p className="text-amber-800">Wait: {s.wait_minutes} min</p>}
+                {s.wait_minutes != null && <p className="text-amber-800">Wait: {fmtDays(s.wait_minutes)}</p>}
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 {isDrying && canCheckOut && (
@@ -258,6 +297,19 @@ export default function LotDetail({ lotId, onBack, onInspectSubLot }: Props) {
         })}
         {detail.sub_lots.length === 0 && <p className="text-slate-500 text-sm">No sub-lots yet. Check in to create one.</p>}
       </ul>
+
+      <AddCartsDialog
+        open={addCartsOpen}
+        lotId={detail.lot.id}
+        lotBarcode={detail.lot.lot_barcode}
+        existingMaxSeq={existingMaxSeq}
+        onClose={() => setAddCartsOpen(false)}
+        onSuccess={(result) => {
+          setAddCartsOpen(false);
+          setMsg(`Added ${result.added_count} cart(s) — ${result.start_seq}–${result.end_seq}`);
+          load();
+        }}
+      />
     </div>
   );
 }

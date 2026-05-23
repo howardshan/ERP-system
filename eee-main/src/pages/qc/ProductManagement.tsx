@@ -11,21 +11,21 @@ import {
 } from '../../services/qcApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { SelectAllCheckbox } from './components/SelectAllCheckbox';
-import { cn } from '../../lib/utils';
+import { cn, fmtDays, daysToMinutes, minutesToDays, MINUTES_PER_DAY } from '../../lib/utils';
 
 const emptyForm = (): ProductInput => ({
-  code: '',
   name: '',
-  standard_drying_minutes: 240,
+  standard_drying_minutes: MINUTES_PER_DAY,  // 1 day default
+  sample_every_n_carts: 1,
   template: { item_name: 'Water Activity (Aw)', unit: null, lower_limit: 0.65, upper_limit: 0.75 },
 });
 
 function productToForm(p: Product): ProductInput {
   const t = p.templates[0];
   return {
-    code: p.code,
     name: p.name,
     standard_drying_minutes: p.standard_drying_minutes,
+    sample_every_n_carts: p.sample_every_n_carts ?? 1,
     template: t
       ? { item_name: t.item_name, unit: t.unit, lower_limit: t.lower_limit, upper_limit: t.upper_limit }
       : emptyForm().template,
@@ -238,10 +238,16 @@ export default function ProductManagement() {
                         )}
                       </div>
                     </div>
-                    <dl className="mt-3 grid sm:grid-cols-2 gap-2 text-xs">
+                    <dl className="mt-3 grid sm:grid-cols-3 gap-2 text-xs">
                       <div>
                         <dt className="text-slate-500">Reference dry</dt>
-                        <dd className="text-slate-800">{p.standard_drying_minutes ? `${p.standard_drying_minutes} min` : 'Not set'}</dd>
+                        <dd className="text-slate-800">{p.standard_drying_minutes != null ? fmtDays(p.standard_drying_minutes) : 'Not set'}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-500">Sampling rate</dt>
+                        <dd className="text-slate-800">
+                          1 per <span className="font-mono font-bold">{p.sample_every_n_carts ?? 1}</span> cart(s)
+                        </dd>
                       </div>
                       {t && (
                         <div>
@@ -263,40 +269,57 @@ export default function ProductManagement() {
 }
 
 function ProductFormFields({ form, setForm }: { form: ProductInput; setForm: (f: ProductInput) => void }) {
+  const daysValue = minutesToDays(form.standard_drying_minutes);
   return (
     <>
+      <label className="block">
+        <span className="text-xs font-medium text-slate-700">Product name</span>
+        <input
+          className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          required
+        />
+        <span className="mt-0.5 block text-[10px] text-slate-500">
+          SKU code is auto-generated (SKU-NNNN).
+        </span>
+      </label>
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">SKU code</span>
+          <span className="text-xs font-medium text-slate-700">Reference dry time (days, SOP)</span>
           <input
+            type="number"
+            min={0.1}
+            step={0.1}
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-            value={form.code}
-            onChange={(e) => setForm({ ...form, code: e.target.value })}
-            required
+            value={daysValue ?? ''}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                standard_drying_minutes: e.target.value ? daysToMinutes(Number(e.target.value)) : null,
+              })
+            }
           />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">Product name</span>
+          <span className="text-xs font-medium text-slate-700">
+            Sampling rate (1 sample per N carts)
+          </span>
           <input
+            type="number"
+            min={1}
+            step={1}
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
+            value={form.sample_every_n_carts ?? 1}
+            onChange={(e) =>
+              setForm({ ...form, sample_every_n_carts: Math.max(1, Number(e.target.value) || 1) })
+            }
           />
+          <span className="mt-0.5 block text-[10px] text-slate-500">
+            On bulk check-out, carts in a work order are chunked into groups of N (round up). Each group picks 1 random cart for testing. PASS releases the whole group.
+          </span>
         </label>
       </div>
-      <label className="block">
-        <span className="text-xs font-medium text-slate-700">Reference dry time (minutes, SOP)</span>
-        <input
-          type="number"
-          min={1}
-          className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-          value={form.standard_drying_minutes ?? ''}
-          onChange={(e) =>
-            setForm({ ...form, standard_drying_minutes: e.target.value ? Number(e.target.value) : null })
-          }
-        />
-      </label>
       <fieldset className="border rounded-lg p-3 space-y-3">
         <legend className="text-xs font-semibold px-1 text-slate-700">Post-dry inspection spec</legend>
         <label className="block">
