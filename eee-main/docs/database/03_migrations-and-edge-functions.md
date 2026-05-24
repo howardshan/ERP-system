@@ -1173,6 +1173,83 @@ closed → dispatched   (pkg_dispatch_carts)
 
 ---
 
+### M-075 `20260523000019_qc_bulk_checkout_fix_step2_cascade.sql`
+**用途**: 修复 `qc_check_out_sub_lots_bulk` Step 2a → Step 2b 级联 bug,该 bug 会把同次 bulk checkout 中刚被分到 fresh group 的 champion 误判成 redry 车,再单独成组,把 sibling 孤立在已废弃的旧组里。
+
+**问题现场**(W12345 批次,`sample_every_n_carts=3`,一次 bulk 出 [001,003,004,005]):
+
+| 阶段 | 行为 |
+|---|---|
+| Step 2a | 把 [001,003,004] 分到 group A(champion=004),[005] 分到 group B。004/005 status='pending',001/003 status='awaiting_group_result' |
+| Step 2b | WHERE `status='pending' AND test_group_id IS NOT NULL` 命中 004 和 005,把它们各自挪到新 singleton group C 和 D |
+| 后果 | 001/003 留在 group A 当孤儿;champion 004 的 PASS 在 group C 里找不到 sibling,M-055 propagation `group_members_propagated=0`;001/003 永远卡在 awaiting_group_result,QC Home 不显示 |
+
+**修复**: 在 Step 1 之后、Step 2a 之前**快照** `fresh_ids` 和 `redry_ids`,Step 2a 只迭代 fresh 集合、Step 2b 只迭代 redry 集合;不再依赖 Step 2a 之后的 `status='pending'` 作为分流条件。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `qc_check_out_sub_lots_bulk` | REPLACE | Step 2 之前显式分类 fresh / redry;两条循环各自 `WHERE sl.id = ANY(...)` 限定到对应集合 |
+
+**业务规则**(沿用,未改语义):
+- **BR-Q1** Fresh 车按 `(production_lot_id, sample_every_n_carts)` 聚合,按 `sub_lot_code` 顺序切块,每块大小 N(最后一块可能 <N),每块随机选 1 个 champion。
+- **BR-Q2** Redry 车按 `(production_lot_id, 旧 test_group_id, sample_every_n_carts)` 聚合,同 cohort 重新切块、重新选 champion;不同 cohort 互不混组。
+- **BR-Q3** 同一次 bulk 调用中 fresh 和 redry 永远进入两条独立的分组路径(M-075 修复保证)。
+
+**配套修复**: 见 M-076,以独立 migration 形式修复因 bug 卡住的具体数据。
+
+**依赖**: M-063(`qc_check_out_sub_lots_bulk` 引入 redry 重组逻辑)、M-056(`qc_submit_inspection` 的 group 传播,本次未改动)。
+
+---
+
+### M-076 `20260523000020_repair_w12345_orphan_siblings.sql`
+**用途**: 一次性数据修复,把 M-075 bug 期间 W12345 批次被孤立的 sibling 车并到 champion 实际所在的 group 下,状态升到 `passed`(对应 champion 的 PASS 判定)。
+
+**修复对象**(基于 `qc_quality_event` 审计):
+
+| 孤儿 sibling | 原孤儿 group | 实际 champion | champion 当前 group | 操作 |
+|---|---|---|---|---|
+| W12345-001, W12345-003 | `d207adf6...` | W12345-004 (passed) | `7724ef98...` | 迁移并设为 `passed` |
+| W12345-010 | `d088289a...` | W12345-009 (passed→released) | `1639a6a0...` | 迁移并设为 `passed` |
+
+**变更**:
+- 受影响 sibling 的 `qc_drying_sub_lot.test_group_id` 改为 champion 当前 group;`status='passed'`;`is_test_champion=false`
+- champion 当前 group 的 `qc_test_group.member_count` 由 1 校正到 3 或 2;`status='passed'`、`resolved_at` 补齐
+- 原孤儿 group 标记 `status='closed_failed'`,标识它们已废弃
+- 写 `qc_quality_event` 类型 `manual_repair`(`payload.migration_ref='M-076'`)留审计;`NOT EXISTS` 保证重跑不重复写
+
+**特性**: 幂等。每条 UPDATE 都带显式的原始破损状态 WHERE,修复完之后再跑都是 no-op。
+
+**依赖**: M-075(必须先修代码,再修数据)。
+
+---
+
+### M-077 `20260523000021_qc_needs_attention_per_group.sql`
+**用途**: 把 `qc_overview()` 的 `needs_attention` 从 M-074 的 per-cart 显示回退到 per-group 显示——一个组一行,旁边列出还需要 action 的成员 badge——同时保留 M-074 想修的「sibling 在 disposition 路径不丢」那个边角语义。
+
+**背景对比**:
+
+| 版本 | 行粒度 | disposition 过滤 | 已知问题 |
+|---|---|---|---|
+| M-070 | per-inspection (≈ per-group) | 仅查 champion 的 disposition | 若 champion 已 dispose 但 sibling 没,整组会被误隐藏 |
+| M-074 | per-cart | 查每车自己的 disposition | UI 噪声大;3 车同 PASS 也要点 3 次 Release |
+| **M-077** | per-group(本迁移) | 查 group 内**任一成员**的 disposition | 兼顾两者 |
+
+**核心 SQL 变化**:
+- 仍从 `qc_inspection_record` 出发(一行 inspection = 一行 needs_attention)
+- WHERE 条件:`test_group_id IS NOT NULL` 时 EXISTS 子查询找「组内还有 status∈(passed,hold) 且未被 disposition 覆盖的成员」;solo 路径同理
+- `group_size` / `group_sub_lot_ids` / `group_sub_lot_codes` 用同样的过滤条件聚合,**已 release/dispose 的成员不进 badge 列表**
+- 前端 `QcHome.tsx` 不需要改 — 沿用 M-074 之前的 `removeAttentionItem(item.inspection_id)` + `group_size > 1` 语义即可
+
+**业务规则**:
+- **BR-Q4** Needs Attention 行的可见性以组为单位:组内只要还有一辆需要 action,这一行就一直显示;最后一辆被 action 之后,这一行从列表消失。
+- **BR-Q5** badge 列表只列出**当前还需要 action**的成员,操作员可以一眼看到「这组还差几辆没处理」。
+
+**依赖**: M-074(本迁移替换其 `qc_overview()` 实现)、M-070(原始 per-group 形式参考)、M-055(group propagation 语义,本次未改)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1231,7 +1308,11 @@ closed → dispatched   (pkg_dispatch_carts)
 | M-065 | 20260523000003_qc_overview_needs_attention_active_only.sql |
 | M-066 | 20260523000004_qc_overview_needs_attention_pass_and_fail.sql |
 | M-067 | 20260523000005_packaging_module.sql |
-| **M-068** | _(下一个)_ |
+| _(M-068–M-074)_ | _(中间几个 migration 文件存在但本索引未补登,详见 `supabase/migrations/`)_ |
+| M-075 | 20260523000019_qc_bulk_checkout_fix_step2_cascade.sql |
+| M-076 | 20260523000020_repair_w12345_orphan_siblings.sql |
+| M-077 | 20260523000021_qc_needs_attention_per_group.sql |
+| **M-078** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
