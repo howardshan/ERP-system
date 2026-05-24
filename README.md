@@ -13,3 +13,4 @@
 
 - [QC 模块起步与设计指南](docs/QC模块起步与设计指南.md) — 战略路线、**烘干后 QC 延时痛点（§1.4）**、Phase 0 行动清单、设计必要信息、调研问卷与 MVP 范围（v1.1）
 - [QC 模块 Demo 开发计划书](docs/QC模块Demo开发计划书.md) — 会前演示系统范围、功能清单、假数据、排期、演示脚本与任务 Checklist（v1.1）
+- [Warehouse 模块开发计划书](docs/Warehouse模块开发计划书.md) — 仓库与库存 v1.0 范围、库位架构、QC 集成、RPC/页面规划、12 周里程碑与 Checklist（v1.0）
