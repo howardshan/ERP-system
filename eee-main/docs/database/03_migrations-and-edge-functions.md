@@ -1250,6 +1250,24 @@ closed → dispatched   (pkg_dispatch_carts)
 
 ---
 
+### M-078 `20260524000001_fix_auth_trigger_search_path.sql`
+**用途**: 修复 Supabase Dashboard / Auth API 创建用户时报 `relation "erp_user" does not exist`。
+
+**根因**: `on_auth_user_created` 在 `auth.users` 上执行 `handle_new_auth_user()` 时,连接角色为 `supabase_auth_admin`,默认 `search_path` 可能不包含 `public`,裸名 `erp_user` 解析失败;`public.erp_user` 表实际存在。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `handle_new_auth_user()` | REPLACE | `SET search_path = public`;`INSERT INTO public.erp_user` |
+| `assign_employee_id()` | REPLACE | `SET search_path = public`;`FROM public.erp_user`(避免插入 erp_user 时 BEFORE INSERT 触发器再次 42P01) |
+
+**特性**: 幂等(`CREATE OR REPLACE`)。已在 Dashboard SQL Editor 手工验证的用户创建流程,与本 migration 等价。
+
+**依赖**: M-010(`handle_new_auth_user` + trigger)、M-020(`assign_employee_id` + trigger)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1312,7 +1330,7 @@ closed → dispatched   (pkg_dispatch_carts)
 | M-075 | 20260523000019_qc_bulk_checkout_fix_step2_cascade.sql |
 | M-076 | 20260523000020_repair_w12345_orphan_siblings.sql |
 | M-077 | 20260523000021_qc_needs_attention_per_group.sql |
-| **M-078** | _(下一个)_ |
+| M-078 | 20260524000001_fix_auth_trigger_search_path.sql |
 
 | 编号 | 目录 |
 |------|------|
