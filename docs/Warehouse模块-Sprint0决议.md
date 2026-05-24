@@ -519,6 +519,31 @@ END IF;
 | `pkg_dispatch_carts` 调用 `_wh_apply_transaction` 写 `ship` 流水 | ✅ 在 S5 实现 |
 | BR-W1、BR-W4 措辞已在 `files/business-rules.md` 同步 | ✅ S0 完成 |
 
+### 5.5 SKU↔item 关联策略与未关联 SKU 的处理（回填方案 b）— 2026-05-24 备忘
+
+#### 回填方案
+
+决议 1 的 `qc_product_sku.item_id` **不做一次性脚本回填**，采用**方案 b**：
+
+- `item_id` 列保持 NULLable
+- 建空的 item 主数据 + CRUD UI，由业务人员在界面手动建 item 并关联
+- 关联入口放在 **QC 的 [ProductManagement.tsx](../eee-main/src/pages/qc/ProductManagement.tsx)**（QC 人员熟悉自己的 SKU 对应什么物料，比仓库人员更适合做关联）
+
+#### 未关联 SKU 的放行处理（S4 实现）
+
+方案 b 下，某个 QC SKU 可能尚未关联 item。但 D-W04 / BR-W3 要求"放行必须同步 ERP lot"，未关联 item 就建不出 lot。
+
+**决议：把校验关口前移到「建车」环节**——`qc_production_lot` 创建时校验其 `qc_product_sku.item_id IS NOT NULL`，未关联则拒绝建车。这样到放行时一定已关联，放行逻辑无需处理"半成品"状态。
+
+```
+建车 (qc_production_lot 创建)
+  └─ 校验：SELECT item_id FROM qc_product_sku WHERE id = NEW.product_sku_id
+           IF item_id IS NULL THEN RAISE EXCEPTION 'SKU 未关联 ERP 物料，无法建车'
+进烘干 → 检验 → 放行 (此时 item_id 必非空，wh_sync_release_from_qc 可正常建 lot)
+```
+
+**实现时点：** S4（随 `wh_sync_release_from_qc` 一起），现在仅备忘，不做。
+
 ---
 
 ## 决议依赖关系总览

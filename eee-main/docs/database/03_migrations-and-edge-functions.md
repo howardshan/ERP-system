@@ -1268,6 +1268,42 @@ closed → dispatched   (pkg_dispatch_carts)
 
 ---
 
+### M-079 `20260524000002_warehouse_seed_locations.sql`
+**用途**: Warehouse 模块起步 — seed 主工厂仓库 `WH-MAIN` 及 7 个逻辑库区。实现决策 D-W01（`docs/Warehouse模块开发计划书.md` §5.1）。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `warehouse` | INSERT `WH-MAIN`（主工厂） | `ON CONFLICT (code) DO NOTHING` |
+| `location` | INSERT 7 行逻辑库区 | `ON CONFLICT (warehouse_id, code) DO NOTHING` |
+
+**7 个库区（code → location_type）**: `LOC-RM`/storage、`LOC-PRE-DRY`/production、`LOC-DRY-WIP`/production、`LOC-QC-PENDING`/quarantine、`LOC-PACK-STAGE`/storage、`LOC-NG`/quarantine、`LOC-FG`/storage。
+
+**特性**: 幂等（ON CONFLICT）。`location_type` 复用既有 CHECK 约束，未改 schema。
+
+**依赖**: M-001（`warehouse` / `location` 表）。
+
+---
+
+### M-080 `20260524000003_qc_product_sku_add_item_id.sql`
+**用途**: 桥接 QC SKU 与 ERP 主数据 item（Sprint 0 决议 1，方案 A）。给 `qc_product_sku` 增加指向 `item(id)` 的可空 FK。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `qc_product_sku.item_id` | ADD COLUMN（NULLable，FK→`item(id)`） | `ADD COLUMN IF NOT EXISTS` |
+| `idx_qc_product_sku_item` | CREATE INDEX | `IF NOT EXISTS` |
+
+**设计理由**: 采用回填方案 b（见 `docs/Warehouse模块-Sprint0决议.md` §5.5）——列保持 NULLable，**不做脚本回填**，由业务人员在 QC ProductManagement UI 手动建 item 并关联。"建车前必须已关联"的校验留到 S4 随 `wh_sync_release_from_qc` 实现。
+
+**特性**: 幂等（IF NOT EXISTS）。
+
+**依赖**: M-001（`item` 表）、M-033（`qc_product_sku` 表）。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1331,6 +1367,8 @@ closed → dispatched   (pkg_dispatch_carts)
 | M-076 | 20260523000020_repair_w12345_orphan_siblings.sql |
 | M-077 | 20260523000021_qc_needs_attention_per_group.sql |
 | M-078 | 20260524000001_fix_auth_trigger_search_path.sql |
+| M-079 | 20260524000002_warehouse_seed_locations.sql |
+| M-080 | 20260524000003_qc_product_sku_add_item_id.sql |
 
 | 编号 | 目录 |
 |------|------|
