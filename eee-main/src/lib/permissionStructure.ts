@@ -75,6 +75,39 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'manage', label: 'Manage User Permissions', prereq: null },
         ],
       },
+      items: {
+        label: 'Items (Master Data)',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'create', label: 'Create', prereq: 'view' },
+          { id: 'edit',   label: 'Edit',   prereq: 'view' },
+          { id: 'delete', label: 'Delete', prereq: 'edit' },
+        ],
+      },
+      locations: {
+        label: 'Locations',
+        permissions: [
+          { id: 'view', label: 'View', prereq: null },
+          { id: 'edit', label: 'Edit', prereq: 'view' },
+        ],
+      },
+      lots: {
+        label: 'Lots',
+        permissions: [
+          { id: 'view',    label: 'View',    prereq: null },
+          { id: 'release', label: 'Release', prereq: 'view' },
+          { id: 'reject',  label: 'Reject',  prereq: 'view' },
+        ],
+      },
+      goods_receipt: {
+        label: 'Goods Receipt',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'create', label: 'Create', prereq: 'view' },
+          { id: 'post',   label: 'Post',   prereq: 'create' },
+          { id: 'cancel', label: 'Cancel', prereq: 'view' },
+        ],
+      },
       inventory: {
         label: 'Inventory',
         permissions: [

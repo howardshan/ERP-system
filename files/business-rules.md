@@ -159,3 +159,55 @@ Physical deletion is not permitted anywhere in the system.
 Every table records `created_at` and `created_by`. Documents that are posted
 also record who posted them and when. An ERP must always be able to answer
 "who did this, and when".
+
+---
+
+## Warehouse module (v1.0)
+
+Module-scoped rules added with the Warehouse & Inventory module. Numbered
+`BR-W*` so they sit in a per-module namespace alongside the global rules.
+Source: `ERP-system/docs/Warehouse模块开发计划书.md` §7. Some wording (notably
+BR-W1) may be refined after the Sprint 0 decision on lot granularity is signed
+off — see `ERP-system/docs/Warehouse模块-Sprint0决议.md`.
+
+**BR-W1 — Drying-zone inventory: lot at cart level, transactions at sub-lot level.**
+ERP `lot` and `qc_production_lot` (cart) are 1:1 — one cart, one ERP lot.
+`inventory_transaction` quantities, however, are posted per `qc_drying_sub_lot`
+(the cart's quality-grouping sub-batch), so a single cart's lot may end up
+spread across multiple locations as its sub-lots reach terminal QC states.
+Furnace cells are managed by QC only; the ERP ledger does not record cell-level
+quantities. (Refined per `ERP-system/docs/Warehouse模块-Sprint0决议.md` §5.3.)
+
+**BR-W2 — Direct receipts must be explicitly flagged.**
+A goods receipt without a purchase order is allowed in v1.0 but must set
+`goods_receipt.po_id IS NULL` *and* `goods_receipt.receipt_type = 'direct'`.
+UI must surface the `direct` flag prominently in lists and detail pages so the
+absence of a PO is auditable, not silent.
+
+**BR-W3 — QC release succeeds only when the ERP sync succeeds.**
+A QC sub-lot transitions to `closed` (released) only if
+`wh_sync_release_from_qc(sub_lot_id)` returns success within the same
+transaction. Failure of the sync rolls back the QC status change — there must
+never be a "released in QC, missing in ERP" state.
+
+**BR-W4 — Rejected / on-hold stock is not issuable (double-condition check).**
+Outbound transactions (`issue`, `ship`, `production_consume`) must satisfy
+*both* conditions:
+(1) `lot.status` ∉ {`on_hold`, `rejected`, `expired`}; and
+(2) source `location.location_type` ≠ `quarantine`.
+Either condition failing causes the RPC to reject and roll back. The two-part
+check is required because under BR-W1, a single lot may have part of its
+quantity in a quarantine zone (e.g. `LOC-NG`) while the lot as a whole is
+`available` — see `ERP-system/docs/Warehouse模块-Sprint0决议.md` §5.2 for the
+implementation pattern.
+
+**BR-W5 — Quarantine zones hold quarantine-status lots.**
+Stock physically located in a quarantine zone (e.g. `LOC-QC-PENDING`) must have
+`lot.status = 'quarantine'` until released. The release event (BR-W3) is what
+flips status to `available` and moves the stock to the pack-stage location.
+
+**BR-W6 — Opening-balance imports are traceable.**
+Every row written by the opening-balance import carries an `import_batch_id`
+and uses the reason code `OPENING_BALANCE` on its inventory transaction.
+Historical movements are never fabricated — the opening balance is recorded as
+a single `adjustment` per (item, lot, location), not as a fake receipt.

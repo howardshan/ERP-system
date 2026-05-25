@@ -115,7 +115,7 @@ eee-main/
 | `home` | `HomePage` | `src/pages/HomePage.tsx` | ✅ 已完成（模块卡片按 `canAccessModule()` 过滤，无访问权限则不显示） |
 | `finance` | `DashboardLayout` + 财务子页面 | `src/components/layout/DashboardLayout.tsx` | ✅ 已完成 |
 | `workflow` | `WorkflowModule` → `WorkflowList` / `WorkflowBuilder` | `src/pages/WorkflowList.tsx`, `src/pages/WorkflowBuilder.tsx` | ✅ 已完成（执行引擎待开发） |
-| `warehouse` | `ModulePlaceholder` | `src/App.tsx`（内联） | 🔲 规划中 |
+| `warehouse` | `WarehouseModule` → Overview / Items / Locations | `src/pages/warehouse/WarehouseModule.tsx` | 🚧 Sprint 0（物料 CRUD + 7 库区只读 + QC↔item 关联），见 `docs/modules/11_warehouse-inventory.md` |
 | `sales` | `ModulePlaceholder` | `src/App.tsx`（内联） | 🔲 规划中 |
 | `production` | `ModulePlaceholder` | `src/App.tsx`（内联） | 🔲 规划中 |
 | `auth` | `UserManagement` | `src/pages/auth/UserManagement.tsx` | ✅ 已完成 |

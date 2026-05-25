@@ -6,9 +6,11 @@ import {
   updateProduct,
   deleteProduct,
   deleteProducts,
+  listProductItemLinks,
   Product,
   ProductInput,
 } from '../../services/qcApi';
+import { listItems, WarehouseItem } from '../../services/warehouseApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { SelectAllCheckbox } from './components/SelectAllCheckbox';
 import { PermissionDenied } from './components/PermissionDenied';
@@ -18,15 +20,17 @@ const emptyForm = (): ProductInput => ({
   name: '',
   standard_drying_minutes: MINUTES_PER_DAY,  // 1 day default
   sample_every_n_carts: 1,
+  item_id: null,
   template: { item_name: 'Water Activity (Aw)', unit: null, lower_limit: 0.65, upper_limit: 0.75 },
 });
 
-function productToForm(p: Product): ProductInput {
+function productToForm(p: Product, itemId: number | null): ProductInput {
   const t = p.templates[0];
   return {
     name: p.name,
     standard_drying_minutes: p.standard_drying_minutes,
     sample_every_n_carts: p.sample_every_n_carts ?? 1,
+    item_id: itemId,
     template: t
       ? { item_name: t.item_name, unit: t.unit, lower_limit: t.lower_limit, upper_limit: t.upper_limit }
       : emptyForm().template,
@@ -49,14 +53,28 @@ export default function ProductManagement() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [items, setItems] = useState<WarehouseItem[]>([]);
+  const [links, setLinks] = useState<Record<string, number | null>>({});
 
-  const load = () => listProducts().then(setProducts).catch((e) => setError(e.message));
+  const load = () => {
+    listProducts().then(setProducts).catch((e) => setError(e.message));
+    listProductItemLinks().then(setLinks).catch(() => { /* link map optional */ });
+  };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    listItems().then(setItems).catch(() => { /* ERP items optional for linking */ });
+  }, []);
+
+  const itemLabel = (id: number | null | undefined) => {
+    if (id == null) return null;
+    const it = items.find((x) => x.id === id);
+    return it ? `${it.sku} · ${it.name}` : `#${id}`;
+  };
 
   const cancel = () => { setEditingId(null); setCreating(false); setForm(emptyForm()); };
   const startCreate = () => { setEditingId(null); setForm(emptyForm()); setCreating(true); setMsg(''); setError(''); };
-  const startEdit = (p: Product) => { setCreating(false); setEditingId(p.id); setForm(productToForm(p)); setMsg(''); setError(''); };
+  const startEdit = (p: Product) => { setCreating(false); setEditingId(p.id); setForm(productToForm(p, links[p.id] ?? null)); setMsg(''); setError(''); };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -180,7 +198,7 @@ export default function ProductManagement() {
       {creating && (
         <form onSubmit={submit} className="bg-white border-2 border-blue-400 rounded-xl p-4 mb-6 space-y-4 shadow-sm">
           <h2 className="font-semibold text-blue-800 text-sm">New product</h2>
-          <ProductFormFields form={form} setForm={setForm} />
+          <ProductFormFields form={form} setForm={setForm} items={items} />
           <div className="flex gap-2">
             <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">Save</button>
             <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>Cancel</button>
@@ -201,7 +219,7 @@ export default function ProductManagement() {
               {isEditing ? (
                 <form onSubmit={submit} className="space-y-4">
                   <h2 className="font-semibold text-blue-800 text-sm">Edit · {p.name}</h2>
-                  <ProductFormFields form={form} setForm={setForm} />
+                  <ProductFormFields form={form} setForm={setForm} items={items} />
                   <div className="flex gap-2">
                     <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">Save</button>
                     <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>Cancel</button>
@@ -261,6 +279,12 @@ export default function ProductManagement() {
                           <dd className="text-slate-800">[{t.lower_limit}, {t.upper_limit}]</dd>
                         </div>
                       )}
+                      <div>
+                        <dt className="text-slate-500">关联 ERP 物料</dt>
+                        <dd className={cn('text-slate-800', itemLabel(links[p.id]) ? '' : 'text-amber-600')}>
+                          {itemLabel(links[p.id]) ?? '未关联'}
+                        </dd>
+                      </div>
                     </dl>
                   </div>
                 </div>
@@ -274,7 +298,11 @@ export default function ProductManagement() {
   );
 }
 
-function ProductFormFields({ form, setForm }: { form: ProductInput; setForm: (f: ProductInput) => void }) {
+function ProductFormFields({ form, setForm, items }: {
+  form: ProductInput;
+  setForm: (f: ProductInput) => void;
+  items: WarehouseItem[];
+}) {
   const daysValue = minutesToDays(form.standard_drying_minutes);
   return (
     <>
@@ -288,6 +316,22 @@ function ProductFormFields({ form, setForm }: { form: ProductInput; setForm: (f:
         />
         <span className="mt-0.5 block text-[10px] text-slate-500">
           SKU code is auto-generated (SKU-NNNN).
+        </span>
+      </label>
+      <label className="block">
+        <span className="text-xs font-medium text-slate-700">关联 ERP 物料 (Warehouse item)</span>
+        <select
+          className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white"
+          value={form.item_id ?? ''}
+          onChange={(e) => setForm({ ...form, item_id: e.target.value ? Number(e.target.value) : null })}
+        >
+          <option value="">— 未关联 —</option>
+          {items.map((it) => (
+            <option key={it.id} value={it.id}>{it.sku} · {it.name}</option>
+          ))}
+        </select>
+        <span className="mt-0.5 block text-[10px] text-slate-500">
+          关联后，建车与放行时才能同步 ERP 库存批次（决议 §5.5）。
         </span>
       </label>
       <div className="grid sm:grid-cols-2 gap-3">
