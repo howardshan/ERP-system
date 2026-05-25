@@ -11,6 +11,7 @@ import {
 import { usePermissions } from '../../contexts/PermissionContext';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { SelectAllCheckbox } from './components/SelectAllCheckbox';
+import { PermissionDenied } from './components/PermissionDenied';
 import { cn } from '../../lib/utils';
 
 type Panel = 'pending' | 'hold' | 'passed' | 'rate';
@@ -24,6 +25,7 @@ const DISP_TYPES = [
 
 export default function AdminDashboard() {
   const { can } = usePermissions();
+  const canView = can('qc', 'dashboard', 'view');
   // Admin dashboard uses the legacy 4-type disposition picker; require all three
   // disposition types for full functionality, or any to show the panel.
   const canDispose =
@@ -132,6 +134,10 @@ export default function AdminDashboard() {
   };
 
   const pollingEnabled = selectedHold === null && bulkSelected.size === 0;
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.dashboard.view" feature="Quality Dashboard" />;
+  }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">

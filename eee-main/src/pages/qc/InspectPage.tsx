@@ -6,6 +6,8 @@ import {
 } from '../../services/qcApi';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { NumericKeypad } from './components/NumericKeypad';
+import { PermissionDenied } from './components/PermissionDenied';
+import { usePermissions } from '../../contexts/PermissionContext';
 
 interface Props {
   subLotId: string;
@@ -13,6 +15,8 @@ interface Props {
 }
 
 export default function InspectPage({ subLotId, onBack }: Props) {
+  const { can } = usePermissions();
+  const canSubmit = can('qc', 'testing', 'submit_inspection');
   const [subCode, setSubCode] = useState('');
   const [status, setStatus] = useState('');
   const [limits, setLimits] = useState<[number, number] | null>(null);
@@ -46,6 +50,10 @@ export default function InspectPage({ subLotId, onBack }: Props) {
       setSubmitting(false);
     }
   };
+
+  if (!canSubmit) {
+    return <PermissionDenied permission="qc.testing.submit_inspection" feature="Inspection submission" />;
+  }
 
   return (
     <div className="p-8 max-w-2xl mx-auto">

@@ -15,6 +15,7 @@ import {
 import { usePermissions } from '../../contexts/PermissionContext';
 import { NumericKeypad } from './components/NumericKeypad';
 import { cn } from '../../lib/utils';
+import { PermissionDenied } from './components/PermissionDenied';
 
 interface Props {
   onOpenHistory: (subLotId: string) => void;
@@ -24,6 +25,8 @@ type Phase = 'idle' | 'sample' | 'measure' | 'done';
 
 export default function TestingPage({ onOpenHistory }: Props) {
   const { can } = usePermissions();
+  const canView = can('qc', 'testing', 'view_status');
+  const canViewDashboard = can('qc', 'testing', 'view_dashboard');
   const canSample = can('qc', 'testing', 'take_sample');
   const canSubmit = can('qc', 'testing', 'submit_inspection');
 
@@ -42,6 +45,10 @@ export default function TestingPage({ onOpenHistory }: Props) {
 
   const selected = useMemo(() => pending.find(s => s.id === selectedId) ?? null, [pending, selectedId]);
 
+  if (!canView) {
+    return <PermissionDenied permission="qc.testing.view_status" feature="Testing" />;
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">Testing</h1>
@@ -49,33 +56,38 @@ export default function TestingPage({ onOpenHistory }: Props) {
         Sub-lots checked out of the dryer · take a sample → enter WA → confirm Pass/Fail · auto-judged by SKU template (BR-Q1)
       </p>
 
-      {/* Tab toggle */}
-      <div className="flex gap-1 mb-5 bg-slate-100 rounded-lg p-1 w-fit">
-        <button
-          type="button"
-          onClick={() => setActiveTab('queue')}
-          className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
-            activeTab === 'queue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
-          )}
-        >
-          <ListChecks size={12} /> Queue
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('dashboard')}
-          className={cn(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
-            activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
-          )}
-        >
-          <LayoutDashboard size={12} /> Dashboard
-        </button>
-      </div>
+      {/* Tab toggle — Dashboard tab only shown when user has view_dashboard. */}
+      {canViewDashboard && (
+        <div className="flex gap-1 mb-5 bg-slate-100 rounded-lg p-1 w-fit">
+          <button
+            type="button"
+            onClick={() => setActiveTab('queue')}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
+              activeTab === 'queue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+            )}
+          >
+            <ListChecks size={12} /> Queue
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('dashboard')}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
+              activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+            )}
+          >
+            <LayoutDashboard size={12} /> Dashboard
+          </button>
+        </div>
+      )}
 
-      {activeTab === 'dashboard' && <TestingDashboard />}
+      {activeTab === 'dashboard' && canViewDashboard && <TestingDashboard />}
 
-      {activeTab === 'queue' && <>
+      {/* Show the queue whenever dashboard isn't being shown — protects the
+          edge case where activeTab='dashboard' but the user lacks view_dashboard
+          (e.g. permission revoked mid-session). */}
+      {(activeTab === 'queue' || !canViewDashboard) && <>
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm flex items-center gap-2">
         <CheckCircle2 size={14} /> {msg}
       </p>}

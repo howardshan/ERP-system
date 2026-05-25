@@ -12,6 +12,7 @@ import {
 } from '../../services/qcApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn, daysToMinutes, minutesToDays } from '../../lib/utils';
+import { CartStickerSheet } from './components/CartStickerSheet';
 
 interface Props {
   onCreated?: (lotId: string) => void;
@@ -45,6 +46,20 @@ export default function Production({ onCreated }: Props) {
   const [existingSubLots, setExistingSubLots] = useState<SubLot[]>([]);
   const [lookingUp, setLookingUp] = useState(false);
   const lastAutoAdvancedFor = useRef<string>('');
+
+  // Printable carts after a successful create / add-carts.  Holds the
+  // sub-set the user just produced, plus the SKU + work-order context the
+  // sticker needs.  Null while the form is being filled out; populated after
+  // a successful submit so the "Print stickers" button in the success banner
+  // has something to open.  `printOpen` controls the modal independently so
+  // closing the modal doesn't lose the data.
+  const [printable, setPrintable] = useState<{
+    carts: SubLot[];
+    workOrderBarcode: string;
+    skuCode: string | null;
+    skuName: string;
+  } | null>(null);
+  const [printOpen, setPrintOpen] = useState(false);
 
   useEffect(() => {
     listProducts().then(setSkus).catch(e => setError(e.message));
@@ -153,6 +168,18 @@ export default function Production({ onCreated }: Props) {
         setMsg(`Added ${res.added_count} cart(s) to ${existingLot.lot_number} (carts ${res.start_seq}–${res.end_seq}).`);
         const subs = await listSubLotsForLot(existingLot.id);
         setExistingSubLots(subs);
+        const newCarts = subs.filter(s => {
+          const n = parseSeq(s.sub_lot_code);
+          return n >= res.start_seq && n <= res.end_seq;
+        });
+        if (newCarts.length > 0) {
+          setPrintable({
+            carts: newCarts,
+            workOrderBarcode: existingLot.work_order_barcode,
+            skuCode: existingLot.sku_code ?? null,
+            skuName: existingLot.sku_name ?? '',
+          });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Add failed');
       }
@@ -187,6 +214,20 @@ export default function Production({ onCreated }: Props) {
       };
       const res = await createProductionBatch(payload);
       setMsg(`Created work order ${res.lot_number} with ${res.sub_lot_count} cart(s): ${wo}-${String(minN).padStart(3,'0')} … ${wo}-${String(maxN).padStart(3,'0')}.`);
+      // Fetch the freshly-created sub_lots so the sticker print button has
+      // their codes.  Wrap separately so a list failure doesn't mask the
+      // successful create.
+      try {
+        const subs = await listSubLotsForLot(res.lot_id);
+        if (subs.length > 0 && currentSku) {
+          setPrintable({
+            carts: subs,
+            workOrderBarcode: wo,
+            skuCode: currentSku.code,
+            skuName: currentSku.name,
+          });
+        }
+      } catch { /* non-fatal — user can re-load to print later */ }
       if (onCreated) onCreated(res.lot_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Create failed');
@@ -205,7 +246,20 @@ export default function Production({ onCreated }: Props) {
         Create a new work order or add carts to an existing one.
       </p>
 
-      {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
+      {msg && (
+        <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-lg mb-3 text-sm flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-emerald-700">{msg}</p>
+          {printable && (
+            <button
+              type="button"
+              onClick={() => setPrintOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white"
+            >
+              Print {printable.carts.length} sticker{printable.carts.length === 1 ? '' : 's'}
+            </button>
+          )}
+        </div>
+      )}
       {error && <p className="text-red-600 bg-red-50 p-2 rounded-lg mb-3 text-sm">{error}</p>}
 
       {disabled && (
@@ -398,6 +452,16 @@ export default function Production({ onCreated }: Props) {
           }
         </button>
       </form>
+
+      {printOpen && printable && (
+        <CartStickerSheet
+          carts={printable.carts}
+          workOrderBarcode={printable.workOrderBarcode}
+          skuCode={printable.skuCode}
+          skuName={printable.skuName}
+          onClose={() => setPrintOpen(false)}
+        />
+      )}
     </div>
   );
 }

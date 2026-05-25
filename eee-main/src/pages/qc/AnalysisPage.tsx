@@ -19,6 +19,8 @@ import {
   ProductionLot,
 } from '../../services/qcApi';
 import { fmtDays, cn } from '../../lib/utils';
+import { usePermissions } from '../../contexts/PermissionContext';
+import { PermissionDenied } from './components/PermissionDenied';
 
 type OutcomeMetric = 'pass' | 'fail' | 'pass_rate';
 type MetricKey = 'avg_dry' | 'pass' | 'fail' | 'pass_rate';
@@ -67,6 +69,11 @@ const RECOVERY_LABELS: Record<RecoveryType, string> = {
 };
 
 export default function AnalysisPage() {
+  const { can } = usePermissions();
+  // Analysis is also accessible to anyone who can view the dashboard
+  // (read-only reporting) — see QualityControlModule's canViewAnalysis.
+  const canView = can('qc', 'analysis', 'view') || can('qc', 'dashboard', 'view');
+
   const [products, setProducts] = useState<Product[]>([]);
   const [lots, setLots] = useState<ProductionLot[]>([]);
 
@@ -280,6 +287,10 @@ export default function AnalysisPage() {
 
   const fmtPct = (v: number | null) => v == null ? '—' : `${v.toFixed(1)}%`;
   const fmtMin = (v: number | null) => v == null ? '—' : fmtDays(v);
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.analysis.view" feature="Analysis" />;
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

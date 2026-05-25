@@ -8,6 +8,7 @@ import {
 import { usePermissions } from '../../contexts/PermissionContext';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { SelectAllCheckbox } from './components/SelectAllCheckbox';
+import { PermissionDenied } from './components/PermissionDenied';
 import { cn } from '../../lib/utils';
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
 
 export default function PendingQueue({ onInspectSubLot }: Props) {
   const { can } = usePermissions();
+  const canView = can('qc', 'testing', 'view_status');
   const canSubmit = can('qc', 'testing', 'submit_inspection');
 
   const [items, setItems] = useState<SubLot[]>([]);
@@ -71,6 +73,10 @@ export default function PendingQueue({ onInspectSubLot }: Props) {
     }
     setBusy(false);
   };
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.testing.view_status" feature="Testing Queue" />;
+  }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">

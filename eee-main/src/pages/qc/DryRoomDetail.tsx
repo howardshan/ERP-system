@@ -17,6 +17,7 @@ import { QcStatusBadge } from './components/QcStatusBadge';
 import { ScanQrDialog } from './components/ScanQrDialog';
 import { DryRoomListMode } from './components/DryRoomListMode';
 import { useQcSpotSelectionEnabled } from './hooks/useQcSpotSelectionEnabled';
+import { PermissionDenied } from './components/PermissionDenied';
 import { cn } from '../../lib/utils';
 
 interface Props {
@@ -52,6 +53,7 @@ type Mode =
 
 export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpenHistory }: Props) {
   const { can } = usePermissions();
+  const canView = can('qc', 'dry_rooms', 'view_status');
   const canCheckIn = can('qc', 'dry_rooms', 'check_in');
   const canCheckOut = can('qc', 'dry_rooms', 'check_out');
   const canMove = can('qc', 'dry_rooms', 'move');
@@ -239,6 +241,10 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
     // (d) Other status (pending / inspecting / passed / hold / room_temp / closed)
     setError(`${sl.sub_lot_code} status is "${sl.status}" — no action available in Dry Rooms. (Try Testing or History.)`);
   };
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.dry_rooms.view_status" feature="Dry Rooms" />;
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

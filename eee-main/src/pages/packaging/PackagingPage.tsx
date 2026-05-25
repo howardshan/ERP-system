@@ -18,6 +18,8 @@ import {
   PkgSku,
 } from '../../services/pkgApi';
 import { cn } from '../../lib/utils';
+import { usePermissions } from '../../contexts/PermissionContext';
+import { PermissionDenied } from '../qc/components/PermissionDenied';
 
 function DaysInStockBadge({ days }: { days: number }) {
   if (days < 10) {
@@ -55,6 +57,9 @@ function formatDate(iso: string): string {
 }
 
 export default function PackagingPage() {
+  const { can } = usePermissions();
+  const canView = can('packaging', 'outbound', 'view');
+  const canDispatch = can('packaging', 'outbound', 'dispatch');
   const [skus, setSkus] = useState<PkgSku[]>([]);
   const [skusLoading, setSkusLoading] = useState(true);
   const [selectedSkuId, setSelectedSkuId] = useState<string | null>(null);
@@ -174,6 +179,10 @@ export default function PackagingPage() {
 
   const allSelected = carts.length > 0 && selectedIds.size === carts.length;
   const someSelected = selectedIds.size > 0 && selectedIds.size < carts.length;
+
+  if (!canView) {
+    return <PermissionDenied permission="packaging.outbound.view" feature="Packaging" />;
+  }
 
   return (
     <div className="flex h-full min-h-0" style={{ minHeight: 'calc(100vh - 56px)' }}>
@@ -400,7 +409,8 @@ export default function PackagingPage() {
             />
             <button
               onClick={handleDispatch}
-              disabled={selectedIds.size === 0 || dispatching}
+              disabled={selectedIds.size === 0 || dispatching || !canDispatch}
+              title={canDispatch ? undefined : 'Missing packaging.outbound.dispatch permission'}
               className="flex items-center gap-2 px-5 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors shrink-0"
             >
               {dispatching ? (

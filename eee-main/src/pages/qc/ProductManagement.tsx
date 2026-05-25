@@ -13,6 +13,7 @@ import {
 import { listItems, WarehouseItem } from '../../services/warehouseApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { SelectAllCheckbox } from './components/SelectAllCheckbox';
+import { PermissionDenied } from './components/PermissionDenied';
 import { cn, fmtDays, daysToMinutes, minutesToDays, MINUTES_PER_DAY } from '../../lib/utils';
 
 const emptyForm = (): ProductInput => ({
@@ -38,6 +39,7 @@ function productToForm(p: Product, itemId: number | null): ProductInput {
 
 export default function ProductManagement() {
   const { can } = usePermissions();
+  const canView = can('qc', 'products', 'view');
   const canCreate = can('qc', 'products', 'create');
   const canEdit = can('qc', 'products', 'edit');
   const canDelete = can('qc', 'products', 'delete');
@@ -142,6 +144,10 @@ export default function ProductManagement() {
   };
 
   const isBusy = creating || editingId !== null;
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.products.view" feature="Products & Templates" />;
+  }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
