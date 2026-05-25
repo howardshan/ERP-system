@@ -268,7 +268,7 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
         permissions: [
           { id: 'view_status', label: 'View Dryer Status & Grid',          prereq: null },
           { id: 'check_in',    label: 'Check In Sub-lot to Cell',          prereq: 'view_status' },
-          { id: 'move',        label: 'Move Sub-lot Between Cells',        prereq: 'view_status' },
+          { id: 'move',        label: 'Move Sub-lot Between Dry Rooms',    prereq: 'view_status' },
           { id: 'check_out',   label: 'Check Out Sub-lot from Dryer',      prereq: 'view_status' },
         ],
       },
@@ -276,6 +276,7 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
         label: 'Testing & Dispositions',
         permissions: [
           { id: 'view_status',              label: 'View Testing Queue',                  prereq: null },
+          { id: 'view_dashboard',           label: 'View Testing Dashboard (forecast)',   prereq: 'view_status' },
           { id: 'take_sample',              label: 'Take Sample',                         prereq: 'view_status' },
           { id: 'submit_inspection',        label: 'Submit Inspection (input WA)',        prereq: 'view_status' },
           { id: 'dispose_redry',            label: 'Dispose: Re-dry in dryer',            prereq: 'view_status' },

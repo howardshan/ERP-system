@@ -3,6 +3,8 @@ import { X, MapPin, FlaskConical, ClipboardCheck, Thermometer, Activity } from '
 import { subLotFullHistory, formatQcDateTime, SubLotFullHistory } from '../../services/qcApi';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { cn } from '../../lib/utils';
+import { usePermissions } from '../../contexts/PermissionContext';
+import { PermissionDenied } from './components/PermissionDenied';
 
 interface Props {
   subLotId: string;
@@ -29,6 +31,8 @@ function fmtMin(m: number | null | undefined): string {
 }
 
 export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
+  const { can } = usePermissions();
+  const canView = can('qc', 'sub_lots', 'view_history');
   const [data, setData] = useState<SubLotFullHistory | null>(null);
   const [error, setError] = useState('');
 
@@ -102,6 +106,28 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
     items.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
     return items;
   }, [data]);
+
+  if (!canView) {
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end">
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/40"
+          onClick={onClose}
+          aria-label="Close drawer"
+        />
+        <aside className="relative w-full max-w-xl h-full bg-white shadow-2xl flex flex-col">
+          <header className="px-5 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
+            <p className="text-sm font-bold text-slate-900">Sub-lot history</p>
+            <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded">
+              <X size={16} />
+            </button>
+          </header>
+          <PermissionDenied permission="qc.sub_lots.view_history" feature="Sub-lot history" />
+        </aside>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">

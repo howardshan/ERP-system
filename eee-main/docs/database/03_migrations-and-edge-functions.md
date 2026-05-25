@@ -1250,90 +1250,61 @@ closed → dispatched   (pkg_dispatch_carts)
 
 ---
 
-### M-078 `20260524000001_fix_auth_trigger_search_path.sql`
-**用途**: 修复 Supabase Dashboard / Auth API 创建用户时报 `relation "erp_user" does not exist`。
+### M-078 `20260523000022_qc_create_disposition_fix_room_temp_columns.sql`
+**用途**: 修复 `qc_create_disposition` 的 `room_temp_dry` 分支两个 regression(由 M-072 引入):
 
-**根因**: `on_auth_user_created` 在 `auth.users` 上执行 `handle_new_auth_user()` 时,连接角色为 `supabase_auth_admin`,默认 `search_path` 可能不包含 `public`,裸名 `erp_user` 解析失败;`public.erp_user` 表实际存在。
+1. **列名拼错** — INSERT 时写的 `started_by`,而表上实际列名是 `started_by_auth_id`。前端点 "Room temp dry" → Confirm disposition 直接报 `column "started_by" of relation "qc_room_temp_dry_session" does not exist`。
+2. **disposition_id 链接丢失** — M-072 把 `qc_disposition` 的 INSERT 移到了 type 分支之后,导致写 `qc_room_temp_dry_session` 时还没有 `new_id`,disposition_id 字段被默默漏掉,事后按 disposition 追溯 session 找不到记录。
 
-**变更**:
+**修复**:
+- 把 `qc_disposition` INSERT 移回 type 分支**之前**(M-048 / M-060 / M-061 / M-065 一直是这个顺序)
+- room_temp_dry 分支恢复 `INSERT INTO qc_room_temp_dry_session (drying_sub_lot_id, disposition_id, started_by_auth_id)`,列名和 disposition_id 都对
+- M-072 修的 「champion 无 sibling 时 retest 走回 'pending'」语义**完整保留**
 
-| 对象 | 操作 | 说明 |
-|------|------|------|
-| `handle_new_auth_user()` | REPLACE | `SET search_path = public`;`INSERT INTO public.erp_user` |
-| `assign_employee_id()` | REPLACE | `SET search_path = public`;`FROM public.erp_user`(避免插入 erp_user 时 BEFORE INSERT 触发器再次 42P01) |
-
-**特性**: 幂等(`CREATE OR REPLACE`)。已在 Dashboard SQL Editor 手工验证的用户创建流程,与本 migration 等价。
-
-**依赖**: M-010(`handle_new_auth_user` + trigger)、M-020(`assign_employee_id` + trigger)。
+**依赖**: M-072(继承其 retest 语义),M-039(`qc_room_temp_dry_session` 表 DDL)。
 
 ---
 
-### M-079 `20260524000002_warehouse_seed_locations.sql`
-**用途**: Warehouse 模块起步 — seed 主工厂仓库 `WH-MAIN` 及 7 个逻辑库区。实现决策 D-W01（`docs/Warehouse模块开发计划书.md` §5.1）。
+### M-079 `20260523000023_qc_testing_view_dashboard_permission.sql`
+**用途**: 前端为 TestingPage 内嵌的「Dashboard」标签新增独立权限 `qc.testing.view_dashboard`(今日汇总 + 3 天预测,主要给计划/管理层看,而不是 QC 操作员)。本迁移把这条新权限补发给两个已有「全 QC 权限」的开发账号(`ysha@smu.edu` via M-040,`shayiqing16@gmail.com` via M-063),让 demo 行为不变。
 
 **变更**:
+- `user_permission_grant` 插入两行 `(qc, testing, view_dashboard)`;`ON CONFLICT DO NOTHING` 保证重跑无害
 
-| 对象 | 操作 | 说明 |
-|------|------|------|
-| `warehouse` | INSERT `WH-MAIN`（主工厂） | `ON CONFLICT (code) DO NOTHING` |
-| `location` | INSERT 7 行逻辑库区 | `ON CONFLICT (warehouse_id, code) DO NOTHING` |
+**业务规则**: 沿用 BR-Q19(每个动作一个独立开关)。视图也算「动作」之一时再拆分,避免「能看队列就能看预测」的粗粒度耦合。
 
-**7 个库区（code → location_type）**: `LOC-RM`/storage、`LOC-PRE-DRY`/production、`LOC-DRY-WIP`/production、`LOC-QC-PENDING`/quarantine、`LOC-PACK-STAGE`/storage、`LOC-NG`/quarantine、`LOC-FG`/storage。
+**前端配套**:
+- `src/lib/permissionStructure.ts` — `qc.testing` 资源下新增 `view_dashboard` 条目,prereq=`view_status`
+- `src/pages/qc/TestingPage.tsx` — Dashboard 标签按钮仅在 `canViewDashboard` 时显示;`activeTab='dashboard'` 也要 `canViewDashboard` 才会渲染 `<TestingDashboard />`;且回退 queue 显示条件改为 `activeTab === 'queue' || !canViewDashboard`,防止权限被收回时页面空白
 
-**特性**: 幂等（ON CONFLICT）。`location_type` 复用既有 CHECK 约束，未改 schema。
-
-**依赖**: M-001（`warehouse` / `location` 表）。
+**依赖**: M-063(给 gmail 开发账号的全 QC 权限种子,本迁移在其基础上补 1 个 key)。
 
 ---
 
-### M-080 `20260524000003_qc_product_sku_add_item_id.sql`
-**用途**: 桥接 QC SKU 与 ERP 主数据 item（Sprint 0 决议 1，方案 A）。给 `qc_product_sku` 增加指向 `item(id)` 的可空 FK。
+### M-080 `20260525000001_qc_location_crud.sql`
+**用途**: 给 `qc_drying_location`(烘干位置主数据)加 CRUD,并把 `qc_dry_room_summary` 改成数据驱动,以便新增 dryer / cell 后 Dry Rooms 列表自动反映。之前 5×100 的 grid 是 M-036 一次性 seed,代码里 `qc.locations.{view,manage}` 权限早就定义了但没有任何后台 RPC / 前端页面,完全是占位。
 
-**变更**:
+**新增 RPC**:
 
-| 对象 | 操作 | 说明 |
-|------|------|------|
-| `qc_product_sku.item_id` | ADD COLUMN（NULLable，FK→`item(id)`） | `ADD COLUMN IF NOT EXISTS` |
-| `idx_qc_product_sku_item` | CREATE INDEX | `IF NOT EXISTS` |
+| 函数 | 说明 |
+|---|---|
+| `qc_create_location(p_dryer_number, p_cell_number, p_display_name, p_code)` | 插入新 cell,code 不传则按 `DR<n>-<NN>` 自动生成;`UNIQUE(dryer_number, cell_number)` 保证不重复 |
+| `qc_update_location(p_id, p_display_name, p_code)` | 只允许修改 `display_name` 和 `code`;`dryer_number` / `cell_number` 是 grid 拓扑的天然主键,不允许 re-key(要换位置请删 + 新建) |
+| `qc_delete_location(p_id)` | 删除前检查占用:有 sub-lot 在 `drying / pending / inspecting / hold / disposing / awaiting_recheck / room_temp_drying` 状态指向这个 cell 时,抛 `Cannot delete <code>: cell is currently occupied by <sub_lot_code>` |
 
-**设计理由**: 采用回填方案 b（见 `docs/Warehouse模块-Sprint0决议.md` §5.5）——列保持 NULLable，**不做脚本回填**，由业务人员在 QC ProductManagement UI 手动建 item 并关联。"建车前必须已关联"的校验留到 S4 随 `wh_sync_release_from_qc` 实现。
+**修改**:
+- `qc_dry_room_summary` 不再 hardcode `generate_series(1, 5)` 和 `total_cells: 100`。改成从 `qc_drying_location` 聚合得到每个 dryer 的实际 cell 总数和 dryer 列表。原有 500 个 seed 行为不变;但加第 6 个 dryer / 改 cell 数量后 DryRoomsList 会自动反映。
 
-**特性**: 幂等（IF NOT EXISTS）。
+**业务规则**:
+- **BR-Q37** Dryer location 删除必须保留**已结束**(closed / dispatched)sub-lot 的历史可追溯性。FK 早在 M-036 已设 `ON DELETE SET NULL`,所以删除一个不再使用的 cell 不会损坏历史 trace。
+- **BR-Q38** 当前正占用某 cell 的 sub-lot 必须先释放(check-out / dispose / release)才能删除 cell。
 
-**依赖**: M-001（`item` 表）、M-033（`qc_product_sku` 表）。
+**前端配套**:
+- `src/services/qcApi.ts` — 新增 `createLocation` / `updateLocation` / `deleteLocation` wrapper
+- `src/pages/qc/LocationManagement.tsx` — 新页面,按 dryer 分组折叠 + 行内编辑;权限:`qc.locations.view` 看,`qc.locations.manage` 改
+- `src/pages/qc/QualityControlModule.tsx` — sidebar Master Data 区新增 "Dryer Locations" 入口(`MapPin` 图标),`screen='locations'` 路由分支
 
----
-
-### M-081 `20260524000004_warehouse_seed_uom.sql`
-**用途**: seed 基础计量单位（UOM）。`uom` 表自 M-001 起从未 seed，而 `item.base_uom_id` 是 NOT NULL FK —— 不先 seed 就无法创建任何 item。此 migration 解除 Warehouse Items 表单的阻塞。
-
-**变更**:
-
-| 对象 | 操作 | 说明 |
-|------|------|------|
-| `uom` | INSERT 9 行 | KG/G/TON（weight）、L/ML（volume）、EACH/BAG/BOX/PALLET（count），`ON CONFLICT (code) DO NOTHING` |
-
-**特性**: 幂等。不 seed `uom_conversion`（item 级换算待有真实物料时再配）。
-
-**依赖**: M-001（`uom` 表）。
-
----
-
-### M-082 `20260524000005_warehouse_permission_seed.sql`
-**用途**: 给管理员账户 `tianzuohuang@crave-cook.com` 授予 Warehouse 模块访问 + 全部 warehouse 资源权限（仿 M-035）。
-
-**变更**:
-
-| 对象 | 操作 | 说明 |
-|------|------|------|
-| `user_module_access` | INSERT `warehouse` | `ON CONFLICT DO NOTHING` |
-| `user_permission_grant` | INSERT warehouse 全量 (resource, permission) | 字符串与 `permissionStructure.ts` warehouse 段逐字一致 |
-
-**资源/权限**: `module_permissions.manage`、`items.{view,create,edit,delete}`、`locations.{view,edit}`、`lots.{view,release,reject}`、`goods_receipt.{view,create,post,cancel}`、`inventory.{view,receive,transfer,adjust}`。
-
-**特性**: 幂等。**契约**: resource/permission 字符串必须与前端 `permissionStructure.ts` 匹配，否则 `can()` 静默返回 false。
-
-**依赖**: M-009（权限系统）、M-079（warehouse seed）。
+**依赖**: M-036(`qc_drying_location` schema + 5×100 seed),M-047(`qc_dry_room_summary` 上一版)。
 
 ---
 
@@ -1399,11 +1370,10 @@ closed → dispatched   (pkg_dispatch_carts)
 | M-075 | 20260523000019_qc_bulk_checkout_fix_step2_cascade.sql |
 | M-076 | 20260523000020_repair_w12345_orphan_siblings.sql |
 | M-077 | 20260523000021_qc_needs_attention_per_group.sql |
-| M-078 | 20260524000001_fix_auth_trigger_search_path.sql |
-| M-079 | 20260524000002_warehouse_seed_locations.sql |
-| M-080 | 20260524000003_qc_product_sku_add_item_id.sql |
-| M-081 | 20260524000004_warehouse_seed_uom.sql |
-| M-082 | 20260524000005_warehouse_permission_seed.sql |
+| M-078 | 20260523000022_qc_create_disposition_fix_room_temp_columns.sql |
+| M-079 | 20260523000023_qc_testing_view_dashboard_permission.sql |
+| M-080 | 20260525000001_qc_location_crud.sql |
+| **M-081** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

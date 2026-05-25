@@ -164,6 +164,36 @@ export async function listLocations(): Promise<DryingLocation[]> {
   return rpc<DryingLocation[]>('qc_list_locations');
 }
 
+export async function createLocation(input: {
+  dryer_number: number;
+  cell_number: number;
+  display_name: string;
+  code?: string | null;
+}): Promise<DryingLocation> {
+  return rpc<DryingLocation>('qc_create_location', {
+    p_dryer_number: input.dryer_number,
+    p_cell_number: input.cell_number,
+    p_display_name: input.display_name,
+    p_code: input.code ?? null,
+  });
+}
+
+export async function updateLocation(input: {
+  id: string;
+  display_name: string;
+  code?: string | null;
+}): Promise<DryingLocation> {
+  return rpc<DryingLocation>('qc_update_location', {
+    p_id: input.id,
+    p_display_name: input.display_name,
+    p_code: input.code ?? null,
+  });
+}
+
+export async function deleteLocation(id: string): Promise<{ id: string; code: string; deleted: boolean }> {
+  return rpc('qc_delete_location', { p_id: id });
+}
+
 export async function createProduct(input: ProductInput): Promise<Product> {
   if (input.template.lower_limit > input.template.upper_limit) {
     throw new Error('Lower limit cannot exceed upper limit');

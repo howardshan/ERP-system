@@ -10,6 +10,7 @@ import {
   HelpCircle,
   ArrowLeft,
   BarChart3,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -22,6 +23,7 @@ import AdminDashboard from './AdminDashboard';
 import TraceListPage from './TraceListPage';
 import TracePage from './TracePage';
 import ProductManagement from './ProductManagement';
+import LocationManagement from './LocationManagement';
 import AnalysisPage from './AnalysisPage';
 import Production from './Production';
 import DryRoomsList from './DryRoomsList';
@@ -73,6 +75,7 @@ export default function QualityControlModule({ onHome }: Props) {
   const canViewTesting    = can('qc', 'testing', 'view_status');
   const canViewTrace      = can('qc', 'trace', 'view');
   const canManageProducts = can('qc', 'products', 'view');
+  const canViewLocations  = can('qc', 'locations', 'view');
   // Analysis is a read-only reporting page — visible to anyone who can access
   // the QC dashboard (dashboard.view) or has the explicit analysis.view grant.
   const canViewDashboard  = can('qc', 'dashboard', 'view');
@@ -184,6 +187,9 @@ export default function QualityControlModule({ onHome }: Props) {
     if (screen === 'products') {
       return <ProductManagement />;
     }
+    if (screen === 'locations') {
+      return <LocationManagement />;
+    }
     if (screen === 'analysis') {
       return <AnalysisPage />;
     }
@@ -246,9 +252,12 @@ export default function QualityControlModule({ onHome }: Props) {
                      onClick={() => navigate('trace')} />
           )}
 
-          {canManageProducts && <NavSection title="Master Data" />}
+          {(canManageProducts || canViewLocations) && <NavSection title="Master Data" />}
           {canManageProducts && (
             <NavItem icon={Package} label="Products & Templates" isActive={isActive('products')} onClick={() => navigate('products')} />
+          )}
+          {canViewLocations && (
+            <NavItem icon={MapPin} label="Dryer Locations" isActive={isActive('locations')} onClick={() => navigate('locations')} />
           )}
         </nav>
 

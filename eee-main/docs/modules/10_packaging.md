@@ -103,6 +103,14 @@ closed → dispatched
 | `outbound` | view | 查看打包队列（SKU 列表 + 车辆列表） |
 | `outbound` | dispatch | 执行出库操作（Dispatch 按钮） |
 
+### 页面级 view-permission 兜底（2026-05-23 起）
+
+之前 `PackagingPage` 完全未做 `can()` 检查 — 任何能访问 `packaging` 模块的用户都能看到队列**并触发** Dispatch。本次补:
+
+- 顶层 `canView = can('packaging','outbound','view')`,不通过渲染 [`PermissionDenied`](../../src/pages/qc/components/PermissionDenied.tsx)（QC 模块那边创建的复用组件）
+- Dispatch 按钮的 `disabled` 条件加入 `!canDispatch`,并加 `title` 提示缺权限
+- 沿用 QC 模块的 **BR-Q35/BR-Q36** 约定:view 控页面、action 控按钮,两者独立
+
 ---
 
 ## 前端文件
