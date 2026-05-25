@@ -216,6 +216,70 @@ supabase functions deploy create-auth-user
 
 ---
 
+### EF-003 `reset-user-password`
+**目录**: `supabase/functions/reset-user-password/index.ts`
+**用途**: 使用 service role key 重置某 Auth 用户密码,供 IT 管理员通过 app 内面板操作。
+
+**请求**:
+```
+POST /functions/v1/reset-user-password
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{ "auth_user_id": "<uuid>", "new_password": "..." }
+```
+
+**响应**:
+```json
+{ "success": true }   // 成功
+{ "error": "..." }    // 失败
+```
+
+**技术细节**:
+- 调用方需提供有效 JWT(验证已登录)
+- `new_password` 至少 6 位
+- 使用 `SUPABASE_SERVICE_ROLE_KEY` 调 `auth.admin.updateUserById`
+
+**部署命令**:
+```bash
+supabase functions deploy reset-user-password
+```
+
+---
+
+### EF-004 `send-notification`
+**目录**: `supabase/functions/send-notification/index.ts`
+**用途**: 通过 SMTP2Go HTTP API 发送 ERP 通知邮件。Phase 1 处理 QC 测试结果通知,由 M-083 的 `trg_qc_notify_on_inspection` 触发器经 pg_net 调用——每记录一次 QC 测试自动发信。
+
+**请求**(由 DB 触发器发起,无终端用户 JWT):
+```
+POST /functions/v1/send-notification
+x-notify-secret: <NOTIFY_WEBHOOK_SECRET>
+Content-Type: application/json
+
+{ "type_key": "qc_test_result", "inspection_id": "<uuid>" }
+```
+
+**响应**:
+```json
+{ "sent": [{ "to": "...", "ok": true }] }   // 已发送(每个收件人一条)
+{ "skipped": "no recipients enabled" }       // 无生效收件人
+{ "error": "..." }                            // 失败
+```
+
+**技术细节**:
+- **必须用 `--no-verify-jwt` 部署**(触发器无用户 JWT);改用共享密钥 `x-notify-secret` == `NOTIFY_WEBHOOK_SECRET` 鉴权
+- 用 `SUPABASE_SERVICE_ROLE_KEY` 调 RPC `notification_recipients` 解析收件人、`qc_test_result_email` 组装内容
+- 发件人取 `NOTIFY_SENDER_EMAIL`(默认 `noreply@crave-cook.com`),API key 取 `SMTP2GO_API_KEY`,均为 Supabase secret,**不入前端/不入库**
+- 每个收件人逐封发送并写 `notification_log`
+
+**部署命令**:
+```bash
+supabase functions deploy send-notification --no-verify-jwt
+```
+
+---
+
 ## 变更操作规范
 
 ### 新增 Migration
@@ -1308,6 +1372,58 @@ closed → dispatched   (pkg_dispatch_carts)
 
 ---
 
+### M-083 `20260525000002_notification_system.sql`
+**用途**: 邮件通知系统地基(Phase 1)。引入通知类型目录、按用户的三态偏好、投递日志,并把 QC 测试结果邮件自动化:每次写入 `qc_inspection_record` 都通过 pg_net 调用 `send-notification` Edge Function(EF-004)发邮件。对应需求决策:**「每次测试都发」+ DB Webhook 触发**。
+
+**新增表**:
+
+| 表 | 说明 |
+|---|---|
+| `notification_type` | 通知类型目录。`module_id` 用于前端按模块分卡片(qc / warehouse / …);Phase 1 仅 seed 一条 `qc_test_result` |
+| `user_notification_setting` | 按用户的三态偏好:`admin_enabled`(管理员设定)、`user_overridable`(是否允许账户自改)、`user_enabled`(用户选择,NULL=未设,回退到 admin) |
+| `notification_log` | 投递审计:每个收件人一行,`status` = `sent`/`failed`,含 `provider_response` 与 `context` |
+
+**生效规则(唯一来源 `notification_recipients`)**:`user_overridable AND user_enabled IS NOT NULL ? user_enabled : admin_enabled`。
+
+**新增 RPC**:
+
+| 函数 | 说明 |
+|---|---|
+| `notification_recipients(p_type_key)` | 返回某通知类型下「生效开启」且 active、有邮箱的收件人 (email, full_name) |
+| `qc_test_result_email(p_inspection_id)` | 组装 QC 测试结果邮件 payload:本批结果(sub_lot_code / SKU / lot / Aw / pass-fail / inspector / sample)+ `qc_overview()->'stats'`(今日合格/不合格/等待数) |
+
+**触发器**: `trg_qc_notify_on_inspection` — `AFTER INSERT ON qc_inspection_record`,经 `qc_notify_on_inspection()` 用 `net.http_post` 调 `send-notification`。fire-and-forget,异常被吞掉,**不会回滚测试结果插入**。组传播只给 champion 写 inspection record,故监听 INSERT 恰好每次真实提交触发一次,不重复。
+
+**Seed**: `qc_test_result` 类型;默认收件人 `tianzuohuang@crave-cook.com`(`admin_enabled=true, user_overridable=true`)。
+
+**部署后必做的手动配置(不入库,均为机密)**:
+- `supabase secrets set SMTP2GO_API_KEY=... NOTIFY_WEBHOOK_SECRET=... NOTIFY_SENDER_EMAIL=noreply@crave-cook.com`
+- 把同一段 `NOTIFY_WEBHOOK_SECRET` 存进 Vault(**见 M-084**):`select vault.create_secret('<同 NOTIFY_WEBHOOK_SECRET>', 'notify_webhook_secret');`
+- ⚠️ 原计划用 `ALTER DATABASE ... SET app.notify_webhook_secret` 存暗号,但托管版 `postgres` 角色无此权限(42501),已由 M-084 改为从 Vault 读取。
+
+**业务规则**:
+- **BR-N1** 通知偏好与操作权限解耦:不复用 `user_permission_grant`(只能表达布尔授权),用 `user_notification_setting` 表达三态(管理员强制 / 允许自改 / 用户选择)。
+- **BR-N2** 通知发送失败绝不影响主业务(测试结果插入):触发器 `EXCEPTION WHEN OTHERS THEN RETURN NEW`。
+
+**依赖**: M-033(`qc_inspection_record` / `qc_drying_sub_lot` / `qc_product_sku`),M-039(`qc_sample`),M-041(`qc_overview`),M-009/M-010(`erp_user` / `auth_user_id`)。**关联文档**: `docs/modules/09_qc.md`、`docs/modules/06_users-auth.md`。
+
+---
+
+### M-084 `20260525000003_notification_secret_via_vault.sql`
+**用途**: 修正 M-083 的暗号读取方式。M-083 让触发器从 `current_setting('app.notify_webhook_secret')` 读共享暗号,需要 `ALTER DATABASE ... SET` 配置;但托管版 `postgres` 角色**无权限设置数据库参数**(`ERROR 42501: permission denied to set parameter`)。改为 `CREATE OR REPLACE FUNCTION qc_notify_on_inspection()` 从 **Supabase Vault** 读取 `notify_webhook_secret`(postgres 角色对 Vault 有读写权限)。
+
+**手动配置(运行一次,含机密,不入库)**:
+```sql
+select vault.create_secret('<同 NOTIFY_WEBHOOK_SECRET 的值>', 'notify_webhook_secret');
+-- 轮换:select vault.update_secret((select id from vault.secrets where name='notify_webhook_secret'), '<新值>');
+```
+
+**说明**: Vault 读取被 `BEGIN ... EXCEPTION` 包裹——Vault 缺条目/未启用都不会中断测试结果插入(只会发空暗号,EF 返回 401)。触发器无需重建,`CREATE OR REPLACE FUNCTION` 原地更新。
+
+**依赖**: M-083。**关联文档**: `docs/modules/09_qc.md`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1373,11 +1489,17 @@ closed → dispatched   (pkg_dispatch_carts)
 | M-078 | 20260523000022_qc_create_disposition_fix_room_temp_columns.sql |
 | M-079 | 20260523000023_qc_testing_view_dashboard_permission.sql |
 | M-080 | 20260525000001_qc_location_crud.sql |
-| **M-081** | _(下一个)_ |
+| M-081 | 20260524000004_warehouse_seed_uom.sql _(文件头标注 M-081)_ |
+| M-082 | 20260524000005_warehouse_permission_seed.sql _(文件头标注 M-082)_ |
+| M-083 | 20260525000002_notification_system.sql |
+| M-084 | 20260525000003_notification_secret_via_vault.sql |
+| **M-085** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
 | EF-001 | functions/post-journal-entry/ |
 | EF-SHARED | functions/_shared/ |
 | EF-002 | functions/create-auth-user/ |
-| **EF-003** | _(下一个)_ |
+| EF-003 | functions/reset-user-password/ |
+| EF-004 | functions/send-notification/ |
+| **EF-005** | _(下一个)_ |
