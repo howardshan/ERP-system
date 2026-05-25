@@ -8,6 +8,8 @@ import {
   formatQcDateTime,
 } from '../../services/qcApi';
 import { cn } from '../../lib/utils';
+import { usePermissions } from '../../contexts/PermissionContext';
+import { PermissionDenied } from './components/PermissionDenied';
 
 interface Props {
   onSelectDryer: (dryerNumber: number) => void;
@@ -26,6 +28,8 @@ function fmtRemaining(eta: string | null): string {
 }
 
 export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Props) {
+  const { can } = usePermissions();
+  const canView = can('qc', 'dry_rooms', 'view_status');
   const [dryers, setDryers] = useState<DryRoomSummary[]>([]);
   const [roomTemp, setRoomTemp] = useState<RoomTempDryingSubLot[]>([]);
   const [error, setError] = useState('');
@@ -44,6 +48,10 @@ export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Pro
   const longestRoomTempMin = roomTemp.reduce(
     (m, r) => Math.max(m, r.room_temp_elapsed_minutes ?? 0), 0,
   );
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.dry_rooms.view_status" feature="Dry Rooms" />;
+  }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">

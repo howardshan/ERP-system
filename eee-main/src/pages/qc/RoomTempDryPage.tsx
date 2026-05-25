@@ -8,6 +8,7 @@ import {
 } from '../../services/qcApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn } from '../../lib/utils';
+import { PermissionDenied } from './components/PermissionDenied';
 
 interface Props {
   onOpenHistory: (subLotId: string) => void;
@@ -24,6 +25,7 @@ function fmtElapsed(min: number): string {
 
 export default function RoomTempDryPage({ onOpenHistory, onBack }: Props) {
   const { can } = usePermissions();
+  const canView = can('qc', 'testing', 'view_status');
   const canStop = can('qc', 'testing', 'stop_room_temp');
 
   const [rows, setRows] = useState<RoomTempDryingSubLot[]>([]);
@@ -55,6 +57,10 @@ export default function RoomTempDryPage({ onOpenHistory, onBack }: Props) {
 
   const liveElapsedMin = (startedAt: string): number =>
     Math.max(0, (Date.now() - new Date(startedAt).getTime()) / 60_000);
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.testing.view_status" feature="Room Temp Dry" />;
+  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto">

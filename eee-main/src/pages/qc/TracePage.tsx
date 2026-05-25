@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { ArrowLeft, History } from 'lucide-react';
 import { productionLotDetail, ProductionLotDetail, formatQcDateTime } from '../../services/qcApi';
 import { QcStatusBadge } from './components/QcStatusBadge';
+import { PermissionDenied } from './components/PermissionDenied';
 import { cn } from '../../lib/utils';
+import { usePermissions } from '../../contexts/PermissionContext';
 
 const FAIL_EVENTS = new Set(['inspection_failed_hold', 'displaced']);
 
@@ -13,6 +15,8 @@ interface Props {
 }
 
 export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
+  const { can } = usePermissions();
+  const canView = can('qc', 'trace', 'view');
   const [detail, setDetail] = useState<ProductionLotDetail | null>(null);
   const [error, setError] = useState('');
 
@@ -23,6 +27,10 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
         .catch((e) => setError(e.message));
     }
   }, [lotId]);
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.trace.view" feature="Batch Trace" />;
+  }
 
   if (!detail) {
     return (

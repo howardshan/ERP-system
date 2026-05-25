@@ -1250,6 +1250,64 @@ closed → dispatched   (pkg_dispatch_carts)
 
 ---
 
+### M-078 `20260523000022_qc_create_disposition_fix_room_temp_columns.sql`
+**用途**: 修复 `qc_create_disposition` 的 `room_temp_dry` 分支两个 regression(由 M-072 引入):
+
+1. **列名拼错** — INSERT 时写的 `started_by`,而表上实际列名是 `started_by_auth_id`。前端点 "Room temp dry" → Confirm disposition 直接报 `column "started_by" of relation "qc_room_temp_dry_session" does not exist`。
+2. **disposition_id 链接丢失** — M-072 把 `qc_disposition` 的 INSERT 移到了 type 分支之后,导致写 `qc_room_temp_dry_session` 时还没有 `new_id`,disposition_id 字段被默默漏掉,事后按 disposition 追溯 session 找不到记录。
+
+**修复**:
+- 把 `qc_disposition` INSERT 移回 type 分支**之前**(M-048 / M-060 / M-061 / M-065 一直是这个顺序)
+- room_temp_dry 分支恢复 `INSERT INTO qc_room_temp_dry_session (drying_sub_lot_id, disposition_id, started_by_auth_id)`,列名和 disposition_id 都对
+- M-072 修的 「champion 无 sibling 时 retest 走回 'pending'」语义**完整保留**
+
+**依赖**: M-072(继承其 retest 语义),M-039(`qc_room_temp_dry_session` 表 DDL)。
+
+---
+
+### M-079 `20260523000023_qc_testing_view_dashboard_permission.sql`
+**用途**: 前端为 TestingPage 内嵌的「Dashboard」标签新增独立权限 `qc.testing.view_dashboard`(今日汇总 + 3 天预测,主要给计划/管理层看,而不是 QC 操作员)。本迁移把这条新权限补发给两个已有「全 QC 权限」的开发账号(`ysha@smu.edu` via M-040,`shayiqing16@gmail.com` via M-063),让 demo 行为不变。
+
+**变更**:
+- `user_permission_grant` 插入两行 `(qc, testing, view_dashboard)`;`ON CONFLICT DO NOTHING` 保证重跑无害
+
+**业务规则**: 沿用 BR-Q19(每个动作一个独立开关)。视图也算「动作」之一时再拆分,避免「能看队列就能看预测」的粗粒度耦合。
+
+**前端配套**:
+- `src/lib/permissionStructure.ts` — `qc.testing` 资源下新增 `view_dashboard` 条目,prereq=`view_status`
+- `src/pages/qc/TestingPage.tsx` — Dashboard 标签按钮仅在 `canViewDashboard` 时显示;`activeTab='dashboard'` 也要 `canViewDashboard` 才会渲染 `<TestingDashboard />`;且回退 queue 显示条件改为 `activeTab === 'queue' || !canViewDashboard`,防止权限被收回时页面空白
+
+**依赖**: M-063(给 gmail 开发账号的全 QC 权限种子,本迁移在其基础上补 1 个 key)。
+
+---
+
+### M-080 `20260525000001_qc_location_crud.sql`
+**用途**: 给 `qc_drying_location`(烘干位置主数据)加 CRUD,并把 `qc_dry_room_summary` 改成数据驱动,以便新增 dryer / cell 后 Dry Rooms 列表自动反映。之前 5×100 的 grid 是 M-036 一次性 seed,代码里 `qc.locations.{view,manage}` 权限早就定义了但没有任何后台 RPC / 前端页面,完全是占位。
+
+**新增 RPC**:
+
+| 函数 | 说明 |
+|---|---|
+| `qc_create_location(p_dryer_number, p_cell_number, p_display_name, p_code)` | 插入新 cell,code 不传则按 `DR<n>-<NN>` 自动生成;`UNIQUE(dryer_number, cell_number)` 保证不重复 |
+| `qc_update_location(p_id, p_display_name, p_code)` | 只允许修改 `display_name` 和 `code`;`dryer_number` / `cell_number` 是 grid 拓扑的天然主键,不允许 re-key(要换位置请删 + 新建) |
+| `qc_delete_location(p_id)` | 删除前检查占用:有 sub-lot 在 `drying / pending / inspecting / hold / disposing / awaiting_recheck / room_temp_drying` 状态指向这个 cell 时,抛 `Cannot delete <code>: cell is currently occupied by <sub_lot_code>` |
+
+**修改**:
+- `qc_dry_room_summary` 不再 hardcode `generate_series(1, 5)` 和 `total_cells: 100`。改成从 `qc_drying_location` 聚合得到每个 dryer 的实际 cell 总数和 dryer 列表。原有 500 个 seed 行为不变;但加第 6 个 dryer / 改 cell 数量后 DryRoomsList 会自动反映。
+
+**业务规则**:
+- **BR-Q37** Dryer location 删除必须保留**已结束**(closed / dispatched)sub-lot 的历史可追溯性。FK 早在 M-036 已设 `ON DELETE SET NULL`,所以删除一个不再使用的 cell 不会损坏历史 trace。
+- **BR-Q38** 当前正占用某 cell 的 sub-lot 必须先释放(check-out / dispose / release)才能删除 cell。
+
+**前端配套**:
+- `src/services/qcApi.ts` — 新增 `createLocation` / `updateLocation` / `deleteLocation` wrapper
+- `src/pages/qc/LocationManagement.tsx` — 新页面,按 dryer 分组折叠 + 行内编辑;权限:`qc.locations.view` 看,`qc.locations.manage` 改
+- `src/pages/qc/QualityControlModule.tsx` — sidebar Master Data 区新增 "Dryer Locations" 入口(`MapPin` 图标),`screen='locations'` 路由分支
+
+**依赖**: M-036(`qc_drying_location` schema + 5×100 seed),M-047(`qc_dry_room_summary` 上一版)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1312,7 +1370,10 @@ closed → dispatched   (pkg_dispatch_carts)
 | M-075 | 20260523000019_qc_bulk_checkout_fix_step2_cascade.sql |
 | M-076 | 20260523000020_repair_w12345_orphan_siblings.sql |
 | M-077 | 20260523000021_qc_needs_attention_per_group.sql |
-| **M-078** | _(下一个)_ |
+| M-078 | 20260523000022_qc_create_disposition_fix_room_temp_columns.sql |
+| M-079 | 20260523000023_qc_testing_view_dashboard_permission.sql |
+| M-080 | 20260525000001_qc_location_crud.sql |
+| **M-081** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

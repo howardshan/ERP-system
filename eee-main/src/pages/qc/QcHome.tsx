@@ -19,6 +19,7 @@ import { getInventorySummary, getAvailableCarts, PkgInventorySku, PkgCart } from
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn } from '../../lib/utils';
 import { DisposeDialog } from './components/DisposeDialog';
+import { PermissionDenied } from './components/PermissionDenied';
 
 interface Props {
   onNavigate: (screen: string) => void;
@@ -28,6 +29,7 @@ interface Props {
 
 export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Props) {
   const { can } = usePermissions();
+  const canView = can('qc', 'dashboard', 'view');
   const canRelease = can('qc', 'dashboard', 'release_pass');
   const dispositionPerms = {
     redry: can('qc', 'testing', 'dispose_redry'),
@@ -119,6 +121,10 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
     if (id) removeAttentionItem(id);
     else load();
   };
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.dashboard.view" feature="QC Home" />;
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto">

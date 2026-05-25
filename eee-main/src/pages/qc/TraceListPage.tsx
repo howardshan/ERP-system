@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { listProductionLots, ProductionLot } from '../../services/qcApi';
+import { usePermissions } from '../../contexts/PermissionContext';
+import { PermissionDenied } from './components/PermissionDenied';
 
 interface Props { onSelectLot: (id: string) => void; }
 
 export default function TraceListPage({ onSelectLot }: Props) {
+  const { can } = usePermissions();
+  const canView = can('qc', 'trace', 'view');
   const [lots, setLots] = useState<ProductionLot[]>([]);
   const [error, setError] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -37,6 +41,10 @@ export default function TraceListPage({ onSelectLot }: Props) {
       return next;
     });
   };
+
+  if (!canView) {
+    return <PermissionDenied permission="qc.trace.view" feature="Batch Trace" />;
+  }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
