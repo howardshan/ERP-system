@@ -20,6 +20,7 @@ import UserManagement from './pages/auth/UserManagement';
 import HRModule from './pages/hr/HRModule';
 import QualityControlModule from './pages/qc/QualityControlModule';
 import PackagingModule from './pages/packaging/PackagingModule';
+import WarehouseModule from './pages/warehouse/WarehouseModule';
 import AuditLog from './pages/finance/AuditLog';
 import ProfitLoss from './pages/finance/ProfitLoss';
 import BalanceSheet from './pages/finance/BalanceSheet';
@@ -156,6 +157,10 @@ function AppShell({
     return <PackagingModule onHome={() => setActiveModule('home')} />;
   }
 
+  if (activeModule === 'warehouse') {
+    return <WarehouseModule onHome={() => setActiveModule('home')} />;
+  }
+
   return <ModulePlaceholder name={activeModule} onHome={() => setActiveModule('home')} />;
 }
 
@@ -182,7 +187,6 @@ function WorkflowModule({ onHome }: { onHome: () => void }) {
 
 function ModulePlaceholder({ name, onHome }: { name: string; onHome: () => void }) {
   const labels: Record<string, string> = {
-    warehouse: 'Warehouse & Inventory',
     sales: 'Sales & Distribution',
     production: 'Production & Manufacturing',
     auth: 'Users & Authentication',

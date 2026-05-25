@@ -81,6 +81,7 @@ export interface ProductInput {
   name: string;
   standard_drying_minutes: number | null;
   sample_every_n_carts?: number;  // M-048
+  item_id?: number | null;  // M-080: link to ERP item (Warehouse bridge, 决议 §5.5)
   template: {
     item_name: string;
     unit: string | null;
@@ -181,6 +182,7 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       name: input.name,
       standard_drying_minutes: input.standard_drying_minutes,
       sample_every_n_carts: input.sample_every_n_carts ?? 1,
+      item_id: input.item_id ?? null,
     })
     .select('id, code, name, standard_drying_minutes, sample_every_n_carts')
     .single();
@@ -211,6 +213,7 @@ export async function updateProduct(id: string, input: Partial<ProductInput>): P
   if (input.name !== undefined) skuPatch.name = input.name;
   if (input.standard_drying_minutes !== undefined) skuPatch.standard_drying_minutes = input.standard_drying_minutes;
   if (input.sample_every_n_carts !== undefined) skuPatch.sample_every_n_carts = input.sample_every_n_carts;
+  if (input.item_id !== undefined) skuPatch.item_id = input.item_id;
   if (Object.keys(skuPatch).length > 0) {
     const { error } = await supabase.from('qc_product_sku').update(skuPatch).eq('id', id);
     if (error) throw new Error(error.message);
@@ -259,6 +262,16 @@ export async function deleteProducts(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const { error } = await supabase.from('qc_product_sku').delete().in('id', ids);
   if (error) throw new Error(error.message);
+}
+
+// M-080: read each SKU's linked ERP item_id. Kept separate from qc_list_products
+// (which doesn't return item_id) to avoid a server-side RPC change in S0.
+export async function listProductItemLinks(): Promise<Record<string, number | null>> {
+  const { data, error } = await supabase.from('qc_product_sku').select('id, item_id');
+  if (error) throw new Error(error.message);
+  const map: Record<string, number | null> = {};
+  (data ?? []).forEach((r: { id: string; item_id: number | null }) => { map[r.id] = r.item_id; });
+  return map;
 }
 
 // ── Production lots ───────────────────────────────────────────────────────────
