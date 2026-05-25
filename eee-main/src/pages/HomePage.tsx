@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ChevronRight,
   RefreshCw,
+  Settings,
 } from 'lucide-react';
 import { usePermissions } from '../contexts/PermissionContext';
 
@@ -253,10 +254,21 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-sm font-bold text-slate-900">{userName}</p>
+          <button
+            onClick={() => onNavigate('account-settings')}
+            className="text-right group"
+            title="Account settings"
+          >
+            <p className="text-sm font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{userName}</p>
             <p className="text-[11px] text-slate-400 mt-0.5">{userEmail}</p>
-          </div>
+          </button>
+          <button
+            onClick={() => onNavigate('account-settings')}
+            title="Account settings"
+            className="p-2 text-slate-400 hover:text-slate-700 transition-colors"
+          >
+            <Settings size={15} />
+          </button>
           <button
             onClick={handleReload}
             disabled={reloading}

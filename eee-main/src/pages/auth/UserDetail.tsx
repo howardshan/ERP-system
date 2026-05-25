@@ -1,8 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Save, Loader2, KeyRound, Eye, EyeOff, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, KeyRound, Eye, EyeOff, CheckCircle2, AlertCircle, ShieldCheck, Bell } from 'lucide-react';
 import { getUser, getUsers, getUserPermissions, setPermission, setModuleAccess, updateUser, resetUserPassword } from '../../services/authApi';
+import {
+  getNotificationTypes,
+  getUserNotificationSettings,
+  setUserNotificationSetting,
+  groupByModule,
+} from '../../services/notificationApi';
 import { PERMISSION_STRUCTURE } from '../../lib/permissionStructure';
-import type { ErpUser, UserPermissionGrant } from '../../types/auth';
+import type { ErpUser, UserPermissionGrant, NotificationType, UserNotificationSetting } from '../../types/auth';
 import { usePermissions } from '../../contexts/PermissionContext';
 
 interface Props {
@@ -36,14 +42,45 @@ export default function UserDetail({ userId, onBack }: Props) {
   const [localGrants, setLocalGrants] = useState<Map<string, number | null>>(new Map());
   const [removedGrants, setRemovedGrants] = useState<Set<string>>(new Set());
 
+  // Notification settings state
+  const [notifTypes, setNotifTypes] = useState<NotificationType[]>([]);
+  const [notifSettings, setNotifSettings] = useState<Record<string, UserNotificationSetting>>({});
+  const [localNotif, setLocalNotif] = useState<Map<string, { admin_enabled: boolean; user_overridable: boolean }>>(new Map());
+
   useEffect(() => {
-    Promise.all([getUser(userId), getUserPermissions(userId)]).then(([u, g]) => {
+    Promise.all([
+      getUser(userId),
+      getUserPermissions(userId),
+      getNotificationTypes(),
+      getUserNotificationSettings(userId),
+    ]).then(([u, g, ts, ss]) => {
       setUser(u);
       setGrants(g);
       setLocalModules(new Set(u.module_access ?? []));
+      setNotifTypes(ts);
+      const m: Record<string, UserNotificationSetting> = {};
+      for (const s of ss) m[s.type_key] = s;
+      setNotifSettings(m);
       setLoading(false);
     });
   }, [userId]);
+
+  // ── Notification helpers ────────────────────────────────────────────────
+
+  function getNotif(typeKey: string): { admin_enabled: boolean; user_overridable: boolean } {
+    if (localNotif.has(typeKey)) return localNotif.get(typeKey)!;
+    const s = notifSettings[typeKey];
+    return { admin_enabled: s?.admin_enabled ?? false, user_overridable: s?.user_overridable ?? false };
+  }
+
+  function setNotif(typeKey: string, patch: Partial<{ admin_enabled: boolean; user_overridable: boolean }>) {
+    setLocalNotif(prev => {
+      const cur = prev.get(typeKey) ?? getNotif(typeKey);
+      const next = new Map(prev);
+      next.set(typeKey, { ...cur, ...patch });
+      return next;
+    });
+  }
 
   // ── Permission helpers ──────────────────────────────────────────────
 
@@ -161,7 +198,19 @@ export default function UserDetail({ userId, onBack }: Props) {
         const [mod, res, perm] = key.split('|');
         await setPermission(userId, mod, res, perm, false);
       }
-      const [u, g] = await Promise.all([getUser(userId), getUserPermissions(userId)]);
+      // Notification settings (admin-side: admin_enabled + user_overridable)
+      for (const [typeKey, v] of localNotif) {
+        await setUserNotificationSetting(userId, typeKey, {
+          admin_enabled: v.admin_enabled,
+          user_overridable: v.user_overridable,
+        });
+      }
+
+      const [u, g, ss] = await Promise.all([
+        getUser(userId),
+        getUserPermissions(userId),
+        getUserNotificationSettings(userId),
+      ]);
       for (const key of removedGrants) {
         const [mod, res, perm] = key.split('|');
         const stillExists = g.some(gr => gr.module_id === mod && gr.resource === res && gr.permission === perm);
@@ -170,6 +219,10 @@ export default function UserDetail({ userId, onBack }: Props) {
       setUser(u); setGrants(g);
       setLocalGrants(new Map()); setRemovedGrants(new Set());
       setLocalModules(new Set(u.module_access ?? []));
+      const m: Record<string, UserNotificationSetting> = {};
+      for (const s of ss) m[s.type_key] = s;
+      setNotifSettings(m);
+      setLocalNotif(new Map());
       setSaveMsg({ type: 'ok', text: 'Saved' });
       setTimeout(() => setSaveMsg(null), 2500);
       await reloadPermissions();
@@ -281,6 +334,18 @@ export default function UserDetail({ userId, onBack }: Props) {
             }`}
           >
             <ShieldCheck size={14} /> Account
+          </button>
+
+          {/* Notifications */}
+          <button
+            onClick={() => setSelectedPanel('notifications')}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold transition-colors ${
+              selectedPanel === 'notifications'
+                ? 'text-blue-700 bg-blue-50 border-r-2 border-blue-600'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Bell size={14} /> Notifications
           </button>
 
           <div className="mx-4 my-2 h-px bg-slate-200" />
@@ -421,6 +486,67 @@ export default function UserDetail({ userId, onBack }: Props) {
                     This user has no linked Supabase Auth account. Password reset is not available.
                   </p>
                 </div>
+              )}
+            </div>
+          ) : selectedPanel === 'notifications' ? (
+            <div className="max-w-3xl space-y-6">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Notification Settings</h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  Control which emails this user receives. Enable <span className="font-semibold text-slate-700">Receive</span> to
+                  send it; enable <span className="font-semibold text-slate-700">User can self-manage</span> to let the user
+                  turn it on/off in their own Account Settings (otherwise it is enforced).
+                </p>
+              </div>
+              {notifTypes.length === 0 ? (
+                <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
+                  No notification types defined yet.
+                </div>
+              ) : (
+                Object.entries(groupByModule(notifTypes)).map(([moduleId, modTypes]) => (
+                  <div key={moduleId} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+                      <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        {PERMISSION_STRUCTURE[moduleId]?.label ?? moduleId.toUpperCase()}
+                      </p>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {modTypes.map(t => {
+                        const n = getNotif(t.key);
+                        return (
+                          <div key={t.key} className="px-5 py-4 flex items-start gap-4">
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-slate-800">{t.label}</p>
+                              {t.description && (
+                                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{t.description}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-5 shrink-0 pt-0.5">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={n.admin_enabled}
+                                  onChange={() => setNotif(t.key, { admin_enabled: !n.admin_enabled })}
+                                  className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                                />
+                                <span className="text-xs text-slate-600">Receive</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={n.user_overridable}
+                                  onChange={() => setNotif(t.key, { user_overridable: !n.user_overridable })}
+                                  className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                                />
+                                <span className="text-xs text-slate-600">User can self-manage</span>
+                              </label>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           ) : !moduleDef ? (

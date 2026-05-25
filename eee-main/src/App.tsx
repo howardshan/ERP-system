@@ -24,6 +24,7 @@ import WarehouseModule from './pages/warehouse/WarehouseModule';
 import AuditLog from './pages/finance/AuditLog';
 import ProfitLoss from './pages/finance/ProfitLoss';
 import BalanceSheet from './pages/finance/BalanceSheet';
+import AccountSettings from './pages/AccountSettings';
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -143,6 +144,10 @@ function AppShell({
 
   if (activeModule === 'auth') {
     return <UserManagement onHome={() => setActiveModule('home')} />;
+  }
+
+  if (activeModule === 'account-settings') {
+    return <AccountSettings onHome={() => setActiveModule('home')} />;
   }
 
   if (activeModule === 'hr') {
