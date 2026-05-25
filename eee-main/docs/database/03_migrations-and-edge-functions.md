@@ -1304,6 +1304,39 @@ closed → dispatched   (pkg_dispatch_carts)
 
 ---
 
+### M-081 `20260524000004_warehouse_seed_uom.sql`
+**用途**: seed 基础计量单位（UOM）。`uom` 表自 M-001 起从未 seed，而 `item.base_uom_id` 是 NOT NULL FK —— 不先 seed 就无法创建任何 item。此 migration 解除 Warehouse Items 表单的阻塞。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `uom` | INSERT 9 行 | KG/G/TON（weight）、L/ML（volume）、EACH/BAG/BOX/PALLET（count），`ON CONFLICT (code) DO NOTHING` |
+
+**特性**: 幂等。不 seed `uom_conversion`（item 级换算待有真实物料时再配）。
+
+**依赖**: M-001（`uom` 表）。
+
+---
+
+### M-082 `20260524000005_warehouse_permission_seed.sql`
+**用途**: 给管理员账户 `tianzuohuang@crave-cook.com` 授予 Warehouse 模块访问 + 全部 warehouse 资源权限（仿 M-035）。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `user_module_access` | INSERT `warehouse` | `ON CONFLICT DO NOTHING` |
+| `user_permission_grant` | INSERT warehouse 全量 (resource, permission) | 字符串与 `permissionStructure.ts` warehouse 段逐字一致 |
+
+**资源/权限**: `module_permissions.manage`、`items.{view,create,edit,delete}`、`locations.{view,edit}`、`lots.{view,release,reject}`、`goods_receipt.{view,create,post,cancel}`、`inventory.{view,receive,transfer,adjust}`。
+
+**特性**: 幂等。**契约**: resource/permission 字符串必须与前端 `permissionStructure.ts` 匹配，否则 `can()` 静默返回 false。
+
+**依赖**: M-009（权限系统）、M-079（warehouse seed）。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1369,6 +1402,8 @@ closed → dispatched   (pkg_dispatch_carts)
 | M-078 | 20260524000001_fix_auth_trigger_search_path.sql |
 | M-079 | 20260524000002_warehouse_seed_locations.sql |
 | M-080 | 20260524000003_qc_product_sku_add_item_id.sql |
+| M-081 | 20260524000004_warehouse_seed_uom.sql |
+| M-082 | 20260524000005_warehouse_permission_seed.sql |
 
 | 编号 | 目录 |
 |------|------|

@@ -63,19 +63,24 @@
 |------|------|------|
 | ⚙️ | M-079 库位 seed | 🟢 |
 | ⚙️ | M-080 `qc_product_sku.item_id` | 🟢 |
-| 🔑 | 扩展 `permissionStructure.warehouse`：增 `master_data.items`、`master_data.locations`、`lots`、`goods_receipt`（§11.3） | 🔲 |
-| ⚙️ | M-081 权限 seed：给 dev/QC/仓库角色授予 warehouse 资源权限（仿 M-035） | 🔲 |
-| 🧩 | 新建 `warehouseApi.ts`：`listItems` / `createItem` / `updateItem` / `listLocations` / `listLots`(只读) | 🔲 |
-| 🖥️ | `WarehouseModule.tsx` 壳 + sidebar（emerald），App.tsx 接线替换 placeholder | 🔲 |
-| 🖥️ | Items 页（物料 CRUD）、Locations 页（库区只读/维护） | 🔲 |
-| 🖥️ | QC `ProductManagement.tsx` 加"关联 ERP 物料"列（写 `qc_product_sku.item_id`，决议 §5.5） | 🔲 |
-| 📄 | 新建 `docs/modules/11_warehouse-inventory.md` 骨架 + 录入 §5 跨决议细则 | 🔲 |
+| ⚙️ | **M-081 UOM seed**（探索新发现：`uom` 空表阻塞 Items 表单） | 🟢 |
+| 🔑 | 扩展 `permissionStructure.warehouse`：增 `items`、`locations`、`lots`、`goods_receipt`（§11.3，3 层拍平） | 🟢 |
+| ⚙️ | M-082 权限 seed：给管理员 `tianzuohuang@crave-cook.com` 授 warehouse 全权（仿 M-035） | 🟢 |
+| 🧩 | 新建 `warehouseApi.ts`：`listItems` / `createItem` / `updateItem` / `listUoms` / `listItemCategories` / `listLocations` / `listLots`(只读) | 🟢 |
+| 🖥️ | `WarehouseModule.tsx` 壳 + sidebar（emerald），App.tsx 接线替换 placeholder；HomePage warehouse 卡片 `coming_soon→active` | 🟢 |
+| 🖥️ | Items 页（物料 CRUD + 停用/启用）、Locations 页（库区只读） | 🟢 |
+| 🖥️ | QC `ProductManagement.tsx` 加"关联 ERP 物料"下拉（写 `qc_product_sku.item_id`，决议 §5.5） | 🟢 |
+| 📄 | 新建 `docs/modules/11_warehouse-inventory.md` 骨架 + 录入 §5 跨决议细则 | 🟢 |
+
+> **编号顺延**：S0 实际占用 M-081（UOM seed）、M-082（权限 seed）。下方 S1 起的 M-082+ 顺延为 **M-083+**。
+> **关联读取实现**：`item_id` 通过 `listProductItemLinks()` 直查 `qc_product_sku.id,item_id`（不改 `qc_list_products` RPC，避免 S0 多一次 push）。
+> **RLS**：`item`/`uom`/`location`/`lot` 现无 RLS（世界可写），S5 收紧。
 
 **✅ 验证门 M0：**
-- 能在 UI 新建一个 item、编辑、停用
+- 能在 UI 新建一个 item（base_uom 下拉有值=M-081 生效）、编辑、停用
 - 能在 QC ProductManagement 把一个 SKU 关联到刚建的 item，刷新后 `qc_product_sku.item_id` 落库
 - 7 个库区在 Locations 页可见
-- 收货员/仓库主管/QC 三个角色登录后看到的菜单/按钮按权限不同
+- 「三角色权限分离演示」改到后续单独建测试用户（本轮只给管理员授全权）
 
 ---
 
