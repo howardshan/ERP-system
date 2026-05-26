@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Clock, LogOut, Package, QrCode, CheckSquare, ArrowRightLeft } from 'lucide-react';
+import { ChevronDown, ChevronRight, Clock, LogOut, Package, QrCode, CheckSquare, ArrowRightLeft, AlertCircle, X } from 'lucide-react';
 import {
   listAwaitingCheckIn,
   listAwaitingRecheck,
@@ -151,8 +151,9 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
     setMsg(`Selected ${sl.sub_lot_code} for check-out`);
   };
 
+  // Dialog stays open after each scan (keepOpen mode); operator clicks Done
+  // to close.  Each handler only updates internal state — no setScanOpen(false).
   const handleScanned = (sl: SubLot) => {
-    setScanOpen(false);
     setError('');
     if (sl.status === 'created' || sl.status === 'awaiting_recheck') {
       if (scannedIn.has(sl.sub_lot_code)) {
@@ -172,7 +173,6 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
   };
 
   const handleScannedForOut = (sl: SubLot) => {
-    setScanOutOpen(false);
     setError('');
     if (sl.status === 'drying' && sl.dryer_number === dryerNumber) {
       if (scannedOut.has(sl.sub_lot_code)) {
@@ -287,8 +287,48 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
       {msg && (
         <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>
       )}
+
+      {/* Errors render as a center popup with a close button — clearer than
+          an inline banner that the operator might miss while scanning. */}
       {error && (
-        <p className="text-red-600 bg-red-50 p-2 rounded-lg mb-3 text-sm">{error}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setError('')}
+            aria-label="Dismiss"
+          />
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border-2 border-red-200">
+            <header className="px-5 py-4 border-b border-slate-200 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-red-100 text-red-700 flex items-center justify-center shrink-0">
+                <AlertCircle size={18} />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Cannot proceed</p>
+                <h2 className="text-base font-bold text-slate-900 mt-0.5">Scan / action failed</h2>
+              </div>
+              <button
+                onClick={() => setError('')}
+                className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </header>
+            <div className="px-5 py-4 text-sm text-slate-800">
+              {error}
+            </div>
+            <footer className="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setError('')}
+                className="px-4 py-2 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-700 text-white"
+              >
+                OK
+              </button>
+            </footer>
+          </div>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5">
@@ -303,9 +343,10 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
               <button
                 type="button"
                 onClick={() => setScanOpen(true)}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold bg-slate-900 hover:bg-slate-700 text-white"
+                title="Use a barcode scanner (or type) to add carts to the check-in selection"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-700 text-white shadow-sm"
               >
-                <QrCode size={11} /> Scan
+                <QrCode size={13} /> Scan to check in
               </button>
             </div>
 
@@ -391,9 +432,10 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
               <button
                 type="button"
                 onClick={() => setScanOutOpen(true)}
-                className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold bg-slate-900 hover:bg-slate-700 text-white"
+                title="Use a barcode scanner (or type) to add carts to the check-out selection"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-700 text-white shadow-sm"
               >
-                <QrCode size={11} /> Scan
+                <QrCode size={13} /> Scan to check out
               </button>
               {canMove && (
                 <button
@@ -576,6 +618,8 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
       <ScanQrDialog
         open={scanOpen}
         dryerNumber={dryerNumber}
+        keepOpen
+        runningSummary={`${selected.size} cart${selected.size === 1 ? '' : 's'} queued for check-in`}
         onClose={() => setScanOpen(false)}
         onFound={handleScanned}
       />
@@ -591,6 +635,8 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
       <ScanQrDialog
         open={scanOutOpen}
         dryerNumber={dryerNumber}
+        keepOpen
+        runningSummary={`${selectedOut.size} cart${selectedOut.size === 1 ? '' : 's'} queued for check-out`}
         onClose={() => setScanOutOpen(false)}
         onFound={handleScannedForOut}
       />
