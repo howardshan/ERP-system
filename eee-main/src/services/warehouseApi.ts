@@ -1,5 +1,12 @@
 import { supabase } from '../lib/supabase';
 
+// RPC wrapper — throws on error (mirrors qcApi convention).
+async function rpc<T>(fn: string, params: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.rpc(fn, params);
+  if (error) throw new Error(error.message);
+  return data as T;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ItemType = 'raw_material' | 'packaging' | 'intermediate' | 'finished_good';
@@ -173,4 +180,116 @@ export async function listLots(): Promise<WarehouseLot[]> {
     .order('id', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as WarehouseLot[];
+}
+
+// ── Inventory ledger (Sprint 1) ─────────────────────────────────────────────
+
+export interface WarehouseBalance {
+  item_id: number;
+  item_sku: string;
+  item_name: string;
+  lot_id: number | null;
+  lot_number: string | null;
+  lot_status: LotStatus | null;
+  expiry_date: string | null;
+  location_id: number;
+  location_code: string;
+  location_type: LocationType;
+  quantity_on_hand: number;
+  quantity_allocated: number;
+  quantity_available: number;
+  base_uom: string;
+}
+
+export interface WarehouseTransaction {
+  id: number;
+  transaction_date: string;
+  item_sku: string;
+  item_name: string;
+  lot_number: string | null;
+  location_code: string;
+  quantity: number;
+  transaction_type: string;
+  unit_cost: number | null;
+  reference_type: string | null;
+  reference_id: number | null;
+  notes: string | null;
+  created_by: string | null;
+}
+
+export interface ReceiptLineInput {
+  item_id: number;
+  quantity: number;
+  uom_id: number;
+  location_id: number;
+  lot_status?: LotStatus;        // default 'available'
+  lot_number?: string | null;    // auto-generated if absent
+  expiry_date?: string | null;
+  unit_cost?: number | null;
+}
+
+export interface ReceiptInput {
+  lines: ReceiptLineInput[];
+  receipt_date?: string;         // default today (server)
+  supplier_id?: number | null;   // optional for direct receipts
+  warehouse_id?: number | null;  // default WH-MAIN (server)
+  notes?: string | null;
+}
+
+export interface PostReceiptResult {
+  grn_id: number;
+  grn_number: string;
+  line_count: number;
+  lot_ids: number[];
+}
+
+export interface GoodsReceiptRow {
+  id: number;
+  grn_number: string;
+  receipt_type: 'po' | 'direct';
+  po_id: number | null;
+  supplier_id: number | null;
+  receipt_date: string;
+  warehouse_id: number;
+  status: 'draft' | 'posted' | 'cancelled';
+  created_at: string;
+}
+
+export async function postReceipt(input: ReceiptInput): Promise<PostReceiptResult> {
+  if (!input.lines || input.lines.length === 0) throw new Error('至少需要一行收货明细');
+  return rpc<PostReceiptResult>('wh_post_receipt', {
+    p_lines: input.lines,
+    p_receipt_date: input.receipt_date ?? null,
+    p_supplier_id: input.supplier_id ?? null,
+    p_warehouse_id: input.warehouse_id ?? null,
+    p_notes: input.notes ?? null,
+  });
+}
+
+export async function listBalance(filters: { locationId?: number; itemId?: number } = {}): Promise<WarehouseBalance[]> {
+  return rpc<WarehouseBalance[]>('wh_list_balance', {
+    p_location_id: filters.locationId ?? null,
+    p_item_id: filters.itemId ?? null,
+  });
+}
+
+export async function listTransactions(
+  filters: { itemId?: number; lotId?: number; locationId?: number; limit?: number } = {},
+): Promise<WarehouseTransaction[]> {
+  return rpc<WarehouseTransaction[]>('wh_list_transactions', {
+    p_item_id: filters.itemId ?? null,
+    p_lot_id: filters.lotId ?? null,
+    p_location_id: filters.locationId ?? null,
+    p_limit: filters.limit ?? 200,
+  });
+}
+
+// GR list is a read — direct query is allowed (RPC-first only governs writes).
+export async function listGoodsReceipts(): Promise<GoodsReceiptRow[]> {
+  const { data, error } = await supabase
+    .from('goods_receipt')
+    .select('id, grn_number, receipt_type, po_id, supplier_id, receipt_date, warehouse_id, status, created_at')
+    .order('id', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as GoodsReceiptRow[];
 }
