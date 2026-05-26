@@ -150,12 +150,37 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
         ],
       },
       production_order: {
-        label: 'Production Orders',
+        label: 'Production Orders (planned, not yet wired)',
         permissions: [
           { id: 'view',     label: 'View',     prereq: null },
           { id: 'create',   label: 'Create',   prereq: 'view' },
           { id: 'release',  label: 'Release',  prereq: 'view' },
           { id: 'complete', label: 'Complete', prereq: 'view' },
+        ],
+      },
+      // Moved here from `qc` module — see M-094.  Frontend call sites:
+      // pages/qc/Production.tsx, pages/qc/LotDetail.tsx.
+      work_orders: {
+        label: 'Work Orders (Production form)',
+        permissions: [
+          { id: 'create', label: 'Create Work Order / Add Carts', prereq: null },
+        ],
+      },
+      trace: {
+        label: 'Batch Trace',
+        permissions: [
+          { id: 'view',            label: 'View Trace',                       prereq: null },
+          { id: 'add_carts',       label: 'Add Carts to Existing Work Order', prereq: 'view' },
+          { id: 'reprint_sticker', label: 'Reprint Cart Sticker',             prereq: 'view' },
+        ],
+      },
+      products: {
+        label: 'Products & Inspection Templates',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'create', label: 'Create', prereq: 'view' },
+          { id: 'edit',   label: 'Edit',   prereq: 'view' },
+          { id: 'delete', label: 'Delete', prereq: 'edit' },
         ],
       },
     },
@@ -257,12 +282,7 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'manage', label: 'Manage User Permissions', prereq: null },
         ],
       },
-      production: {
-        label: 'Production',
-        permissions: [
-          { id: 'create_batch', label: 'Create Batch (Production form)', prereq: null },
-        ],
-      },
+      // (Moved to `production` module — see M-094.)
       dry_rooms: {
         label: 'Dry Rooms (5 physical dryers)',
         permissions: [
@@ -292,15 +312,7 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'view_history', label: 'View Sub-lot Full Timeline', prereq: null },
         ],
       },
-      products: {
-        label: 'Products & Inspection Templates',
-        permissions: [
-          { id: 'view',   label: 'View',   prereq: null },
-          { id: 'create', label: 'Create', prereq: 'view' },
-          { id: 'edit',   label: 'Edit',   prereq: 'view' },
-          { id: 'delete', label: 'Delete', prereq: 'edit' },
-        ],
-      },
+      // products: moved to `production` module — see M-094.
       locations: {
         label: 'Dryer Locations (master data)',
         permissions: [
@@ -321,12 +333,7 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'view', label: 'View Analysis', prereq: null },
         ],
       },
-      trace: {
-        label: 'Batch Trace',
-        permissions: [
-          { id: 'view', label: 'View Trace', prereq: null },
-        ],
-      },
+      // trace: moved to `production` module — see M-094.
       audit_log: {
         label: 'QC Audit Log',
         permissions: [

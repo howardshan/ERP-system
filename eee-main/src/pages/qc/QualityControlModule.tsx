@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import {
   ClipboardCheck,
   ListChecks,
-  GitBranch,
-  Package,
-  Factory,
   Grid3X3,
   LayoutGrid,
   HelpCircle,
@@ -20,12 +17,8 @@ import LotDetail from './LotDetail';
 import PendingQueue from './PendingQueue';
 import InspectPage from './InspectPage';
 import AdminDashboard from './AdminDashboard';
-import TraceListPage from './TraceListPage';
-import TracePage from './TracePage';
-import ProductManagement from './ProductManagement';
 import LocationManagement from './LocationManagement';
 import AnalysisPage from './AnalysisPage';
-import Production from './Production';
 import DryRoomsList from './DryRoomsList';
 import DryRoomDetail from './DryRoomDetail';
 import TestingPage from './TestingPage';
@@ -70,11 +63,10 @@ export default function QualityControlModule({ onHome }: Props) {
   const [selectedDryerNumber, setSelectedDryerNumber] = useState<number | null>(null);
   const [historySubLotId, setHistorySubLotId] = useState<string | null>(null);
 
-  const canCreateProduction = can('qc', 'production', 'create_batch');
+  // Production / Batch Trace / Products & Templates / Test Types moved to
+  // the Production module — their `can()` checks live in ProductionModule.tsx.
   const canViewDryRooms   = can('qc', 'dry_rooms', 'view_status');
   const canViewTesting    = can('qc', 'testing', 'view_status');
-  const canViewTrace      = can('qc', 'trace', 'view');
-  const canManageProducts = can('qc', 'products', 'view');
   const canViewLocations  = can('qc', 'locations', 'view');
   // Analysis is a read-only reporting page — visible to anyone who can access
   // the QC dashboard (dashboard.view) or has the explicit analysis.view grant.
@@ -94,13 +86,6 @@ export default function QualityControlModule({ onHome }: Props) {
           onNavigate={navigate}
           onOpenHistory={(id) => setHistorySubLotId(id)}
           onOpenSubLot={(_id) => navigate('testing')}
-        />
-      );
-    }
-    if (screen === 'production') {
-      return (
-        <Production
-          onCreated={(_lotId) => { setScreen('dry-rooms'); }}
         />
       );
     }
@@ -168,25 +153,9 @@ export default function QualityControlModule({ onHome }: Props) {
     if (screen === 'dashboard') {
       return <AdminDashboard />;
     }
-    if (screen === 'trace') {
-      return (
-        <TraceListPage
-          onSelectLot={(id) => { setSelectedLotId(id); setScreen('trace-detail'); }}
-        />
-      );
-    }
-    if (screen === 'trace-detail' && selectedLotId) {
-      return (
-        <TracePage
-          lotId={selectedLotId}
-          onBack={() => setScreen('trace')}
-          onOpenHistory={(id) => setHistorySubLotId(id)}
-        />
-      );
-    }
-    if (screen === 'products') {
-      return <ProductManagement />;
-    }
+    // Production / Batch Trace / Products & Templates / Test Types moved to
+    // the Production module (BR-Q51).  Their old screen keys are no longer
+    // routed here; navigating to them from inside QC falls through to QcHome.
     if (screen === 'locations') {
       return <LocationManagement />;
     }
@@ -225,37 +194,21 @@ export default function QualityControlModule({ onHome }: Props) {
                      onClick={() => navigate('analysis')} />
           )}
 
-          {(canCreateProduction || canViewDryRooms || canViewTesting) && <NavSection title="Floor" />}
-          {canCreateProduction && (
-            <NavItem icon={Factory} label="Production"
-                     isActive={isActive('production')}
-                     onClick={() => navigate('production')} />
-          )}
+          {(canViewDryRooms || canViewTesting) && <NavSection title="Floor" />}
           {canViewDryRooms && (
             <NavItem icon={Grid3X3} label="Dry Rooms"
                      isActive={isActive('dry-rooms') || isActive('dry-room-detail')}
                      onClick={() => navigate('dry-rooms')} />
           )}
-          {/* Batches sidebar entry retired — Production form is the canonical Batch creator */}
           {canViewTesting && (
             <NavItem icon={ListChecks} label="Testing"
                      isActive={isActive('testing') || isActive('pending') || isActive('inspect')}
                      onClick={() => navigate('testing')} />
           )}
           {/* Room Temp Dry is now managed inside Dry Rooms (card on DryRoomsList) — no separate sidebar entry */}
+          {/* Production / Batch Trace / Products & Templates moved to the Production module (BR-Q51) */}
 
-          {/* QC Dashboard merged into QC Home (top of sidebar) */}
-          {canViewTrace && <NavSection title="Management" />}
-          {canViewTrace && (
-            <NavItem icon={GitBranch} label="Batch Trace"
-                     isActive={isActive('trace') || isActive('trace-detail')}
-                     onClick={() => navigate('trace')} />
-          )}
-
-          {(canManageProducts || canViewLocations) && <NavSection title="Master Data" />}
-          {canManageProducts && (
-            <NavItem icon={Package} label="Products & Templates" isActive={isActive('products')} onClick={() => navigate('products')} />
-          )}
+          {canViewLocations && <NavSection title="Master Data" />}
           {canViewLocations && (
             <NavItem icon={MapPin} label="Dryer Locations" isActive={isActive('locations')} onClick={() => navigate('locations')} />
           )}

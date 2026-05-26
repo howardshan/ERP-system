@@ -5,11 +5,13 @@ import {
   findLotsByWorkOrder,
   listSubLotsForLot,
   addSubLotsToLot,
+  listProductItemLinks,
   Product,
   ProductionBatchInput,
   ProductionLot,
   SubLot,
 } from '../../services/qcApi';
+import { listItems, WarehouseItem } from '../../services/warehouseApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn, daysToMinutes, minutesToDays } from '../../lib/utils';
 import { CartStickerSheet } from './components/CartStickerSheet';
@@ -26,7 +28,7 @@ function parseSeq(code: string): number {
 
 export default function Production({ onCreated }: Props) {
   const { can } = usePermissions();
-  const canCreateBatch = can('qc', 'production', 'create_batch');
+  const canCreateBatch = can('production', 'work_orders', 'create');
   const disabled = !canCreateBatch;
 
   const [skus, setSkus] = useState<Product[]>([]);
@@ -60,10 +62,37 @@ export default function Production({ onCreated }: Props) {
     skuName: string;
   } | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
+  // The lot id of the most recent successful submit; used by the
+  // "Continue to Dry Rooms" button so navigation is now manual instead of
+  // happening automatically on submit (which would unmount this component
+  // before the user could see the Print button).
+  const [lastCreatedLotId, setLastCreatedLotId] = useState<string | null>(null);
+
+  // Final-product picker (M-095) — the work order's chosen packaging item.
+  // List of items this SKU is allowed to be packed into is configured in
+  // ProductManagement → "Final products" (qc_sku_item junction).  The form
+  // shows a dropdown filtered to that list and forces a pick if the list
+  // is non-empty.
+  const [allItems, setAllItems] = useState<WarehouseItem[]>([]);
+  const [skuItemLinks, setSkuItemLinks] = useState<Record<string, number[]>>({});
+  const [packagingItemId, setPackagingItemId] = useState<string>('');  // '' = none picked
 
   useEffect(() => {
     listProducts().then(setSkus).catch(e => setError(e.message));
+    listItems().then(setAllItems).catch(() => {});
+    listProductItemLinks().then(setSkuItemLinks).catch(() => {});
   }, []);
+
+  const linkedItemIds = skuId ? (skuItemLinks[skuId] ?? []) : [];
+  const linkedItems = linkedItemIds
+    .map(id => allItems.find(it => it.id === id))
+    .filter(Boolean) as WarehouseItem[];
+
+  // Reset packaging pick whenever SKU changes (the old choice may not be in
+  // the new SKU's allowed list).
+  useEffect(() => {
+    setPackagingItemId('');
+  }, [skuId]);
 
   const currentSku = skus.find(s => s.id === skuId);
 
@@ -132,6 +161,13 @@ export default function Production({ onCreated }: Props) {
   const isAddMode = existingLots.length > 0;
   const existingLot = existingLots[0] ?? null;
 
+  // SKU mismatch: user selected a different SKU than what the existing work order uses
+  const skuMismatch =
+    isAddMode &&
+    !!skuId &&
+    existingLot != null &&
+    existingLot.sku_id !== skuId;
+
   const fillDemo = () => {
     if (skus[0]) setSkuId(skus[0].id);
     setWorkOrder('WO-DEMO-' + Math.floor(Math.random() * 900 + 100));
@@ -151,6 +187,10 @@ export default function Production({ onCreated }: Props) {
       );
       return;
     }
+    if (skuMismatch) {
+      setError('Selected SKU does not match the existing work order. Please select the correct SKU or use a different work order number.');
+      return;
+    }
     if (subLotCount === 0 || maxN < minN) {
       setError('Last cart number must be >= first cart number');
       return;
@@ -166,6 +206,7 @@ export default function Production({ onCreated }: Props) {
           end_seq: maxN,
         });
         setMsg(`Added ${res.added_count} cart(s) to ${existingLot.lot_number} (carts ${res.start_seq}–${res.end_seq}).`);
+        setLastCreatedLotId(existingLot.id);
         const subs = await listSubLotsForLot(existingLot.id);
         setExistingSubLots(subs);
         const newCarts = subs.filter(s => {
@@ -198,6 +239,13 @@ export default function Production({ onCreated }: Props) {
       setError('Expected dry time must be > 0');
       return;
     }
+    // M-095: if the SKU has any linked final-product options, the operator
+    // MUST pick one — packaging is intentionally required at lot creation so
+    // it shows up on stickers and downstream packaging routing.
+    if (linkedItems.length > 0 && !packagingItemId) {
+      setError('Pick a final product before creating the work order.');
+      return;
+    }
     setBusy(true);
     try {
       const wo = workOrder.trim();
@@ -211,9 +259,11 @@ export default function Production({ onCreated }: Props) {
         expected_dry_minutes: dryMin,
         sub_lot_start_seq: minN,
         sub_lot_end_seq: maxN,
+        packaging_item_id: packagingItemId ? Number(packagingItemId) : null,
       };
       const res = await createProductionBatch(payload);
       setMsg(`Created work order ${res.lot_number} with ${res.sub_lot_count} cart(s): ${wo}-${String(minN).padStart(3,'0')} … ${wo}-${String(maxN).padStart(3,'0')}.`);
+      setLastCreatedLotId(res.lot_id);
       // Fetch the freshly-created sub_lots so the sticker print button has
       // their codes.  Wrap separately so a list failure doesn't mask the
       // successful create.
@@ -228,7 +278,8 @@ export default function Production({ onCreated }: Props) {
           });
         }
       } catch { /* non-fatal — user can re-load to print later */ }
-      if (onCreated) onCreated(res.lot_id);
+      // Navigation to Dry Rooms is now triggered by the success-banner button
+      // so the user has a chance to print stickers first.
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Create failed');
     }
@@ -249,15 +300,26 @@ export default function Production({ onCreated }: Props) {
       {msg && (
         <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-lg mb-3 text-sm flex items-center justify-between gap-3 flex-wrap">
           <p className="text-emerald-700">{msg}</p>
-          {printable && (
-            <button
-              type="button"
-              onClick={() => setPrintOpen(true)}
-              className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white"
-            >
-              Print {printable.carts.length} sticker{printable.carts.length === 1 ? '' : 's'}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {printable && (
+              <button
+                type="button"
+                onClick={() => setPrintOpen(true)}
+                className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white"
+              >
+                Print {printable.carts.length} sticker{printable.carts.length === 1 ? '' : 's'}
+              </button>
+            )}
+            {lastCreatedLotId && onCreated && (
+              <button
+                type="button"
+                onClick={() => onCreated(lastCreatedLotId)}
+                className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white"
+              >
+                Continue to Dry Rooms →
+              </button>
+            )}
+          </div>
         </div>
       )}
       {error && <p className="text-red-600 bg-red-50 p-2 rounded-lg mb-3 text-sm">{error}</p>}
@@ -350,16 +412,32 @@ export default function Production({ onCreated }: Props) {
 
         {/* ── Existing work order banner ─────────────────────────────── */}
         {isAddMode && existingLot && (
-          <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-2">
+          <div className={cn(
+            'border-2 rounded-xl p-4 space-y-2',
+            skuMismatch
+              ? 'bg-red-50 border-red-400'
+              : 'bg-amber-50 border-amber-300',
+          )}>
             <div className="flex items-center gap-2">
-              <span className="text-amber-500 text-base">⚠</span>
-              <p className="text-sm font-bold text-amber-900">Work order already exists — adding carts</p>
+              <span className={skuMismatch ? 'text-red-500 text-base' : 'text-amber-500 text-base'}>
+                {skuMismatch ? '✗' : '⚠'}
+              </span>
+              <p className={cn('text-sm font-bold', skuMismatch ? 'text-red-900' : 'text-amber-900')}>
+                {skuMismatch
+                  ? 'SKU mismatch — cannot add carts to this work order'
+                  : 'Work order already exists — adding carts'}
+              </p>
             </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-amber-800">
+            <div className={cn('flex flex-wrap gap-x-6 gap-y-1 text-xs', skuMismatch ? 'text-red-800' : 'text-amber-800')}>
               <span>Work order: <span className="font-mono font-bold">{existingLot.lot_number}</span></span>
-              <span>SKU: <span className="font-semibold">{existingLot.sku_name ?? existingLot.sku_code ?? '—'}</span></span>
+              <span>Existing SKU: <span className="font-semibold">{existingLot.sku_name ?? existingLot.sku_code ?? '—'}</span></span>
             </div>
-            {existingSubLots.length > 0 && (
+            {skuMismatch && (
+              <p className="text-xs text-red-700 font-medium">
+                This work order was created for a different SKU. Please select the correct SKU or use a different work order number.
+              </p>
+            )}
+            {!skuMismatch && existingSubLots.length > 0 && (
               <div className="pt-1">
                 <p className="text-[11px] font-semibold text-amber-700 mb-1">
                   Existing carts ({existingSubLots.length}):
@@ -432,12 +510,57 @@ export default function Production({ onCreated }: Props) {
           )}
         </section>
 
-        <button
+        {/* ── Final product picker (M-095) ──────────────────────────── */}
+        {skuId && !isAddMode && (
+          <section className="bg-white border rounded-xl p-5 space-y-3">
+            <h2 className="font-semibold text-slate-900 text-sm">
+              Final product
+              <span className="ml-2 text-xs font-normal text-slate-400">
+                · {currentSku?.name}
+              </span>
+            </h2>
+
+            {linkedItems.length === 0 ? (
+              <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded p-2">
+                This SKU has no final-product options configured. Go to{' '}
+                <strong>Production → Products</strong> and add at least one item under{' '}
+                <strong>Final products</strong>, then come back.
+              </p>
+            ) : (
+              <>
+                <label className="block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Pack into <span className="text-red-500">*</span>
+                  </span>
+                  <select
+                    className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white"
+                    value={packagingItemId}
+                    onChange={e => setPackagingItemId(e.target.value)}
+                    required
+                  >
+                    <option value="">— Choose a final product —</option>
+                    {linkedItems.map(it => (
+                      <option key={it.id} value={it.id}>
+                        {it.sku} · {it.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-[10px] text-slate-400">
+                  Only the items linked to this SKU under <em>Products → Final products</em>{' '}
+                  are listed. Edit the SKU there to add more options.
+                </p>
+              </>
+            )}
+          </section>
+        )}
+
+        {!msg && <button
           type="submit"
-          disabled={busy || disabled || subLotCount === 0 || hasConflict}
+          disabled={busy || disabled || subLotCount === 0 || hasConflict || skuMismatch || (!isAddMode && linkedItems.length > 0 && !packagingItemId)}
           className={cn(
             'w-full py-3 rounded-xl text-sm font-bold transition-colors',
-            disabled || hasConflict
+            disabled || hasConflict || skuMismatch
               ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
               : isAddMode
                 ? 'bg-amber-600 hover:bg-amber-500 text-white disabled:opacity-50'
@@ -450,7 +573,7 @@ export default function Production({ onCreated }: Props) {
               ? `Add ${subLotCount} cart(s) to existing order`
               : `Create work order with ${subLotCount} cart(s)`
           }
-        </button>
+        </button>}
       </form>
 
       {printOpen && printable && (

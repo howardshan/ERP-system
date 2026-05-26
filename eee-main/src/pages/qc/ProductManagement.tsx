@@ -1,14 +1,19 @@
 import React, { FormEvent, useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, FlaskConical, Package } from 'lucide-react';
 import {
   listProducts,
   createProduct,
   updateProduct,
   deleteProduct,
   deleteProducts,
+  listTestTypes,
   listProductItemLinks,
+  addSkuItem,
+  removeSkuItem,
   Product,
   ProductInput,
+  TestType,
+  TemplateInput,
 } from '../../services/qcApi';
 import { listItems, WarehouseItem } from '../../services/warehouseApi';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -18,31 +23,32 @@ import { cn, fmtDays, daysToMinutes, minutesToDays, MINUTES_PER_DAY } from '../.
 
 const emptyForm = (): ProductInput => ({
   name: '',
-  standard_drying_minutes: MINUTES_PER_DAY,  // 1 day default
+  standard_drying_minutes: MINUTES_PER_DAY,
   sample_every_n_carts: 1,
-  item_id: null,
-  template: { item_name: 'Water Activity (Aw)', unit: null, lower_limit: 0.65, upper_limit: 0.75 },
+  templates: [],
 });
 
-function productToForm(p: Product, itemId: number | null): ProductInput {
-  const t = p.templates[0];
+function productToForm(p: Product): ProductInput {
   return {
     name: p.name,
     standard_drying_minutes: p.standard_drying_minutes,
     sample_every_n_carts: p.sample_every_n_carts ?? 1,
-    item_id: itemId,
-    template: t
-      ? { item_name: t.item_name, unit: t.unit, lower_limit: t.lower_limit, upper_limit: t.upper_limit }
-      : emptyForm().template,
+    templates: p.templates
+      .filter(t => t.test_type_id != null)
+      .map(t => ({
+        test_type_id: t.test_type_id!,
+        lower_limit: t.lower_limit,
+        upper_limit: t.upper_limit,
+      })),
   };
 }
 
 export default function ProductManagement() {
   const { can } = usePermissions();
-  const canView = can('qc', 'products', 'view');
-  const canCreate = can('qc', 'products', 'create');
-  const canEdit = can('qc', 'products', 'edit');
-  const canDelete = can('qc', 'products', 'delete');
+  const canView = can('production', 'products', 'view');
+  const canCreate = can('production', 'products', 'create');
+  const canEdit = can('production', 'products', 'edit');
+  const canDelete = can('production', 'products', 'delete');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -53,43 +59,94 @@ export default function ProductManagement() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
-  const [items, setItems] = useState<WarehouseItem[]>([]);
-  const [links, setLinks] = useState<Record<string, number | null>>({});
+  const [testTypes, setTestTypes] = useState<TestType[]>([]);
+
+  // Final-product (ERP item) linking — see qc_sku_item (M-087) + M-095.
+  // `allItems` = every item in the warehouse master, used to populate the
+  // multi-select.  `skuItemLinks` = current persisted SKU → item_ids map.
+  // `selectedItemIds` = the working set being edited in the open form.
+  const [allItems, setAllItems] = useState<WarehouseItem[]>([]);
+  const [skuItemLinks, setSkuItemLinks] = useState<Record<string, number[]>>({});
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<number>>(new Set());
 
   const load = () => {
     listProducts().then(setProducts).catch((e) => setError(e.message));
-    listProductItemLinks().then(setLinks).catch(() => { /* link map optional */ });
   };
+
+  const reloadLinks = () =>
+    listProductItemLinks().then(setSkuItemLinks).catch(() => {});
 
   useEffect(() => {
     load();
-    listItems().then(setItems).catch(() => { /* ERP items optional for linking */ });
+    listTestTypes().then(setTestTypes).catch(() => {});
+    listItems().then(setAllItems).catch(() => {});
+    reloadLinks();
   }, []);
 
-  const itemLabel = (id: number | null | undefined) => {
-    if (id == null) return null;
-    const it = items.find((x) => x.id === id);
-    return it ? `${it.sku} · ${it.name}` : `#${id}`;
+  const cancel = () => {
+    setEditingId(null);
+    setCreating(false);
+    setForm(emptyForm());
+    setSelectedItemIds(new Set());
+  };
+  const startCreate = () => {
+    setEditingId(null);
+    setForm(emptyForm());
+    setCreating(true);
+    setSelectedItemIds(new Set());
+    setMsg('');
+    setError('');
+  };
+  const startEdit = (p: Product) => {
+    setCreating(false);
+    setEditingId(p.id);
+    setForm(productToForm(p));
+    setSelectedItemIds(new Set(skuItemLinks[p.id] ?? []));
+    setMsg('');
+    setError('');
   };
 
-  const cancel = () => { setEditingId(null); setCreating(false); setForm(emptyForm()); };
-  const startCreate = () => { setEditingId(null); setForm(emptyForm()); setCreating(true); setMsg(''); setError(''); };
-  const startEdit = (p: Product) => { setCreating(false); setEditingId(p.id); setForm(productToForm(p, links[p.id] ?? null)); setMsg(''); setError(''); };
+  const toggleItemId = (id: number) => {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  /** Persist the diff between the current saved SKU↔Item links and the
+   *  working set the user just edited.  Add new ones, remove the unselected
+   *  ones, refresh the in-memory map. */
+  const syncSkuItemLinks = async (skuId: string) => {
+    const current = new Set(skuItemLinks[skuId] ?? []);
+    const target = selectedItemIds;
+    const toAdd = [...target].filter(id => !current.has(id));
+    const toRemove = [...current].filter(id => !target.has(id));
+    for (const id of toAdd) await addSkuItem(skuId, id);
+    for (const id of toRemove) await removeSkuItem(skuId, id);
+    await reloadLinks();
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     try {
+      let skuId: string;
       if (editingId) {
         await updateProduct(editingId, form);
+        skuId = editingId;
         setMsg('Product updated');
         setEditingId(null);
       } else {
-        await createProduct(form);
+        const created = await createProduct(form);
+        skuId = created.id;
         setMsg('Product created');
         setCreating(false);
       }
+      await syncSkuItemLinks(skuId);
       setForm(emptyForm());
+      setSelectedItemIds(new Set());
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed');
@@ -146,7 +203,7 @@ export default function ProductManagement() {
   const isBusy = creating || editingId !== null;
 
   if (!canView) {
-    return <PermissionDenied permission="qc.products.view" feature="Products & Templates" />;
+    return <PermissionDenied permission="production.products.view" feature="Products & Templates" />;
   }
 
   return (
@@ -198,7 +255,14 @@ export default function ProductManagement() {
       {creating && (
         <form onSubmit={submit} className="bg-white border-2 border-blue-400 rounded-xl p-4 mb-6 space-y-4 shadow-sm">
           <h2 className="font-semibold text-blue-800 text-sm">New product</h2>
-          <ProductFormFields form={form} setForm={setForm} items={items} />
+          <ProductFormFields
+                    form={form}
+                    setForm={setForm}
+                    testTypes={testTypes}
+                    allItems={allItems}
+                    selectedItemIds={selectedItemIds}
+                    onToggleItem={toggleItemId}
+                  />
           <div className="flex gap-2">
             <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">Save</button>
             <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>Cancel</button>
@@ -219,7 +283,14 @@ export default function ProductManagement() {
               {isEditing ? (
                 <form onSubmit={submit} className="space-y-4">
                   <h2 className="font-semibold text-blue-800 text-sm">Edit · {p.name}</h2>
-                  <ProductFormFields form={form} setForm={setForm} items={items} />
+                  <ProductFormFields
+                    form={form}
+                    setForm={setForm}
+                    testTypes={testTypes}
+                    allItems={allItems}
+                    selectedItemIds={selectedItemIds}
+                    onToggleItem={toggleItemId}
+                  />
                   <div className="flex gap-2">
                     <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">Save</button>
                     <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>Cancel</button>
@@ -273,18 +344,18 @@ export default function ProductManagement() {
                           1 per <span className="font-mono font-bold">{p.sample_every_n_carts ?? 1}</span> cart(s)
                         </dd>
                       </div>
-                      {t && (
-                        <div>
-                          <dt className="text-slate-500">{t.item_name} spec range</dt>
-                          <dd className="text-slate-800">[{t.lower_limit}, {t.upper_limit}]</dd>
+                      {p.templates.length > 0 && (
+                        <div className="sm:col-span-2">
+                          <dt className="text-slate-500 mb-1">Required tests</dt>
+                          <dd className="flex flex-wrap gap-1.5">
+                            {p.templates.map(tmpl => (
+                              <span key={tmpl.id} className="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded px-2 py-0.5">
+                                {tmpl.item_name} · [{tmpl.lower_limit}, {tmpl.upper_limit}]
+                              </span>
+                            ))}
+                          </dd>
                         </div>
                       )}
-                      <div>
-                        <dt className="text-slate-500">关联 ERP 物料</dt>
-                        <dd className={cn('text-slate-800', itemLabel(links[p.id]) ? '' : 'text-amber-600')}>
-                          {itemLabel(links[p.id]) ?? '未关联'}
-                        </dd>
-                      </div>
                     </dl>
                   </div>
                 </div>
@@ -298,12 +369,36 @@ export default function ProductManagement() {
   );
 }
 
-function ProductFormFields({ form, setForm, items }: {
+function ProductFormFields({
+  form, setForm, testTypes, allItems, selectedItemIds, onToggleItem,
+}: {
   form: ProductInput;
   setForm: (f: ProductInput) => void;
-  items: WarehouseItem[];
+  testTypes: TestType[];
+  allItems: WarehouseItem[];
+  selectedItemIds: Set<number>;
+  onToggleItem: (id: number) => void;
 }) {
   const daysValue = minutesToDays(form.standard_drying_minutes);
+  const usedTypeIds = new Set(form.templates.map(t => t.test_type_id));
+  const availableTypes = testTypes.filter(tt => tt.is_active && !usedTypeIds.has(tt.id));
+
+  const updateTemplate = (idx: number, patch: Partial<TemplateInput>) => {
+    const next = form.templates.map((t, i) => i === idx ? { ...t, ...patch } : t);
+    setForm({ ...form, templates: next });
+  };
+
+  const removeTemplate = (idx: number) => {
+    setForm({ ...form, templates: form.templates.filter((_, i) => i !== idx) });
+  };
+
+  const addTemplate = (typeId: number) => {
+    setForm({
+      ...form,
+      templates: [...form.templates, { test_type_id: typeId, lower_limit: 0, upper_limit: 1 }],
+    });
+  };
+
   return (
     <>
       <label className="block">
@@ -318,47 +413,22 @@ function ProductFormFields({ form, setForm, items }: {
           SKU code is auto-generated (SKU-NNNN).
         </span>
       </label>
-      <label className="block">
-        <span className="text-xs font-medium text-slate-700">关联 ERP 物料 (Warehouse item)</span>
-        <select
-          className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white"
-          value={form.item_id ?? ''}
-          onChange={(e) => setForm({ ...form, item_id: e.target.value ? Number(e.target.value) : null })}
-        >
-          <option value="">— 未关联 —</option>
-          {items.map((it) => (
-            <option key={it.id} value={it.id}>{it.sku} · {it.name}</option>
-          ))}
-        </select>
-        <span className="mt-0.5 block text-[10px] text-slate-500">
-          关联后，建车与放行时才能同步 ERP 库存批次（决议 §5.5）。
-        </span>
-      </label>
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
           <span className="text-xs font-medium text-slate-700">Reference dry time (days, SOP)</span>
           <input
-            type="number"
-            min={0.1}
-            step={0.1}
+            type="number" min={0.1} step={0.1}
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             value={daysValue ?? ''}
             onChange={(e) =>
-              setForm({
-                ...form,
-                standard_drying_minutes: e.target.value ? daysToMinutes(Number(e.target.value)) : null,
-              })
+              setForm({ ...form, standard_drying_minutes: e.target.value ? daysToMinutes(Number(e.target.value)) : null })
             }
           />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">
-            Sampling rate (1 sample per N carts)
-          </span>
+          <span className="text-xs font-medium text-slate-700">Sampling rate (1 per N carts)</span>
           <input
-            type="number"
-            min={1}
-            step={1}
+            type="number" min={1} step={1}
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             value={form.sample_every_n_carts ?? 1}
             onChange={(e) =>
@@ -366,50 +436,157 @@ function ProductFormFields({ form, setForm, items }: {
             }
           />
           <span className="mt-0.5 block text-[10px] text-slate-500">
-            On bulk check-out, carts in a work order are chunked into groups of N (round up). Each group picks 1 random cart for testing. PASS releases the whole group.
+            Groups of N carts; 1 random champion tested per group.
           </span>
         </label>
       </div>
+
+      {/* ── Required tests ──────────────────────────────────────────────── */}
       <fieldset className="border rounded-lg p-3 space-y-3">
-        <legend className="text-xs font-semibold px-1 text-slate-700">Post-dry inspection spec</legend>
-        <label className="block">
-          <span className="text-xs text-slate-700">Inspection item</span>
-          <input
-            className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-            value={form.template.item_name}
-            onChange={(e) =>
-              setForm({ ...form, template: { ...form.template, item_name: e.target.value } })
-            }
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="text-xs text-slate-700">Lower limit</span>
-            <input
-              type="number"
-              step="0.01"
-              className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-              value={form.template.lower_limit}
-              onChange={(e) =>
-                setForm({ ...form, template: { ...form.template, lower_limit: Number(e.target.value) } })
-              }
-              required
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs text-slate-700">Upper limit</span>
-            <input
-              type="number"
-              step="0.01"
-              className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-              value={form.template.upper_limit}
-              onChange={(e) =>
-                setForm({ ...form, template: { ...form.template, upper_limit: Number(e.target.value) } })
-              }
-              required
-            />
-          </label>
-        </div>
+        <legend className="text-xs font-semibold px-1 text-slate-700 flex items-center gap-1.5">
+          <FlaskConical size={11} /> Required tests
+        </legend>
+
+        {form.templates.length === 0 && (
+          <p className="text-xs text-amber-600">No tests assigned. Add at least one test below.</p>
+        )}
+
+        {form.templates.map((tmpl, idx) => {
+          const tt = testTypes.find(x => x.id === tmpl.test_type_id);
+          return (
+            <div key={tmpl.test_type_id} className="bg-slate-50 border rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-800">
+                  {tt?.name ?? `Type #${tmpl.test_type_id}`}
+                  {tt?.unit && <span className="ml-1.5 text-[10px] font-mono bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{tt.unit}</span>}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeTemplate(idx)}
+                  className="text-slate-400 hover:text-red-500 p-1 rounded"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="text-[11px] text-slate-600">Lower limit</span>
+                  <input
+                    type="number" step="0.0001"
+                    className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                    value={tmpl.lower_limit}
+                    onChange={e => updateTemplate(idx, { lower_limit: Number(e.target.value) })}
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[11px] text-slate-600">Upper limit</span>
+                  <input
+                    type="number" step="0.0001"
+                    className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                    value={tmpl.upper_limit}
+                    onChange={e => updateTemplate(idx, { upper_limit: Number(e.target.value) })}
+                    required
+                  />
+                </label>
+              </div>
+            </div>
+          );
+        })}
+
+        {availableTypes.length > 0 && (
+          <div className="flex gap-2 items-center pt-1">
+            <select
+              className="flex-1 border rounded-lg px-3 py-1.5 text-sm bg-white"
+              defaultValue=""
+              onChange={e => { if (e.target.value) { addTemplate(Number(e.target.value)); e.target.value = ''; } }}
+            >
+              <option value="">+ Add test…</option>
+              {availableTypes.map(tt => (
+                <option key={tt.id} value={tt.id}>{tt.name}{tt.unit ? ` (${tt.unit})` : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {availableTypes.length === 0 && testTypes.length > 0 && form.templates.length === testTypes.filter(t => t.is_active).length && (
+          <p className="text-[10px] text-slate-400">All active test types assigned.</p>
+        )}
+        {testTypes.length === 0 && (
+          <p className="text-[10px] text-slate-400">
+            No test types defined yet. Go to <strong>Test Types</strong> to add some first.
+          </p>
+        )}
+      </fieldset>
+
+      {/* ── Final products (ERP items this SKU can be packed as) ─────────
+           Scope: finished_good only.  Raw materials / packaging / intermediates
+           live in the same `item` table but aren't valid "what does this SKU
+           end up as" choices — those are upstream / consumable inputs.  Any
+           legacy non-finished_good link will still appear here so the user
+           can uncheck it. */}
+      <fieldset className="border border-slate-200 rounded-lg p-3 space-y-2">
+        <legend className="px-1 text-xs font-bold text-slate-700 flex items-center gap-1.5">
+          <Package size={11} /> Final products
+        </legend>
+        <p className="text-[10px] text-slate-500">
+          Pick every finished good this SKU can ultimately be packaged into. The Production form
+          will only let operators choose from this list when they create a work order.
+        </p>
+
+        {(() => {
+          const finalProductOptions = allItems.filter(it =>
+            it.item_type === 'finished_good' || selectedItemIds.has(it.id),
+          );
+          if (finalProductOptions.length === 0) {
+            return (
+              <p className="text-[10px] text-amber-600">
+                No finished-good items in the Warehouse master yet. Go to{' '}
+                <strong>Warehouse → Items</strong> and add one with{' '}
+                <code className="font-mono">item_type = finished_good</code>.
+              </p>
+            );
+          }
+          return (
+            <>
+              <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded">
+                {finalProductOptions.map(it => {
+                  const checked = selectedItemIds.has(it.id);
+                  const isLegacy = it.item_type !== 'finished_good';
+                  return (
+                    <label
+                      key={it.id}
+                      className={cn(
+                        'flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer',
+                        checked ? 'bg-blue-50' : 'hover:bg-slate-50',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggleItem(it.id)}
+                        className="w-4 h-4 rounded accent-blue-600"
+                      />
+                      <span className="font-mono text-[10px] text-slate-500 uppercase">{it.sku}</span>
+                      <span className="flex-1 truncate text-slate-800">{it.name}</span>
+                      <span
+                        className={cn(
+                          'text-[10px] uppercase tracking-wider',
+                          isLegacy ? 'text-amber-600' : 'text-slate-400',
+                        )}
+                        title={isLegacy ? 'Legacy non-finished_good link — recommend unchecking' : undefined}
+                      >
+                        {it.item_type}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-400">
+                {selectedItemIds.size} of {finalProductOptions.length} selected
+              </p>
+            </>
+          );
+        })()}
       </fieldset>
     </>
   );

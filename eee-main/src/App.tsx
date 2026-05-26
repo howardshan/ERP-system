@@ -20,6 +20,7 @@ import UserManagement from './pages/auth/UserManagement';
 import HRModule from './pages/hr/HRModule';
 import QualityControlModule from './pages/qc/QualityControlModule';
 import PackagingModule from './pages/packaging/PackagingModule';
+import ProductionModule from './pages/production/ProductionModule';
 import WarehouseModule from './pages/warehouse/WarehouseModule';
 import AuditLog from './pages/finance/AuditLog';
 import ProfitLoss from './pages/finance/ProfitLoss';
@@ -156,6 +157,10 @@ function AppShell({
 
   if (activeModule === 'qc') {
     return <QualityControlModule onHome={() => setActiveModule('home')} />;
+  }
+
+  if (activeModule === 'production') {
+    return <ProductionModule onHome={() => setActiveModule('home')} />;
   }
 
   if (activeModule === 'packaging') {

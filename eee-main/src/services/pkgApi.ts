@@ -14,6 +14,11 @@ export interface PkgCart {
   sku_id: string;
   sku_name: string;
   sku_code: string;
+  /** Packaging item (item_type='packaging') assigned to the cart's work order.
+   *  M-092 added these — null when no packaging has been linked yet. */
+  packaging_id: number | null;
+  packaging_sku: string | null;
+  packaging_name: string | null;
   released_at: string;
   days_in_stock: number;
 }

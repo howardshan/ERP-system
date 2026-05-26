@@ -76,6 +76,9 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
   const [msg, setMsg] = useState('');
   const [pendingDisplace, setPendingDisplace] = useState<null | { targetCell: number; targetLoc: DryingLocation; occupant: SubLot }>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  // After scanning a drying cart in THIS dryer, prompt the operator to
+  // check it out immediately instead of just popping the cell-detail card.
+  const [scanCheckOutConfirm, setScanCheckOutConfirm] = useState<SubLot | null>(null);
 
   const load = async () => {
     try {
@@ -227,8 +230,13 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
       load();
       return;
     }
-    // (b) Already in this dryer → pop the cell detail card
+    // (b) Already in this dryer → ask "Check out now?".  Falls back to the
+    //     cell-detail card if the operator dismisses the prompt.
     if (sl.status === 'drying' && sl.dryer_number === dryerNumber && sl.cell_number != null) {
+      if (canCheckOut) {
+        setScanCheckOutConfirm(sl);
+        return;
+      }
       setOpenCell(sl.cell_number);
       setMsg(`Showing cell ${String(sl.cell_number).padStart(2, '0')} (${sl.sub_lot_code})`);
       return;
@@ -267,7 +275,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
             type="button"
             onClick={() => setScanOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-700 text-white"
-            title="Scan a sub-lot QR or barcode to act on it"
+            title="Scan a cart barcode: created → place mode, drying → check-out prompt"
           >
             <QrCode size={13} /> Scan QR
           </button>
@@ -308,6 +316,59 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
         onClose={() => setScanOpen(false)}
         onFound={handleScanned}
       />
+
+      {scanCheckOutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setScanCheckOutConfirm(null)}
+            aria-label="Cancel"
+          />
+          <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl">
+            <header className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
+              <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                <QrCode size={18} />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Scan check-out</p>
+                <h2 className="text-base font-bold text-slate-900 font-mono">{scanCheckOutConfirm.sub_lot_code}</h2>
+              </div>
+            </header>
+            <div className="px-5 py-4 text-sm text-slate-700">
+              Currently in <strong>Dryer {scanCheckOutConfirm.dryer_number}</strong>
+              {scanCheckOutConfirm.cell_number != null && (
+                <> · Cell <strong>{String(scanCheckOutConfirm.cell_number).padStart(2, '0')}</strong></>
+              )}
+              .  Check out now (→ Testing queue)?
+            </div>
+            <footer className="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => {
+                  if (scanCheckOutConfirm.cell_number != null) setOpenCell(scanCheckOutConfirm.cell_number);
+                  setScanCheckOutConfirm(null);
+                }}
+                className="px-4 py-2 rounded-lg text-xs font-bold border border-slate-300 text-slate-700 hover:bg-white"
+              >
+                Just show cell
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={async () => {
+                  const target = scanCheckOutConfirm;
+                  setScanCheckOutConfirm(null);
+                  await handleCheckOut(target);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40"
+              >
+                Check out
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {/* Confirm-displace dialog */}
       {pendingDisplace && mode.kind === 'move' && (
