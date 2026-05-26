@@ -24,6 +24,23 @@ export interface UserPermissionGrant {
   user?: Pick<ErpUser, 'id' | 'full_name' | 'email' | 'department'>;
 }
 
+export interface NotificationType {
+  key: string;
+  module_id: string;
+  label: string;
+  description: string | null;
+  sort_order: number;
+}
+
+export interface UserNotificationSetting {
+  user_id: string;
+  type_key: string;
+  admin_enabled: boolean;
+  user_overridable: boolean;
+  user_enabled: boolean | null;
+  updated_at?: string;
+}
+
 export interface PermissionDef {
   id: string;
   label: string;

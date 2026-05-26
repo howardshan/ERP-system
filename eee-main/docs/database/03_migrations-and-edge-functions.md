@@ -216,6 +216,70 @@ supabase functions deploy create-auth-user
 
 ---
 
+### EF-003 `reset-user-password`
+**目录**: `supabase/functions/reset-user-password/index.ts`
+**用途**: 使用 service role key 重置某 Auth 用户密码,供 IT 管理员通过 app 内面板操作。
+
+**请求**:
+```
+POST /functions/v1/reset-user-password
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{ "auth_user_id": "<uuid>", "new_password": "..." }
+```
+
+**响应**:
+```json
+{ "success": true }   // 成功
+{ "error": "..." }    // 失败
+```
+
+**技术细节**:
+- 调用方需提供有效 JWT(验证已登录)
+- `new_password` 至少 6 位
+- 使用 `SUPABASE_SERVICE_ROLE_KEY` 调 `auth.admin.updateUserById`
+
+**部署命令**:
+```bash
+supabase functions deploy reset-user-password
+```
+
+---
+
+### EF-004 `send-notification`
+**目录**: `supabase/functions/send-notification/index.ts`
+**用途**: 通过 SMTP2Go HTTP API 发送 ERP 通知邮件。Phase 1 处理 QC 测试结果通知,由 M-083 的 `trg_qc_notify_on_inspection` 触发器经 pg_net 调用——每记录一次 QC 测试自动发信。
+
+**请求**(由 DB 触发器发起,无终端用户 JWT):
+```
+POST /functions/v1/send-notification
+x-notify-secret: <NOTIFY_WEBHOOK_SECRET>
+Content-Type: application/json
+
+{ "type_key": "qc_test_result", "inspection_id": "<uuid>" }
+```
+
+**响应**:
+```json
+{ "sent": [{ "to": "...", "ok": true }] }   // 已发送(每个收件人一条)
+{ "skipped": "no recipients enabled" }       // 无生效收件人
+{ "error": "..." }                            // 失败
+```
+
+**技术细节**:
+- **必须用 `--no-verify-jwt` 部署**(触发器无用户 JWT);改用共享密钥 `x-notify-secret` == `NOTIFY_WEBHOOK_SECRET` 鉴权
+- 用 `SUPABASE_SERVICE_ROLE_KEY` 调 RPC `notification_recipients` 解析收件人、`qc_test_result_email` 组装内容
+- 发件人取 `NOTIFY_SENDER_EMAIL`(默认 `noreply@crave-cook.com`),API key 取 `SMTP2GO_API_KEY`,均为 Supabase secret,**不入前端/不入库**
+- 每个收件人逐封发送并写 `notification_log`
+
+**部署命令**:
+```bash
+supabase functions deploy send-notification --no-verify-jwt
+```
+
+---
+
 ## 变更操作规范
 
 ### 新增 Migration
@@ -1658,4 +1722,6 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | EF-001 | functions/post-journal-entry/ |
 | EF-SHARED | functions/_shared/ |
 | EF-002 | functions/create-auth-user/ |
-| **EF-003** | _(下一个)_ |
+| EF-003 | functions/reset-user-password/ |
+| EF-004 | functions/send-notification/ |
+| **EF-005** | _(下一个)_ |
