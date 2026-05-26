@@ -1424,6 +1424,17 @@ select vault.create_secret('<同 NOTIFY_WEBHOOK_SECRET 的值>', 'notify_webhook
 
 ---
 
+### M-085 `20260525000004_notification_group_members.sql`
+**用途**: 给 QC 测试结果邮件 payload 增加抽样组成员信息。一次组测试只物理检测一个 champion 车,但其 pass/fail 适用于全组(M-048/M-056)。原邮件只显示被检测那一车的 `sub_lot_code`,收件人看不到这个结果实际覆盖哪些车。`CREATE OR REPLACE FUNCTION qc_test_result_email` 在 `batch` 中新增:
+- `is_group`(组内 >1 车时为 true)、`group_size`、`group_members`(数组,每项 `{code, tested}`,`tested` 标记被抽检车)。
+- solo(无组)测试返回单成员组、`tested=true`。
+
+EF-004 渲染:有组时邮件加一块「Sampling group — N carts covered」,列出全部成员 chip 并高亮 `tested` 那一个。
+
+**依赖**: M-083(`qc_test_result_email`),M-048(`qc_test_group` / `test_group_id`)。**关联文档**: `docs/modules/09_qc.md`。**注意**: 改了 EF-004 渲染逻辑,需重新 `supabase functions deploy send-notification --no-verify-jwt`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1493,7 +1504,8 @@ select vault.create_secret('<同 NOTIFY_WEBHOOK_SECRET 的值>', 'notify_webhook
 | M-082 | 20260524000005_warehouse_permission_seed.sql _(文件头标注 M-082)_ |
 | M-083 | 20260525000002_notification_system.sql |
 | M-084 | 20260525000003_notification_secret_via_vault.sql |
-| **M-085** | _(下一个)_ |
+| M-085 | 20260525000004_notification_group_members.sql |
+| **M-086** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
