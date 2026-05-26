@@ -58,9 +58,18 @@ export interface ProductionLot {
   created_at: string;
 }
 
+export interface TestType {
+  id: number;
+  name: string;
+  unit: string | null;
+  description: string | null;
+  is_active: boolean;
+}
+
 export interface InspectionTemplate {
   id: string;
   sku_id: string;
+  test_type_id: number | null;  // M-087
   item_name: string;
   unit: string | null;
   lower_limit: number;
@@ -76,18 +85,18 @@ export interface Product {
   templates: InspectionTemplate[];
 }
 
+export interface TemplateInput {
+  test_type_id: number;
+  lower_limit: number;
+  upper_limit: number;
+}
+
 export interface ProductInput {
   code?: string | null;  // M-050: auto-generated if absent (BR-Q33)
   name: string;
   standard_drying_minutes: number | null;
   sample_every_n_carts?: number;  // M-048
-  item_id?: number | null;  // M-080: link to ERP item (Warehouse bridge, 决议 §5.5)
-  template: {
-    item_name: string;
-    unit: string | null;
-    lower_limit: number;
-    upper_limit: number;
-  };
+  templates: TemplateInput[];     // M-087: one entry per required test
 }
 
 export interface DryingLocation {
@@ -195,8 +204,8 @@ export async function deleteLocation(id: string): Promise<{ id: string; code: st
 }
 
 export async function createProduct(input: ProductInput): Promise<Product> {
-  if (input.template.lower_limit > input.template.upper_limit) {
-    throw new Error('Lower limit cannot exceed upper limit');
+  for (const t of input.templates) {
+    if (t.lower_limit > t.upper_limit) throw new Error('Lower limit cannot exceed upper limit');
   }
 
   // M-050: auto-generate SKU code when client doesn't supply one (BR-Q33).
@@ -212,22 +221,34 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       name: input.name,
       standard_drying_minutes: input.standard_drying_minutes,
       sample_every_n_carts: input.sample_every_n_carts ?? 1,
-      item_id: input.item_id ?? null,
     })
     .select('id, code, name, standard_drying_minutes, sample_every_n_carts')
     .single();
   if (error) throw new Error(error.message);
 
-  const { error: tmplErr } = await supabase
-    .from('qc_inspection_template')
-    .insert({
+  // M-087: insert one template row per requested test type
+  if (input.templates.length > 0) {
+    const rows = input.templates.map(t => ({
       sku_id: sku.id,
-      item_name: input.template.item_name,
-      unit: input.template.unit,
-      lower_limit: input.template.lower_limit,
-      upper_limit: input.template.upper_limit,
-    });
-  if (tmplErr) throw new Error(tmplErr.message);
+      test_type_id: t.test_type_id,
+      item_name: '',          // will be overwritten by qc_list_products JOIN
+      lower_limit: t.lower_limit,
+      upper_limit: t.upper_limit,
+    }));
+    // item_name is NOT NULL — derive it from the test type
+    const { data: types } = await supabase
+      .from('qc_test_type')
+      .select('id, name, unit')
+      .in('id', input.templates.map(t => t.test_type_id));
+    const typeMap = Object.fromEntries((types ?? []).map((tt: { id: number; name: string; unit: string | null }) => [tt.id, tt]));
+    const fullRows = rows.map(r => ({
+      ...r,
+      item_name: typeMap[r.test_type_id]?.name ?? 'Unknown',
+      unit: typeMap[r.test_type_id]?.unit ?? null,
+    }));
+    const { error: tmplErr } = await supabase.from('qc_inspection_template').insert(fullRows);
+    if (tmplErr) throw new Error(tmplErr.message);
+  }
 
   const all = await listProducts();
   const found = all.find(p => p.id === sku.id);
@@ -235,46 +256,36 @@ export async function createProduct(input: ProductInput): Promise<Product> {
 }
 
 export async function updateProduct(id: string, input: Partial<ProductInput>): Promise<Product> {
-  if (input.template && input.template.lower_limit > input.template.upper_limit) {
-    throw new Error('Lower limit cannot exceed upper limit');
-  }
   const skuPatch: Record<string, unknown> = {};
   if (input.code !== undefined) skuPatch.code = input.code;
   if (input.name !== undefined) skuPatch.name = input.name;
   if (input.standard_drying_minutes !== undefined) skuPatch.standard_drying_minutes = input.standard_drying_minutes;
   if (input.sample_every_n_carts !== undefined) skuPatch.sample_every_n_carts = input.sample_every_n_carts;
-  if (input.item_id !== undefined) skuPatch.item_id = input.item_id;
   if (Object.keys(skuPatch).length > 0) {
     const { error } = await supabase.from('qc_product_sku').update(skuPatch).eq('id', id);
     if (error) throw new Error(error.message);
   }
-  if (input.template) {
-    const { data: existing } = await supabase
-      .from('qc_inspection_template')
-      .select('id')
-      .eq('sku_id', id)
-      .limit(1)
-      .maybeSingle();
-    if (existing?.id) {
-      const { error } = await supabase
-        .from('qc_inspection_template')
-        .update({
-          item_name: input.template.item_name,
-          unit: input.template.unit,
-          lower_limit: input.template.lower_limit,
-          upper_limit: input.template.upper_limit,
-        })
-        .eq('id', existing.id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await supabase.from('qc_inspection_template').insert({
+  // M-087: replace templates wholesale — delete existing, insert new set
+  if (input.templates !== undefined) {
+    const { error: delErr } = await supabase
+      .from('qc_inspection_template').delete().eq('sku_id', id);
+    if (delErr) throw new Error(delErr.message);
+    if (input.templates.length > 0) {
+      const { data: types } = await supabase
+        .from('qc_test_type')
+        .select('id, name, unit')
+        .in('id', input.templates.map(t => t.test_type_id));
+      const typeMap = Object.fromEntries((types ?? []).map((tt: { id: number; name: string; unit: string | null }) => [tt.id, tt]));
+      const rows = input.templates.map(t => ({
         sku_id: id,
-        item_name: input.template.item_name,
-        unit: input.template.unit,
-        lower_limit: input.template.lower_limit,
-        upper_limit: input.template.upper_limit,
-      });
-      if (error) throw new Error(error.message);
+        test_type_id: t.test_type_id,
+        item_name: typeMap[t.test_type_id]?.name ?? 'Unknown',
+        unit: typeMap[t.test_type_id]?.unit ?? null,
+        lower_limit: t.lower_limit,
+        upper_limit: t.upper_limit,
+      }));
+      const { error: insErr } = await supabase.from('qc_inspection_template').insert(rows);
+      if (insErr) throw new Error(insErr.message);
     }
   }
   const all = await listProducts();
@@ -294,14 +305,59 @@ export async function deleteProducts(ids: string[]): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-// M-080: read each SKU's linked ERP item_id. Kept separate from qc_list_products
-// (which doesn't return item_id) to avoid a server-side RPC change in S0.
-export async function listProductItemLinks(): Promise<Record<string, number | null>> {
-  const { data, error } = await supabase.from('qc_product_sku').select('id, item_id');
+// M-086: SKU → ERP item links (one-to-many via qc_sku_item junction table).
+// Returns a map of sku_id → array of item_ids.
+export async function listProductItemLinks(): Promise<Record<string, number[]>> {
+  const { data, error } = await supabase.from('qc_sku_item').select('sku_id, item_id');
   if (error) throw new Error(error.message);
-  const map: Record<string, number | null> = {};
-  (data ?? []).forEach((r: { id: string; item_id: number | null }) => { map[r.id] = r.item_id; });
+  const map: Record<string, number[]> = {};
+  (data ?? []).forEach((r: { sku_id: string; item_id: number }) => {
+    if (!map[r.sku_id]) map[r.sku_id] = [];
+    map[r.sku_id].push(r.item_id);
+  });
   return map;
+}
+
+export async function addSkuItem(skuId: string, itemId: number): Promise<void> {
+  const { error } = await supabase.from('qc_sku_item').insert({ sku_id: skuId, item_id: itemId });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeSkuItem(skuId: string, itemId: number): Promise<void> {
+  const { error } = await supabase.from('qc_sku_item')
+    .delete().eq('sku_id', skuId).eq('item_id', itemId);
+  if (error) throw new Error(error.message);
+}
+
+// ── Test Type catalog (M-087) ─────────────────────────────────────────────────
+
+export async function listTestTypes(): Promise<TestType[]> {
+  const { data, error } = await supabase
+    .from('qc_test_type')
+    .select('*')
+    .order('id');
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export async function createTestType(input: { name: string; unit?: string | null; description?: string | null }): Promise<TestType> {
+  const { data, error } = await supabase
+    .from('qc_test_type')
+    .insert({ name: input.name.trim(), unit: input.unit ?? null, description: input.description ?? null })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function updateTestType(id: number, patch: { name?: string; unit?: string | null; description?: string | null; is_active?: boolean }): Promise<void> {
+  const { error } = await supabase.from('qc_test_type').update(patch).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteTestType(id: number): Promise<void> {
+  const { error } = await supabase.from('qc_test_type').delete().eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 // ── Production lots ───────────────────────────────────────────────────────────
@@ -344,6 +400,7 @@ export async function createProductionLot(input: {
   sub_lot_start_seq?: number;
   sub_lot_end_seq: number;
   lot_number?: string;
+  packaging_item_id?: number | null;  // M-095
 }): Promise<CreateProductionLotResult> {
   if (!input.expected_dry_minutes || input.expected_dry_minutes <= 0) {
     throw new Error('Expected dry time is required (BR-Q29)');
@@ -356,6 +413,7 @@ export async function createProductionLot(input: {
     p_expected_dry_minutes: input.expected_dry_minutes,
     p_sub_lot_start_seq: input.sub_lot_start_seq ?? 1,
     p_sub_lot_end_seq: input.sub_lot_end_seq,
+    p_packaging_item_id: input.packaging_item_id ?? null,
   });
 }
 
@@ -420,6 +478,7 @@ export interface ProductionBatchInput {
   expected_dry_minutes: number;     // required; days → minutes converted by caller
   sub_lot_start_seq: number;        // inclusive, default 1
   sub_lot_end_seq: number;          // inclusive
+  packaging_item_id?: number | null; // M-095 — final-product item picked from SKU's linked list
 }
 
 export interface ProductionBatchResult {
@@ -450,6 +509,7 @@ export async function createProductionBatch(input: ProductionBatchInput): Promis
     expected_dry_minutes: input.expected_dry_minutes,
     sub_lot_start_seq: input.sub_lot_start_seq,
     sub_lot_end_seq: input.sub_lot_end_seq,
+    packaging_item_id: input.packaging_item_id ?? null,
   });
 }
 
@@ -838,6 +898,23 @@ export interface PassRateForecastItem {
 
 export async function dashboardPassRateForecast(): Promise<PassRateForecastItem[]> {
   return rpc<PassRateForecastItem[]>('qc_dashboard_pass_rate_forecast');
+}
+
+// M-093: per-SKU pipeline summary used by the Production dashboard.
+export interface ProductionPipelineItem {
+  sku_id: string;
+  sku_code: string;
+  sku_name: string;
+  production_count: number;   // status='created'
+  dry_room_count: number;     // drying / awaiting_recheck / room_temp_drying
+  testing_count: number;      // pending / inspecting / awaiting_group_result / hold / passed
+  released_count: number;     // status='closed'  (released, not yet dispatched)
+  packaged_count: number;     // status='dispatched'
+  total: number;
+}
+
+export async function productionPipelineSummary(): Promise<ProductionPipelineItem[]> {
+  return rpc<ProductionPipelineItem[]>('qc_production_pipeline_summary');
 }
 
 // M-050: analysis page metrics with filters (BR-Q32).
@@ -1241,15 +1318,19 @@ export const STATUS_COLOR: Record<string, string> = {
   awaiting_group_result: 'bg-indigo-100 text-indigo-900 border-indigo-300',
 };
 
+/** Format a UTC ISO timestamp as Dallas local time (America/Chicago). */
 export function formatQcDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
   try {
-    return new Date(iso).toLocaleString('en-US', {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Chicago',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-    });
+    }).formatToParts(new Date(iso));
+    const get = (t: string) => parts.find(p => p.type === t)?.value ?? '';
+    return `${get('month')}/${get('day')} ${get('hour')}:${get('minute')} ${get('dayPeriod')}`;
   } catch {
     return iso;
   }

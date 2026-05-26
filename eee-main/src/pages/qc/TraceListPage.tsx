@@ -8,15 +8,16 @@ interface Props { onSelectLot: (id: string) => void; }
 
 export default function TraceListPage({ onSelectLot }: Props) {
   const { can } = usePermissions();
-  const canView = can('qc', 'trace', 'view');
+  const canView = can('production', 'trace', 'view');
   const [lots, setLots] = useState<ProductionLot[]>([]);
   const [error, setError] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     listProductionLots().then(lots => {
-      // sort by created_at ascending within each group
-      setLots([...lots].sort((a, b) => a.created_at.localeCompare(b.created_at)));
+      // Sort by created_at DESCENDING — newest work orders first within each
+      // SKU group, so the most recently produced lots appear at the top.
+      setLots([...lots].sort((a, b) => b.created_at.localeCompare(a.created_at)));
     }).catch(e => setError(e.message));
   }, []);
 
@@ -43,7 +44,7 @@ export default function TraceListPage({ onSelectLot }: Props) {
   };
 
   if (!canView) {
-    return <PermissionDenied permission="qc.trace.view" feature="Batch Trace" />;
+    return <PermissionDenied permission="production.trace.view" feature="Batch Trace" />;
   }
 
   return (

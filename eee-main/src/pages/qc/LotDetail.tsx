@@ -40,7 +40,7 @@ export default function LotDetail({ lotId, onBack, onInspectSubLot }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [addCartsOpen, setAddCartsOpen] = useState(false);
-  const canCreateBatch = can('qc', 'production', 'create_batch');
+  const canCreateBatch = can('production', 'work_orders', 'create');
 
   const load = () =>
     productionLotDetail(lotId)

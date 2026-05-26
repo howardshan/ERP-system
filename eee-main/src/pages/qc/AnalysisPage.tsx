@@ -18,7 +18,7 @@ import {
   Product,
   ProductionLot,
 } from '../../services/qcApi';
-import { fmtDays, cn } from '../../lib/utils';
+import { fmtDays, cn, dallasToday, dallasDaysAgo, fmtDallasTime } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { PermissionDenied } from './components/PermissionDenied';
 
@@ -36,22 +36,20 @@ interface ActiveFilters {
   production_lot_id: string | null;
 }
 
-function isoDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+// Date helpers scoped to Dallas/Texas time (America/Chicago).
+// QC operations run in Dallas; all "today" / "N days ago" comparisons use
+// Dallas local midnight, not UTC or the browser machine's local timezone.
+function today(): string {
+  return dallasToday();
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
+function isoDaysAgo(days: number): string {
+  return dallasDaysAgo(days);
 }
 
 function fmtDateTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString(undefined, {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  // Display timestamps in Dallas local time (America/Chicago)
+  return fmtDallasTime(iso);
 }
 
 const PRESETS: Array<{ key: RangePreset; label: string }> = [

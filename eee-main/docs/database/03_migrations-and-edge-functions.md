@@ -1308,6 +1308,269 @@ closed → dispatched   (pkg_dispatch_carts)
 
 ---
 
+### M-081 `20260525000002_qc_forecast_narrow_inflight.sql`
+**用途**: 收窄 `qc_dashboard_pass_rate_forecast` 的「in flight」池子,让 QC Home 上 "Predicted passes" 卡片只算**正在/即将测试**的车。
+
+**问题**: 之前的实现(M-050)把以下状态全算 in_progress:
+```
+'drying', 'pending', 'awaiting_group_result',
+'awaiting_recheck', 'room_temp_drying', 'hold', 'inspecting'
+```
+这意味着 `forecast_passes = ROUND(in_progress × pass_rate)` 把还在烘干、室温干、redry、hold 等远没轮到测试的车都算进来。用户看到「Predicted passes 15」但 dry room 里只有 10 辆等出库,差额来自 hold/redry 的旧车——令人困惑。
+
+**修复**: in_progress 收窄到三种状态:
+- `'pending'` — 已出库,在 Testing queue 等取样
+- `'inspecting'` — 已取样,正在录 Aw
+- `'awaiting_group_result'` — sibling 等 champion 结果(propagation 后会继承 PASS/FAIL)
+
+公式不变,`COALESCE(pass_rate, 1.0)`(无今日 inspection 默认 100%)也不变——只是「即将产生 inspection」的车数算得更准。
+
+**业务规则**:
+- **BR-Q41** Predicted passes 的 in-flight 集合只包含「正在/即将产生 inspection」的车。drying / room_temp_drying / awaiting_recheck / hold 不算——它们要么还没出库要么已 FAIL,不会直接产生 PASS 计数。
+
+**依赖**: M-050(`qc_dashboard_pass_rate_forecast` 原始实现)。
+
+---
+
+### M-082 `20260525000003_repair_w11111_orphan_siblings.sql`
+**用途**: 一次性数据修复,把 W11111-003/006/007/008 这 4 辆孤儿 sibling(同 M-075 时代级联 bug 的受害者,卡在 `awaiting_group_result`)按操作员决定 → 视作 PASS @ Aw 0.7 + 直接 release。
+
+**变更**(用 PL/pgSQL DO block 循环 4 车,带 status='awaiting_group_result' 守卫保幂等):
+- 每车 INSERT 一条 `qc_inspection_record` (result='pass', values_json={aw: 0.7}, sample_id=NULL)
+- 每车 UPDATE 状态 → `closed`,`released_at` 写 now()
+- 每车写 3 条 `qc_quality_event`:`inspection_passed` / `manual_repair`(`migration_ref='M-082'`)/ `released`
+
+**业务规则**: 沿用 M-076 的 BR — 孤儿 sibling 修复必须保留 trace 历史;原 group 因为还没找到 champion / champion 不可用,直接跳到 closed 不算 propagation。
+
+**依赖**: M-075(根因 bug 修复)、M-067(`released_at` 字段)。
+
+---
+
+### M-083 `20260525000004_qc_trace_action_permissions.sql`
+**用途**: 给 [TracePage](../../src/pages/qc/TracePage.tsx) 新加的两个动作按钮播种权限:
+- `qc.trace.add_carts` — Trace 详情页右上 "Add carts" 按钮(打开 `AddCartsDialog` 在现有 work order 上追加车)
+- `qc.trace.reprint_sticker` — Trace 详情页右上 "Reprint sticker" 按钮(打开 `ReprintPickerDialog` 多选 + 走 `CartStickerSheet`)
+
+种子给两个 dev 账号(`ysha@smu.edu`、`shayiqing16@gmail.com`),`ON CONFLICT DO NOTHING` 保幂等。
+
+**业务规则**:
+- **BR-Q42** Trace 页的 Add carts / Reprint sticker 是**独立权限**,跟 `qc.production.create_batch` 解耦——可以有人能看 trace + 重打贴纸但不能改生产数据,也可以有人能在 trace 页继续往 work order 追车但不能新建 lot。两者 prereq 都是 `qc.trace.view`。
+
+**依赖**: M-040 / M-063(dev 用户全 QC 权限种子的延伸)。
+
+---
+
+### M-084 `20260525000005_qc_forecast_exclude_orphan_agr.sql`
+**用途**: 进一步收窄 `qc_dashboard_pass_rate_forecast` 的 in-flight 池子,排除 **孤儿 awaiting_group_result 车**(其 champion 已经不在 testing 队列里——pass/fail/release/closed 都算)。
+
+**问题**: M-081 把 in-flight 收到 `pending / inspecting / awaiting_group_result` 三种。但 `awaiting_group_result` 里可能有「孤儿」——它们的 champion 已经被释放或关闭,自己再也拿不到结果,却仍被算进 forecast,造成虚高。
+
+**修复**: `awaiting_group_result` 只在「champion 还在 pending/inspecting」时才算 in-flight。`pending / inspecting` 永远算。SQL 通过 EXISTS 子查询找同 group 的 champion 当前状态。
+
+---
+
+### M-085 `20260525000006_repair_stuck_retest_carts.sql`
+**用途**: 一次性数据修复——W12345-005 / W11111-005 / W11111-008 这 3 车走过 retest disposition 但卡在非可见状态(不在 Testing queue,也不在 Needs Attention)。把它们从任何卡住的非终态拉回 `pending`,以便重新取样。带 status 守卫保幂等。
+
+---
+
+### M-086 `20260525000007_repair_retest_carts_pass_07.sql`
+**用途**: 跟 M-085 同样 3 车,但走**另一条决策**——直接 close as PASS @ Aw 0.7 + release(类似 M-082 对 W11111 orphans 的处理)。每车插 synthetic qc_inspection_record (result=pass, aw=0.7) + 状态 → 'closed' + released_at + 3 条 audit 事件。
+
+> **注**: M-085 和 M-086 是**互补但语义对立**的两条处理路径。运行哪个取决于操作员当时的决策——回测 vs 直接 close。两者都带 status 守卫,所以先跑哪个都行,第二次会 no-op。
+
+---
+
+### M-087 `20260525000008_qc_sku_item_junction.sql`
+**用途**: 把 `qc_product_sku.item_id`(一对一)替换为 `qc_sku_item` 多对多 junction 表。一个 SKU 可关联多个 ERP `item`(不同袋装规格、不同客户标签等)。
+
+**变更**:
+- 新表 `qc_sku_item (sku_id, item_id, added_at, PK(sku_id, item_id))`,双侧 FK with `ON DELETE CASCADE`
+- 保留旧 `qc_product_sku.item_id` 列做 backwards-compat(后续会废弃)
+- UI 在 Production 页面管理 SKU↔Item 关联
+
+---
+
+### M-088 `20260525000009_qc_test_type_catalog.sql`
+**用途**: 引入 `qc_test_type` 全局测试类型目录(Water Activity / Moisture Content / pH 等),允许一个 SKU 配置多个测试,每个测试有自己的 per-SKU 上下限。
+
+**变更**:
+- 新表 `qc_test_type (id, name, unit)`,seed 第一条 "Water Activity (Aw)"
+- `qc_inspection_template` 加 `test_type_id` FK(nullable 兼容旧数据,自动 back-fill 现有行)
+- `qc_list_products()` 暴露 `test_type_id`
+
+---
+
+### M-089 `20260525000010_pkg_skus_with_stock_fix_nested_agg.sql`
+**用途**: 修复 `pkg_skus_with_stock` 的 **nested aggregate** 错误,触发条件是终于有 `status='closed'` 的车被打包队列查到。
+
+**问题**:
+```sql
+-- M-067 原始写法:
+SELECT jsonb_agg(jsonb_build_object(..., COUNT(s.id)) ORDER BY sku.name)
+FROM qc_drying_sub_lot s ...
+GROUP BY sku.id, sku.name, sku.code
+```
+`jsonb_agg(...)` 和 `COUNT(s.id)` 同时出现在 SELECT 里,Postgres 拒绝:`aggregate function calls cannot be nested`。之前 production DB 没 closed 车 → GROUP BY 出空集 → 报错没触发。M-082 把 W11111-003/006/007/008 修到 closed 后,Packaging 页面终于读到这条 SQL → 一访问就报错。
+
+**修复**: 把 COUNT 放到 CTE 里先算好,主查询 jsonb_agg 一个 flat 结果集,无嵌套。函数签名/返回类型不变。
+
+---
+
+### M-090 `20260525000011_pkg_dispatch_carts_fix_lot_ambiguous.sql`
+**用途**: 修复 `pkg_dispatch_carts` 两个 latent bug,Dispatch 按钮一直没法用。
+
+**Bug 1 — `column reference "lot.id" is ambiguous`**:
+函数同时声明了 PL/pgSQL 局部变量 `lot qc_production_lot%ROWTYPE` 和 SQL 查询里的表别名 `JOIN qc_production_lot lot`。Postgres 校验函数体到这条 SQL 时,`lot.id` 无法判断是变量还是表列 → 直接报 ambiguous。注意函数体 SQL 是**延迟校验**(lazy),所以 dispatch RPC 直到今天 M-082 留下 closed 状态车、用户首次按 Dispatch,bug 才暴露。
+
+**Bug 2 — silent no-op UPDATE**:
+```sql
+UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
+```
+本意是把 SQL 列写成实际成功数(局部变量),但 PL/pgSQL 把右边 `cart_count` 也当成**列名**(同名局部变量被列遮蔽)。结果是「列 = 列」永远 no-op,即使中途有车被 CONTINUE 跳过,`pkg_outbound.cart_count` 永远等于最初 `array_length` 那个乐观值。
+
+**修复**:
+- 删掉没用到的局部变量 `lot qc_production_lot%ROWTYPE`,SQL 别名继续叫 `lot` 不变
+- 局部计数变量 `cart_count` → 重命名为 `success_count`,避免与列同名;UPDATE 现在真的写新值进去
+
+**业务规则**:
+- **BR-Q46** PL/pgSQL 函数里**禁止局部变量名与已被使用的 SQL 表别名相同**(即便变量未实际引用)。Postgres 不在编译期阻止这种 shadowing,只在运行期抛 ambiguous。代码审查时一并检查。
+
+---
+
+### M-091 `20260525000012_pkg_dispatch_carts_fix_dispatched_by_fkey.sql`
+**用途**: 修复 `pkg_dispatch_carts` 的 FK 违约错误:
+
+> ERROR: insert or update on table "pkg_outbound" violates foreign key constraint "pkg_outbound_dispatched_by_fkey"
+
+**根因**: `pkg_outbound.dispatched_by` 的 FK 是 `REFERENCES erp_user(id)`(M-067 DDL),但函数 INSERT 时塞的是 `auth.uid()`。`auth.uid()` 返回的是 `auth.users.id`,跟 `erp_user.id` 是两个不同体系——两者通过 `erp_user.auth_user_id` 列建关联(M-010)。
+
+**修复**: INSERT 之前先 `SELECT id FROM erp_user WHERE auth_user_id = auth.uid()` 反查 `dispatcher_id`,再写入。列允许 NULL,所以无 auth context 时干净落 NULL,不会出错。
+
+**业务规则**:
+- **BR-Q47** **凡是 FK → `erp_user(id)` 的列(operator/dispatcher 类),写入时必须通过 `auth.uid()` 反查 `erp_user.id`,不能直接写 `auth.uid()`。** FK → `auth.users(id)` 类的列(actor_auth_id / inspector_auth_id 等)继续可以直接 `auth.uid()`。
+
+---
+
+### M-092 `20260525000013_pkg_work_order_packaging.sql`
+**用途**: Packaging 模块按 **work order** 维度分组,每个 work order 关联一种 packaging。
+
+**变更**:
+
+| 对象 | 操作 | 说明 |
+|---|---|---|
+| `item` | INSERT 3 行 | 种子 packaging:`PKG-BAG-500G` (Bag 500g)、`PKG-BAG-1KG` (Bag 1kg)、`PKG-CARTON-5KG` (Carton 5kg);`ON CONFLICT (sku) DO NOTHING` |
+| `qc_production_lot.packaging_item_id bigint` | ADD COLUMN | FK → `item(id)`,nullable |
+| `qc_production_lot` 现有行 | UPDATE backfill | 按 `created_at, id` 排序后 mod 3 round-robin,把 3 个 packaging 平摊给所有 work order(只在 `packaging_item_id IS NULL` 时改,可重跑) |
+| `pkg_available_carts` | REPLACE | 输出新增 `packaging_id` / `packaging_sku` / `packaging_name` 三个字段 (LEFT JOIN item),前端可直接 group by `work_order_barcode` 并展示 packaging 标签 |
+
+**业务规则**:
+- **BR-Q48** 一个 work order **绑定一种** packaging。一对一,简单可控;以后改 m:n 走新迁移。
+- **BR-Q49** Packaging 是 ERP `item` 表里 `item_type='packaging'` 的子集——跟 raw_material/finished_good 共用同一张 master table,只通过 `item_type` 区分。
+
+**前端配套**:
+- `src/services/pkgApi.ts` — `PkgCart` interface 加 `packaging_id / packaging_sku / packaging_name`
+- `src/pages/packaging/PackagingPage.tsx` — 车列表改成**按 work order group**;每组 header 显示 WO 号 + packaging 名称(`Package` 图标) + 组内 select-all + cart 数;未分配 packaging 时显示灰色斜体「No packaging assigned」
+
+---
+
+### M-092a (frontend-only,无 migration)
+
+**ScanQrDialog 连续扫码模式**:
+- 新增 `keepOpen?: boolean` 和 `runningSummary?: string` props
+- `keepOpen=true` 时,扫到一辆车后 dialog **不自动关闭**:input 清空 + 重新 focus + 临时显示「✓ Added <code>」绿色提示。底部 Cancel 按钮文字变成 **Done**(突出黑色背景),Find cart 按钮文字变成 **Add cart**
+- `runningSummary` 字符串(可选)在 dialog 底部以小灰条显示「N carts queued for check-in」之类的当前累计数,操作员心里有数
+
+**接入点**: [DryRoomListMode.tsx](../../src/pages/qc/components/DryRoomListMode.tsx) 两个 `<ScanQrDialog>`(check-in / check-out)都加上 `keepOpen` + `runningSummary`,扫一个不再 dismiss dialog。`handleScanned` / `handleScannedForOut` 内部去掉 `setScanOpen(false)`。
+
+**业务规则**:
+- **BR-Q50** 扫码场景下的 ScanQrDialog 默认走 **continuous-scan 模式**,操作员一次性扫完所有车再点 Done,**不再每扫一辆都被弹回主页面**。grid mode 的 single-scan smart route 行为保留(不传 `keepOpen`)。
+
+---
+
+### M-093 `20260525000014_qc_production_pipeline_summary.sql`
+**用途**: 新 RPC `qc_production_pipeline_summary()` —— 给 Production 模块的新 Dashboard 提供「每个 SKU 当前在 production → packaging 管道里各阶段有多少车」的快照。
+
+**输出**: 每个有任何在飞车的 SKU 一行,包含 5 个 bucket:
+
+| 字段 | 状态映射 |
+|---|---|
+| `production_count` | `created` |
+| `dry_room_count` | `drying` + `awaiting_recheck` + `room_temp_drying` |
+| `testing_count` | `pending` + `inspecting` + `awaiting_group_result` + `hold` + `passed` |
+| `released_count` | `closed`(已 release 待打包) |
+| `packaged_count` | `dispatched`(已出库) |
+
+**业务规则**:
+- **BR-Q51** **Production / Batch Trace / Products & Templates / Test Types** 这 4 个功能从 QC 模块迁移到新的 Production & Manufacturing 模块。组件文件仍在 `src/pages/qc/` 由 ProductionModule import(代码层面不动)。**M-093 时权限 key 暂保留 `qc.*` 命名**;**M-094 起改为 `production.*`**(见下条)。
+- **BR-Q52** Production Dashboard 的 "testing" bucket 包含 `hold` 和 `passed`——它们都是「测试已发生,等人手 action」状态,从工厂经理视角看仍属于「在 QC 流程里」,没出 QC。
+
+**前端配套**:
+- `src/services/qcApi.ts` — 新 `productionPipelineSummary()` wrapper 和 `ProductionPipelineItem` 类型
+- 新文件 `src/pages/production/ProductionModule.tsx` — Production 模块的 sidebar shell,默认 screen='dashboard'
+- 新文件 `src/pages/production/ProductionDashboard.tsx` — 每 15s 自动刷新的 SKU × 5-bucket 表格
+- `src/App.tsx` — case 'production' → `<ProductionModule>`
+- `src/pages/qc/QualityControlModule.tsx` — 移除 Production / Trace / Products / Test Types 的 sidebar 入口和 renderContent 分支(BR-Q51)
+
+---
+
+### M-094 `20260525000015_permission_move_to_production_module.sql`
+**用途**: 把 Production / Batch Trace / Products & Test Types 的权限 key 从 `qc.*` 命名空间**真正搬到** `production.*` 命名空间。M-093 时只搬了 UI、保留旧 key 避免破坏 grant;这次 key 也跟着搬。
+
+**Key 映射**:
+
+| 旧 (qc.*) | 新 (production.*) |
+|---|---|
+| `qc.production.create_batch` | `production.work_orders.create` |
+| `qc.trace.view` | `production.trace.view` |
+| `qc.trace.add_carts` | `production.trace.add_carts` |
+| `qc.trace.reprint_sticker` | `production.trace.reprint_sticker` |
+| `qc.products.view` | `production.products.view` |
+| `qc.products.create` | `production.products.create` |
+| `qc.products.edit` | `production.products.edit` |
+| `qc.products.delete` | `production.products.delete` |
+
+**Migration 步骤**(用 CTE 框定要搬的旧行):
+1. `INSERT user_module_access (user_id, 'production') SELECT DISTINCT user_id FROM old_rows ON CONFLICT DO NOTHING` —— 凡是有这批旧 grant 的用户,先给他们「production 模块」可见权限,否则前端切到新 key 后 Module Hub 卡片就不见了
+2. `INSERT user_permission_grant` 用 CASE 表达式 1:1 映射到新 key,`ON CONFLICT DO NOTHING` 幂等
+3. `DELETE FROM user_permission_grant` 删掉所有旧 key 的行
+
+**前端配套**(同一次任务):
+- `src/lib/permissionStructure.ts` —— `qc.production` / `qc.trace` / `qc.products` 三个 resource 删除;`production` 模块新增 `work_orders` / `trace` / `products` 三个 resource(`production_order` 那个 placeholder 保留)
+- 所有 `can('qc', 'production'|'trace'|'products', ...)` 调用站点改成 `can('production', 'work_orders'|'trace'|'products', ...)` —— 共 8 处文件
+- PermissionDenied 的 `permission="qc.*"` 显示字符串也跟着改成 `permission="production.*"`,跟新 key 一致
+
+**业务规则**:
+- **BR-Q53** **Trace 资源的 `add_carts` 权限对应 SQL 写操作**(`qc_add_sub_lots_to_lot`);因为这是「修改 work order」的能力,跟 `work_orders.create` 解耦——只让某些角色追加车不让从零建。
+- **BR-Q54** Module hub 卡片可见性由 `user_module_access` 控制,跟具体的 grant 行**不联动**。新模块上线时:加 grant **不会**自动让卡片出现,必须显式 `INSERT user_module_access`(BR 在 M-009 已经存在,本次强调一次)。
+
+**已知 follow-up**:
+- M-040 / M-063 的种子 migration 里仍写着 `('qc', 'production', 'create_batch')` 等旧 key —— 那些是历史 already-applied migration,DB 不会重跑;但任何**新种子**(给新用户)请直接用新 key。
+- 后续如要给某些资源(比如 dashboard / analysis)做类似搬迁,参考本 M-094 的 CTE 模式。
+
+---
+
+### M-095 `20260526000001_qc_create_lot_with_packaging.sql`
+**用途**: 让 `qc_create_production_lot_with_sub_lots` 接受 `p_packaging_item_id` 参数,把新建 work order 时操作员选中的「Final product」写到 `qc_production_lot.packaging_item_id` 上(M-092 加的列)。
+
+**变更**:
+- RPC 签名加 `p_packaging_item_id bigint DEFAULT NULL`(可选,向后兼容)
+- 内层 `INSERT INTO qc_production_lot (...)` 加 `packaging_item_id` 列
+- 返回 jsonb 多带 `packaging_item_id` 字段
+
+**未做服务端校验**:有意不强制 `p_packaging_item_id` 必须出现在 `qc_sku_item(p_sku_id)` 里——前端 dropdown 已经收窄到允许集了,Studio 里手动指定别的 item 也允许(后台口子,不堵)。
+
+**业务规则**:
+- **BR-Q55** 每个 SKU 在 ProductManagement 里维护一个「Final products」多选列表(写入 `qc_sku_item` 多对多)。
+- **BR-Q56** 新建 work order 时,如果所选 SKU 已配置至少一个 final product,操作员**必须**从这个列表里选一个;前端 submit 按钮在没选时 disabled,RPC 层不强制。`isAddMode`(给现有 lot 加车)不要求选——继承原 lot 的 packaging。
+
+**前端配套**:
+- `src/services/qcApi.ts` — `ProductionBatchInput` / `createProductionLot` 加 `packaging_item_id?: number | null`
+- `src/pages/qc/ProductManagement.tsx` — 编辑表单加「Final products」勾选区,多选 ERP items;保存时 diff 旧/新 selection,调 `addSkuItem` / `removeSkuItem` 同步 `qc_sku_item`;复用已有 `listProductItemLinks` / `listItems` API
+- `src/pages/qc/Production.tsx` — **删掉**老的「关联 ERP 物料」section(在 Production 表单里临场加关联那个);改成 SKU 选完后弹一个**必填**的 "Final product" 下拉,选项过滤到 `linkedItems`(qc_sku_item 已有的);空集时显示「先去 Products 配置」提示;submit 校验 + button disabled
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1373,7 +1636,22 @@ closed → dispatched   (pkg_dispatch_carts)
 | M-078 | 20260523000022_qc_create_disposition_fix_room_temp_columns.sql |
 | M-079 | 20260523000023_qc_testing_view_dashboard_permission.sql |
 | M-080 | 20260525000001_qc_location_crud.sql |
-| **M-081** | _(下一个)_ |
+| M-081 | 20260525000002_qc_forecast_narrow_inflight.sql |
+| M-082 | 20260525000003_repair_w11111_orphan_siblings.sql |
+| M-083 | 20260525000004_qc_trace_action_permissions.sql |
+| M-084 | 20260525000005_qc_forecast_exclude_orphan_agr.sql |
+| M-085 | 20260525000006_repair_stuck_retest_carts.sql |
+| M-086 | 20260525000007_repair_retest_carts_pass_07.sql |
+| M-087 | 20260525000008_qc_sku_item_junction.sql |
+| M-088 | 20260525000009_qc_test_type_catalog.sql |
+| M-089 | 20260525000010_pkg_skus_with_stock_fix_nested_agg.sql |
+| M-090 | 20260525000011_pkg_dispatch_carts_fix_lot_ambiguous.sql |
+| M-091 | 20260525000012_pkg_dispatch_carts_fix_dispatched_by_fkey.sql |
+| M-092 | 20260525000013_pkg_work_order_packaging.sql |
+| M-093 | 20260525000014_qc_production_pipeline_summary.sql |
+| M-094 | 20260525000015_permission_move_to_production_module.sql |
+| M-095 | 20260526000001_qc_create_lot_with_packaging.sql |
+| **M-096** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

@@ -17,7 +17,7 @@ import {
 } from '../../services/qcApi';
 import { getInventorySummary, getAvailableCarts, PkgInventorySku, PkgCart } from '../../services/pkgApi';
 import { usePermissions } from '../../contexts/PermissionContext';
-import { cn } from '../../lib/utils';
+import { cn, dallasToday, dallasDaysAgo } from '../../lib/utils';
 import { DisposeDialog } from './components/DisposeDialog';
 import { PermissionDenied } from './components/PermissionDenied';
 
@@ -266,7 +266,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
         <section className="mt-6">
           <div className="flex items-baseline justify-between mb-2">
             <h2 className="text-sm font-bold text-slate-900">
-              Needs attention <span className="text-slate-400 font-normal">(last 24h test results)</span>
+              Needs attention <span className="text-slate-400 font-normal">(today's test results)</span>
             </h2>
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
               {overview.needs_attention.length} entries
@@ -581,14 +581,20 @@ function statusBadge(status: string) {
   );
 }
 
+/** Group label for a UTC ISO string using Dallas local date. */
 function dayLabel(isoStr: string): string {
-  const d = new Date(isoStr);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return 'Today';
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const dallasDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date(isoStr));
+  if (dallasDate === dallasToday()) return 'Today';
+  if (dallasDate === dallasDaysAgo(1)) return 'Yesterday';
+  // Format as "May 25"
+  const [, mon, day] = dallasDate.split('-');
+  const label = new Date(`${dallasDate}T12:00:00`).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric',
+  });
+  return label || `${mon}/${day}`;
 }
 
 function FailDetailPanel({ items, loading, onClose, onOpenHistory }: {

@@ -19,11 +19,12 @@
         "minHeight": 700,
         "resizable": true,
         "fullscreen": false,
-        "center": true
+        "center": true,
+        "additionalBrowserArgs": "--kiosk-printing"
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: asset: http://127.0.0.1:5173 ws://127.0.0.1:5173; connect-src 'self' http://127.0.0.1:5173 ws://127.0.0.1:5173 https://*.supabase.co wss://*.supabase.co https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:5173; style-src 'self' 'unsafe-inline' http://127.0.0.1:5173; img-src 'self' data: https: tauri: asset: http://127.0.0.1:5173; font-src 'self' data: http://127.0.0.1:5173"
+      "csp": "default-src 'self' blob: tauri: asset: http://127.0.0.1:5173 ws://127.0.0.1:5173; connect-src 'self' http://127.0.0.1:5173 ws://127.0.0.1:5173 https://*.supabase.co wss://*.supabase.co https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: http://127.0.0.1:5173; style-src 'self' 'unsafe-inline' blob: http://127.0.0.1:5173; img-src 'self' data: blob: https: tauri: asset: http://127.0.0.1:5173; font-src 'self' data: http://127.0.0.1:5173"
     }
   },
   "bundle": {
