@@ -97,21 +97,23 @@
 
 | 类型 | 任务 | 状态 |
 |------|------|------|
-| ⚙️ | M-082 append-only 守护触发器：禁止 `UPDATE`/`DELETE` `inventory_transaction`（BR-1，计划书 §8.1） | 🔲 |
-| ⚙️ | M-083 balance 维护触发器：`inventory_transaction` AFTER INSERT → upsert `inventory_balance`（BR-4） | 🔲 |
-| 🔌 | M-084 `_wh_apply_transaction(...)`：UOM 换算 + 批控(BR-3) + 负库存(BR-5) + **BR-W4 双条件校验**（决议 §5.2） | 🔲 |
-| 🔌 | M-085 `wh_generate_lot_number(p_item_id, p_source_type)`（占位规则，计划书 §9） | 🔲 |
-| 🔌 | M-086 `wh_create_lot` / `wh_post_receipt`（含 `receipt_type='direct'`，BR-W2/D-W03） | 🔲 |
-| 🔌 | M-087 查询：`wh_list_balance` / `wh_list_transactions`（或 view） | 🔲 |
-| 🧩 | warehouseApi：`postReceipt` / `listBalance` / `listTransactions` / `createLot` | 🔲 |
-| 🖥️ | Balance 余额页（按 item/lot/location 三维） | 🔲 |
-| 🖥️ | GR 收货单 list + form，**Direct 醒目标签**（BR-W2） | 🔲 |
-| 📄 | 文档：M-082~087 条目 + 11_warehouse-inventory.md 收货章节 | 🔲 |
+| ⚙️ | **M-100** append-only 守护触发器 + balance 维护触发器（BR-1/BR-4） | 🟢 |
+| ⚙️ | **M-101** `goods_receipt.supplier_id` 可空 + `receipt_type`（BR-W2） | 🟢 |
+| 🔌 | **M-102** `_wh_apply_transaction`（UOM 换算 + BR-3 批控 + BR-5 负库存 + BR-W4 双条件）+ `wh_next_grn_number` + `wh_generate_lot_number`（§9） | 🟢 |
+| 🔌 | **M-103** `wh_create_lot` / `wh_post_receipt`（一次性 direct 收货） | 🟢 |
+| 🔌 | **M-104** `wh_list_balance` / `wh_list_transactions` | 🟢 |
+| 🧩 | warehouseApi：rpc helper + `postReceipt` / `listBalance` / `listTransactions` / `listGoodsReceipts` | 🟢 |
+| 🖥️ | Balance 余额页（按 item/lot/location 三维 + 库区筛选） | 🟢 |
+| 🖥️ | GR 收货单 list + 多行 form，**DIRECT 醒目标签** | 🟢 |
+| 📄 | 文档：M-100~104 索引 + 11_warehouse-inventory.md 内核/收货章节 | 🟢 |
 
-**✅ 验证门 M1：**
-- 无 PO 收货一笔 → `LOC-RM`，余额页正确显示，`goods_receipt.receipt_type='direct'` 且 UI 有标签
-- 尝试手动 `UPDATE inventory_transaction` → 被触发器拒绝
-- 收货数量为负或无 lot（lot 控制物料）→ 被 RPC 拒绝
+> **编号落定**：S1 实占 **M-100~M-104**（`20260526000003`~`007`）。下一个 migration 从 **M-105** 起。
+> **M1 范围限定**：仅批次控制物料可收货（`inventory_balance` PK 含 lot_id）；收货为一次性 post，draft/冲销/调拨留 S2。
+
+**✅ 验证门 M1：**（migration 待 push 后走查）
+- 无 PO 收货一笔 → `LOC-RM`，余额页正确显示，`goods_receipt.receipt_type='direct'` 且 UI 有 DIRECT 标签
+- 尝试手动 `UPDATE inventory_transaction` → 被 `trg_invtxn_append_only` 拒绝
+- 内核守护（SQL 直调）：批控物料无 lot → BR-3 拒；出库使 balance<0 → BR-5 拒；从 quarantine 出 issue/ship → BR-W4 拒
 
 ---
 

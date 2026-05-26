@@ -1677,6 +1677,66 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+> **以下 M-100～M-104 为 Warehouse Sprint 1（库存流水内核 / 可收货入账）。**
+
+### M-100 `20260526000003_wh_ledger_triggers.sql`
+**用途**: 库存账本守护与派生余额维护（BR-1 / BR-4）。
+
+**变更**:
+| 对象 | 操作 | 说明 |
+|------|------|------|
+| `wh_invtxn_append_only()` + `trg_invtxn_append_only` | CREATE | BEFORE UPDATE/DELETE ON `inventory_transaction` → `RAISE EXCEPTION`（只增账本，BR-1） |
+| `wh_invtxn_maintain_balance()` + `trg_invtxn_maintain_balance` | CREATE | AFTER INSERT → upsert `inventory_balance`（`quantity_on_hand += NEW.quantity`，BR-4）；`lot_id IS NULL` 时报错（balance 主键含 lot_id） |
+
+**特性**: 幂等。**依赖**: M-001。
+
+---
+
+### M-101 `20260526000004_wh_goods_receipt_schema.sql`
+**用途**: 为无 PO「direct」收货准备 `goods_receipt`（BR-W2）。
+
+**变更**: `supplier_id` 去 NOT NULL（direct 收货供应商选填）；`ADD COLUMN receipt_type text NOT NULL DEFAULT 'direct' CHECK (po|direct)`。
+
+**特性**: 幂等。**依赖**: M-001。
+
+---
+
+### M-102 `20260526000005_wh_kernel_and_generators.sql`
+**用途**: 库存流水内核 + 编号生成器。
+
+**变更**:
+| 对象 | 说明 |
+|------|------|
+| `wh_next_grn_number()` | `GRN-NNNNNN`，max+1 正则 |
+| `wh_generate_lot_number(item, source_type)` | 占位规则（§9）：purchased→`RM-YYYYMMDD-SEQ4`；produced→`FG-{sku}-YYYYMMDD-SEQ4` |
+| `_wh_apply_transaction(...)` SECURITY DEFINER | **所有库存写操作唯一入口**：BR-3 批控 + BR-2 UOM→base 换算 + BR-W4 双条件（issue/ship/consume）+ BR-5 负库存（`FOR UPDATE` 行锁）；INSERT 签名流水，余额由 M-100 触发器维护 |
+
+**设计**: BR-W4 仅对 `issue/ship/production_consume` 生效——`transfer` 出 quarantine 是合法的（QC 放行调拨），故不拦。`SET search_path = public, pg_temp`。**特性**: 幂等。**依赖**: M-001、M-100。
+
+---
+
+### M-103 `20260526000006_wh_create_lot_and_post_receipt.sql`
+**用途**: 建批 + 一次性直接收货。
+
+**变更**:
+| 对象 | 说明 |
+|------|------|
+| `wh_create_lot(...)` SECURITY DEFINER | lot_number 空则调生成器；BR-6 由 `shelf_life_days` 推 expiry；默认 status=`available` |
+| `wh_post_receipt(p_lines jsonb, ...)` SECURITY DEFINER | 一次性：生成 GRN（`status=posted`,`receipt_type=direct`,`po_id=NULL`,supplier 选填）→ 每行建 lot + `goods_receipt_line` + `_wh_apply_transaction('receipt', +qty)`；返回 `{grn_id, grn_number, line_count, lot_ids}` |
+
+**特性**: 幂等。draft/`wh_cancel_grn` 留 S2。**依赖**: M-102。
+
+---
+
+### M-104 `20260526000007_wh_balance_queries.sql`
+**用途**: 查询函数（只读，`LANGUAGE sql STABLE`）。
+
+**变更**: `wh_list_balance(p_location_id, p_item_id)`（join item/lot/location，含 available=on_hand-allocated、lot.status）；`wh_list_transactions(p_item_id, p_lot_id, p_location_id, p_limit)`（按 date desc）。
+
+**特性**: 幂等。**依赖**: M-001。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1761,7 +1821,12 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-097 | 20260524000003_qc_product_sku_add_item_id.sql （已被 M-087 取代） |
 | M-098 | 20260524000004_warehouse_seed_uom.sql |
 | M-099 | 20260524000005_warehouse_permission_seed.sql |
-| **M-100** | _(下一个)_ |
+| M-100 | 20260526000003_wh_ledger_triggers.sql |
+| M-101 | 20260526000004_wh_goods_receipt_schema.sql |
+| M-102 | 20260526000005_wh_kernel_and_generators.sql |
+| M-103 | 20260526000006_wh_create_lot_and_post_receipt.sql |
+| M-104 | 20260526000007_wh_balance_queries.sql |
+| **M-105** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

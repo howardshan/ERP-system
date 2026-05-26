@@ -6,11 +6,15 @@ import {
   LayoutGrid,
   HelpCircle,
   ArrowLeft,
+  Layers,
+  Truck,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
 import ItemsPage from './ItemsPage';
 import LocationsPage from './LocationsPage';
+import BalancePage from './BalancePage';
+import GoodsReceiptPage from './GoodsReceiptPage';
 
 interface Props {
   onHome: () => void;
@@ -48,11 +52,15 @@ export default function WarehouseModule({ onHome }: Props) {
 
   const canViewItems = can('warehouse', 'items', 'view');
   const canViewLocations = can('warehouse', 'locations', 'view');
+  const canViewInventory = can('warehouse', 'inventory', 'view');
+  const canViewReceipts = can('warehouse', 'goods_receipt', 'view');
 
   const isActive = (id: string) => screen === id || screen.startsWith(id + ':');
   const navigate = (s: string) => setScreen(s);
 
   function renderContent() {
+    if (screen === 'balance' && canViewInventory) return <BalancePage />;
+    if (screen === 'goods-receipt' && canViewReceipts) return <GoodsReceiptPage />;
     if (screen === 'items' && canViewItems) return <ItemsPage />;
     if (screen === 'locations' && canViewLocations) return <LocationsPage />;
     return <WarehouseHome />;
@@ -80,6 +88,14 @@ export default function WarehouseModule({ onHome }: Props) {
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 pb-4">
           <NavItem icon={Package} label="Overview" isActive={isActive('home')} onClick={() => navigate('home')} />
+
+          {(canViewInventory || canViewReceipts) && <NavSection title="Inventory" />}
+          {canViewInventory && (
+            <NavItem icon={Layers} label="Balance" isActive={isActive('balance')} onClick={() => navigate('balance')} />
+          )}
+          {canViewReceipts && (
+            <NavItem icon={Truck} label="Goods Receipt" isActive={isActive('goods-receipt')} onClick={() => navigate('goods-receipt')} />
+          )}
 
           {(canViewItems || canViewLocations) && <NavSection title="Master Data" />}
           {canViewItems && (
