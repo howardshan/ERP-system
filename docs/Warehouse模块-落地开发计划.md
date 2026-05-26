@@ -22,6 +22,13 @@
 
 **结论：** S0 已完成约 30%（两个 migration），可直接从 S0 剩余项接续。
 
+> **现状更新（2026-05-26）**：
+> 1. **Sprint 0 已全部完成并验证通过**（物料 CRUD、库区、QC↔item 关联、UOM seed、权限）。
+> 2. **QC↔ERP 桥接模型已演进**：我的 M-080（`qc_product_sku.item_id` 一对一）被 **M-087（`qc_sku_item` 联结表，一对多）回退替换**，并新增 `qc_production_lot.packaging_item_id`（每工单选定的最终产品 item）。决议文档 §1.5/§5.6 已同步。**S1–S3 不受影响；S4 按 §5.6 实现。**
+> 3. **新出现的 "Production 模块" 是 QC 界面重组**（把 QC 的 Production/Trace/Products/TestTypes 搬进新壳，权限仍 `qc.*`，**不碰库存/lot**），**≠** 蓝图里的制造模块（formula/BOM/production_order）。本计划 §14.1「Warehouse→Production」指的是后者。
+> 4. **库存账本仍是空地**：全库无任何 `inventory_transaction`/ERP `lot` 写入，S1 内核 `_wh_apply_transaction` 从零开始。
+> 5. **migration 编号**：当前索引最大 **M-096**，S1 起的新 migration 从 **M-097** 接续（下方 S1–S5 表中的 M-0xx 仅为**相对顺序示意**，实际号在创建时分配）。
+
 ---
 
 ## 2. 全局执行原则（每个 Sprint 都适用）
@@ -40,7 +47,7 @@
 
 | 项 | 约定 |
 |----|------|
-| 下一个 migration 编号 | **M-081 起**；文件名 `YYYYMMDDNNNNNN_<desc>.sql` |
+| 下一个 migration 编号 | **M-097 起**（当前索引最大 M-096）；文件名 `YYYYMMDDNNNNNN_<desc>.sql`。下方 S1–S5 表的 M-0xx 为相对示意，创建时按实际顺延 |
 | RPC 命名 | 写操作 `wh_*`；内部共享 `_wh_*`；QC 集成 `wh_sync_*` |
 | 内部事务内核 | `_wh_apply_transaction(...)` — 统一 UOM 换算、批控、负库存、BR-W4 双条件校验 |
 | API 层文件 | `src/services/warehouseApi.ts` |
@@ -72,8 +79,8 @@
 | 🖥️ | QC `ProductManagement.tsx` 加"关联 ERP 物料"下拉（写 `qc_product_sku.item_id`，决议 §5.5） | 🟢 |
 | 📄 | 新建 `docs/modules/11_warehouse-inventory.md` 骨架 + 录入 §5 跨决议细则 | 🟢 |
 
-> **编号顺延**：S0 实际占用 M-081（UOM seed）、M-082（权限 seed）。下方 S1 起的 M-082+ 顺延为 **M-083+**。
-> **关联读取实现**：`item_id` 通过 `listProductItemLinks()` 直查 `qc_product_sku.id,item_id`（不改 `qc_list_products` RPC，避免 S0 多一次 push）。
+> **编号顺延（2026-05-26 更正）**：S0 占用 M-081（UOM seed）、M-082（权限 seed）。其后 QC/production/notification 又用掉一批号，当前索引最大 **M-096**，**S1 起从 M-097 接续**（下表 M-0xx 为相对示意）。
+> **关联读取实现（已演进）**：`item_id` 一对一已被 `qc_sku_item` 联结表取代（M-087）；`listProductItemLinks()` 现读 junction 返回一对多，并新增 `addSkuItemLink`/`removeSkuItemLink`。
 > **RLS**：`item`/`uom`/`location`/`lot` 现无 RLS（世界可写），S5 收紧。
 
 **✅ 验证门 M0：**
@@ -155,9 +162,9 @@
 
 | 类型 | 任务 | 状态 |
 |------|------|------|
-| ⚙️ | M-093 `qc_production_lot.lot_id`（FK→lot）+ 索引（决议 §4.5 Migration A） | 🔲 |
-| ⚙️ | M-094 `qc_drying_sub_lot.lot_id` 冗余 + 同步触发器 `qc_sync_sub_lot_lot_id`（决议 §4.5 Migration B）+ 历史 backfill | 🔲 |
-| 🔌 | M-095 建车时写 lot：`qc_production_lot` 创建时调 `wh_create_lot` 并回填 `lot_id`；校验 `item_id IS NOT NULL` 否则拒绝（决议 §5.5） | 🔲 |
+| ⚙️ | `qc_production_lot.lot_id`（FK→lot）+ 索引（决议 §4.5 Migration A） | 🔲 |
+| ⚙️ | `qc_drying_sub_lot.lot_id` 冗余 + 同步触发器 `qc_sync_sub_lot_lot_id`（决议 §4.5 Migration B）+ 历史 backfill | 🔲 |
+| 🔌 | 建车时写 lot：`qc_create_production_lot_with_sub_lots`（M-095 已收 `p_packaging_item_id`）成功后，用 **`packaging_item_id`** 调 `wh_create_lot`（ERP lot.item_id = 成品 item）并回填 `lot_id`；校验 **`packaging_item_id IS NOT NULL`** 否则拒绝（决议 §5.6，已取代原 §5.5 的 item_id 写法） | 🔲 |
 | 🔌 | M-096 `wh_recompute_lot_status(p_lot_id)`：全车终态聚合（决议 §5.1） | 🔲 |
 | 🔌 | M-097 `wh_sync_release_from_qc(p_sub_lot_id)`：放行 transfer PENDING→PACK-STAGE + 调 recompute（计划书 §8.2，BR-W3） | 🔲 |
 | 🔌 | M-098 hold 同步：QC hold/disposing → transfer →LOC-NG + recompute | 🔲 |
@@ -170,7 +177,7 @@
 - 无 PO 收货 → 待检 → QC 放行 → 待包装，数量端到端正确
 - `wh_sync_release_from_qc` 故意失败时，QC sub_lot **不**变 closed（无"已放行但无 lot"脏数据）
 - 部分合格车：合格进 PACK-STAGE、不合格进 LOC-NG、lot.status=available（决议 §3.5 数据流示例可复现）
-- 未关联 item 的 SKU 建车被拒绝
+- 未选 `packaging_item_id` 的建车被拒绝（决议 §5.6；原"未关联 item 的 SKU 被拒"已按 junction 模型调整）
 
 ---
 
@@ -254,3 +261,4 @@ S0(主数据) ──► S1(流水内核) ──► S2(库内作业) ──► S3
 | 日期 | 修订者 | 内容 |
 |------|--------|------|
 | 2026-05-24 | 初稿 | 基于计划书 v1.0 + Sprint0 决议（全选方案 A）制定执行级落地计划 |
+| 2026-05-26 | 现状同步 | S0 完成；QC↔ERP 桥接演进为 `qc_sku_item` 联结表 + `packaging_item_id`（M-087/M-092/M-095）；migration 编号更正为 M-097 起；S4 改按决议 §5.6；澄清 "Production 模块" 为 QC 界面重组（非制造模块） |

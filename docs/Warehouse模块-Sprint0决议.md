@@ -91,6 +91,16 @@ CREATE TABLE qc_sku_item_map (
 签字：__________     日期：__________
 ```
 
+### 1.5 ⚠️ 现状更新（2026-05-26）：本决议已被实现演进取代
+
+方案 A（加 `qc_product_sku.item_id` **一对一**列）**已不再是现状**。团队在 M-087（`20260525000008_qc_sku_item_junction.sql`）中：
+
+- 删除了 `qc_product_sku.item_id` 列（我的 M-080 被回退）；
+- 改用 `qc_sku_item` **联结表**（一对多：1 个 QC SKU → 多个 ERP item，对应不同袋装规格/客户标签）；
+- 并在 `qc_production_lot.packaging_item_id`（M-092 加列，M-095 让建车 RPC 写入）记录**每张工单选定的最终产品 item**。
+
+**对本决议的影响**：决议 1 的"一对一"前提作废，现实更接近原方案 B（联结表）但为一对多。后续所有"QC SKU → ERP item"的引用，一律改用 `qc_sku_item` + `qc_production_lot.packaging_item_id`。S4 实施细则随之调整，见 §5.6。
+
 ---
 
 ## 决议 2：ERP `lot` 与 QC 工作单元的粒度
@@ -168,6 +178,8 @@ qc_production_lot   ← 一个生产批次（一车）
 
 - 当一个 `qc_production_lot` 内有 sub_lot 不合格时：合格部分仍然在原 lot 中放行至 `LOC-PACK-STAGE`；不合格部分通过 `inventory_transaction` 调拨至 `LOC-NG`，**lot 不拆分**，但 lot 内不同位置的余额分别可见
 - BR-W1 的措辞将从「以子批/车为单位过账」精简为「以车（`qc_production_lot`）为单位过账」
+
+> **现状更新（2026-05-26）**：决议 A 仍成立。一对多桥接（§1.5）下"lot 归哪个 item"的歧义，由 `qc_production_lot.packaging_item_id`（每工单选定的最终产品）解决——建车时创建的 ERP lot 即以 `packaging_item_id` 为 `item_id`，代表该工单的**成品**。
 
 ### 2.4 决议
 
@@ -544,6 +556,19 @@ END IF;
 
 **实现时点：** S4（随 `wh_sync_release_from_qc` 一起），现在仅备忘，不做。
 
+### 5.6 ⚠️ 现状更新（2026-05-26）：桥接模型演进，§5.5 实施细则随之调整
+
+§5.5 写于 `item_id` 一对一时代。随 M-087（junction）+ M-092/M-095（`packaging_item_id`），S4 实施细则调整如下（**今后按右列实现**）：
+
+| §5.5 原假设 | 现状（2026-05-26 起按此实现） |
+|------------|------------------------------|
+| `qc_product_sku.item_id` 一对一 | `qc_sku_item` 联结表，一对多（1 SKU → 多 item） |
+| 关联入口在 QC ProductManagement | 在 ProductManagement / Production 模块**多选维护**（复用 `warehouseApi.listItems` + `qcApi.addSkuItemLink`/`removeSkuItemLink`） |
+| 建车校验 `item_id IS NOT NULL` | 建车校验 **`packaging_item_id IS NOT NULL`**（操作员从该 SKU 已关联 item 中选定最终产品） |
+| ERP lot 的 item = SKU 唯一 item | ERP lot 的 `item_id` = `qc_production_lot.packaging_item_id`，代表**成品**（烘干工序：原料 → 成品） |
+
+**S4 落点**：`qc_create_production_lot_with_sub_lots` 已接受 `p_packaging_item_id`（M-095）。S4 在其成功后，用 `packaging_item_id` 调 `wh_create_lot` 并回填 `lot_id`（决议 §4.5），其余（§5.1 聚合、§5.2 双条件、§4.5 sub_lot.lot_id 冗余）不变。
+
 ---
 
 ## 决议依赖关系总览
@@ -585,5 +610,6 @@ END IF;
 | 2026-05-24 | （草案）      | 初稿，4 项决议草案待审                                                                        |
 | 2026-05-24 | （项目组评审）   | 4 项决议全部选择方案 A；选 A 后发现决议 2↔3 在"部分合格"场景下有内部矛盾                                          |
 | 2026-05-24 | （AI 协助修订）  | 修订 §3.2 方案 A 表格；追加 §3.5（部分合格场景细则）、§4.5（lot_id 冗余方案）、§5（跨决议实施细则：聚合规则、双条件校验、BR-W1/W4 措辞修订） |
+| 2026-05-26 | （现状同步）   | QC↔ERP 桥接从 item_id 一对一列演进为 `qc_sku_item` 联结表 + `qc_production_lot.packaging_item_id`（M-087/M-092/M-095）。追加 §1.5、§2.3 注、§5.6；决议 1 与 §5.5 的 S4 实施细则随之更新 |
 
 
