@@ -1,7 +1,17 @@
+/// Print a portrait 812×1218 PNG on the label printer.
+///
+/// The PNG is the landscape sticker design pre-rotated 90° CCW by the browser.
+/// CUPS submits it to rastertolabel with the w4h6 media option so the full
+/// 4×6 inch label is filled.  (Run `lpoptions -p <printer> -o PageSize=w4h6`
+/// once to make w4h6 the persistent default for this queue.)
 #[tauri::command]
-fn print_png(png_base64: String, printer: String) -> Result<(), String> {
+fn print_png(png_base64: String, printer: String) -> Result<String, String> {
     use base64::{Engine, engine::general_purpose::STANDARD};
     use std::fs;
+    use std::process::Command;
+    use std::time::Instant;
+
+    let t0 = Instant::now();
 
     let bytes = STANDARD.decode(&png_base64).map_err(|e| e.to_string())?;
     let temp_path = std::env::temp_dir().join("erp_sticker_print.png");
@@ -9,18 +19,50 @@ fn print_png(png_base64: String, printer: String) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        // PNG is a portrait 812×1218 image (landscape design rotated 90° CCW)
-        // rendered at 203 DPI for the printer's w4h6 label (4×6 inch).
-        // The PNG dimensions exactly match w4h6 at 203 DPI so no scaling is needed.
-        std::process::Command::new("lp")
+        let out = Command::new("lp")
             .arg("-d").arg(&printer)
             .arg("-o").arg("media=w4h6")
             .arg(temp_path.to_str().unwrap())
             .output()
             .map_err(|e| e.to_string())?;
+
+        if !out.status.success() {
+            return Err(format!(
+                "lp failed (exit {}): {}",
+                out.status.code().unwrap_or(-1),
+                String::from_utf8_lossy(&out.stderr).trim(),
+            ));
+        }
+
+        return Ok(format!("submitted in {}ms", t0.elapsed().as_millis()));
     }
 
-    Ok(())
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (printer, bytes);
+    }
+    Ok(format!("done in {}ms", t0.elapsed().as_millis()))
+}
+
+/// Return all CUPS printer queue names that are currently accepting jobs.
+/// Parses `lpstat -a` output — each line starts with the queue name.
+#[tauri::command]
+fn list_printers() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        // `lpstat -e` prints only queue names, one per line — locale-independent.
+        let out = Command::new("lpstat").arg("-e").output().map_err(|e| e.to_string())?;
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let names: Vec<String> = stdout
+            .lines()
+            .map(|l| l.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        return Ok(names);
+    }
+    #[cfg(not(target_os = "macos"))]
+    Ok(vec![])
 }
 
 #[tauri::command]
@@ -33,7 +75,6 @@ fn get_default_printer() -> Result<String, String> {
             .output()
             .map_err(|e| e.to_string())?;
         let stdout = String::from_utf8_lossy(&out.stdout);
-        // Output is: "system default destination: PrinterName"
         if let Some(pos) = stdout.find(": ") {
             return Ok(stdout[pos + 2..].trim().to_string());
         }
@@ -55,18 +96,17 @@ fn print_html(html: String, printer: String) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        let mut cmd = Command::new("lp");
-        cmd.arg("-d").arg(&printer)
-           .arg("-o").arg("media=w105mmh80mm")
-           .arg("-o").arg("fit-to-page")
-           .arg(temp_path.to_str().unwrap());
-        cmd.output().map_err(|e| e.to_string())?;
+        Command::new("lp")
+            .arg("-d").arg(&printer)
+            .arg("-o").arg("media=w105mmh80mm")
+            .arg("-o").arg("fit-to-page")
+            .arg(temp_path.to_str().unwrap())
+            .output()
+            .map_err(|e| e.to_string())?;
     }
 
     #[cfg(target_os = "windows")]
     {
-        // On Windows, kiosk-printing handles this via window.print()
-        // This branch is a no-op — the frontend falls back to window.print()
         let _ = printer;
     }
 
@@ -77,7 +117,7 @@ fn print_html(html: String, printer: String) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![print_html, print_png, get_default_printer])
+        .invoke_handler(tauri::generate_handler![print_html, print_png, get_default_printer, list_printers])
         .run(tauri::generate_context!())
         .expect("error while running ERP Financials");
 }
