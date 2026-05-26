@@ -53,6 +53,9 @@ interface Batch {
   submitted_at?: string;
   inspector?: string;
   sample_id?: string;
+  is_group?: boolean;
+  group_size?: number;
+  group_members?: { code: string; tested: boolean }[];
 }
 interface Stats {
   awaiting_sample?: number;
@@ -77,6 +80,21 @@ function renderQcTestResult(payload: { batch: Batch; stats: Stats }) {
 
   const submitted = b.submitted_at ? new Date(b.submitted_at).toLocaleString() : '';
 
+  const members = b.group_members ?? [];
+  const groupBlockHtml = b.is_group && members.length > 0 ? `
+    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:20px;background:#f8fafc">
+      <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#334155">Sampling group — ${esc(b.group_size)} carts covered</p>
+      <p style="margin:0 0 10px;font-size:12px;color:#64748b">Only the tested cart was measured; this ${resultLabel} result applies to every cart in the group.</p>
+      <div>
+        ${members.map(m => `<span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;${m.tested ? `background:${color};color:#fff` : 'background:#fff;border:1px solid #cbd5e1;color:#475569'}">${esc(m.code)}${m.tested ? ' · tested' : ''}</span>`).join('')}
+      </div>
+    </div>` : '';
+
+  const groupBlockText = b.is_group && members.length > 0
+    ? `\nSampling group (${b.group_size} carts — result applies to all):\n` +
+      members.map(m => `  - ${m.code}${m.tested ? ' (tested)' : ''}`).join('\n') + '\n'
+    : '';
+
   const html = `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#0f172a">
     <h2 style="margin:0 0 4px">QC Test Result</h2>
@@ -95,7 +113,7 @@ function renderQcTestResult(payload: { batch: Batch; stats: Stats }) {
         <tr><td style="padding:8px 16px;color:#64748b">Inspector</td><td style="padding:8px 16px">${esc(b.inspector)}</td></tr>
       </table>
     </div>
-
+${groupBlockHtml}
     <h3 style="margin:0 0 8px;font-size:14px;color:#334155">Today so far</h3>
     <table style="width:100%;border-collapse:collapse;font-size:14px;border:1px solid #e2e8f0;border-radius:8px">
       <tr><td style="padding:8px 16px;color:#64748b">Passed today</td><td style="padding:8px 16px;font-weight:700;color:#16a34a">${esc(s.passed_today ?? 0)}</td></tr>
@@ -112,7 +130,9 @@ function renderQcTestResult(payload: { batch: Batch; stats: Stats }) {
     `QC Test Result — ${resultLabel} (Aw ${b.aw})\n` +
     `Sub-lot: ${b.sub_lot_code}\nProduct: ${b.sku_name} (${b.sku_code})\nLot: ${b.lot_number}\n` +
     `Sample: ${b.sample_id}\nStatus: ${b.current_status}\nInspector: ${b.inspector}\n` +
-    `Time: ${submitted}\n\n` +
+    `Time: ${submitted}\n` +
+    groupBlockText +
+    `\n` +
     `Today so far:\n  Passed: ${s.passed_today ?? 0}\n  Failed: ${s.failed_today ?? 0}\n` +
     `  Awaiting test: ${awaitingTotal} (sample ${s.awaiting_sample ?? 0}, result ${s.awaiting_wa_result ?? 0})\n` +
     `  Currently drying: ${s.currently_drying ?? 0}\n  Pass rate: ${s.pass_rate_pct != null ? s.pass_rate_pct + '%' : '—'}\n`;
