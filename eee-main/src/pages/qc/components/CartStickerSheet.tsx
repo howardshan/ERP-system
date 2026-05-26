@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { SubLot } from '../../../services/qcApi';
+import { getSavedPrinter } from '../../../lib/printerConfig';
 
 interface Props {
   carts: SubLot[];
@@ -14,19 +15,21 @@ interface Props {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Physical label: 4 × 6 inch (w4h6).  The GP-1324D feeds labels portrait
-// (short side across the print head).  Our sticker design is LANDSCAPE, so we
-// render landscape then rotate 90° CCW to produce a portrait PNG that CUPS
-// prints on the w4h6 label — the physical sticker reads normally when the
-// label is rotated 90° CW after application.
+// (short side across the print head).  Our sticker design is LANDSCAPE.
 //
-// Preview shows the pre-rotation landscape PNG so the operator sees exactly
-// what will appear on the finished label.
+// Print path:
+//   renderPrintPng rotates the landscape 1218×812 canvas 90° CCW to produce
+//   a portrait 812×1218 PNG, then submits it with `lp -o media=w4h6`.
+//   CUPS fills the full 4×6 label.  Peel and apply the label, then rotate it
+//   90° CW — the design reads normally (barcode on left, fields on right).
+//
+// Prerequisite (run once per machine):
+//   lpoptions -p <printer_name> -o PageSize=w4h6
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DESIGN_W_IN = 6;   // design canvas width  in inches (landscape)
 const DESIGN_H_IN = 4;   // design canvas height in inches (landscape)
-const RENDER_DPI  = 406; // render at 2× then downscale for sharp edges
-const PRINT_DPI   = 203; // GP-1324D native DPI
+const PRINT_DPI   = 203; // GP-1324D native DPI — render directly at this res
 
 /**
  * Draw the sticker design onto a canvas and return the LANDSCAPE 203-DPI
@@ -39,10 +42,10 @@ function drawStickerCanvas(
   skuName: string,
 ): Promise<HTMLCanvasElement> {
   return new Promise((resolve) => {
-    const mm = (v: number) => Math.round(v * RENDER_DPI / 25.4);
+    const mm = (v: number) => Math.round(v * PRINT_DPI / 25.4);
 
-    const W = Math.round(DESIGN_W_IN * RENDER_DPI);  // 2436
-    const H = Math.round(DESIGN_H_IN * RENDER_DPI);  // 1624
+    const W = Math.round(DESIGN_W_IN * PRINT_DPI);  // 1218
+    const H = Math.round(DESIGN_H_IN * PRINT_DPI);  // 812
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d')!;
@@ -179,68 +182,39 @@ function drawStickerCanvas(
       d[i] = d[i + 1] = d[i + 2] = bw; d[i + 3] = 255;
     }
     ctx.putImageData(imgData, 0, 0);
-
-    // ── Downscale 2:1 to 203 DPI → landscape 1218 × 812 ─────────────────
-    const W2 = Math.round(DESIGN_W_IN * PRINT_DPI);  // 1218
-    const H2 = Math.round(DESIGN_H_IN * PRINT_DPI);  // 812
-    const srcPx = ctx.getImageData(0, 0, W, H).data;
-    const out = document.createElement('canvas');
-    out.width = W2; out.height = H2;
-    const outCtx = out.getContext('2d')!;
-    const outImg = outCtx.createImageData(W2, H2);
-    const dst = outImg.data;
-    for (let r = 0; r < H2; r++) {
-      for (let col = 0; col < W2; col++) {
-        let blacks = 0, total = 0;
-        for (let dy = 0; dy < 2; dy++)
-          for (let dx = 0; dx < 2; dx++) {
-            const sy = r * 2 + dy, sx = col * 2 + dx;
-            if (sy < H && sx < W) {
-              if (srcPx[(sy * W + sx) * 4] === 0) blacks++;
-              total++;
-            }
-          }
-        const bw = total > 0 && blacks * 2 >= total ? 0 : 255;
-        const di = (r * W2 + col) * 4;
-        dst[di] = dst[di + 1] = dst[di + 2] = bw; dst[di + 3] = 255;
-      }
-    }
-    outCtx.putImageData(outImg, 0, 0);
-    resolve(out);  // 1218 × 812 landscape canvas
+    resolve(canvas);  // 1218 × 812 landscape canvas at native 203 DPI
   });
 }
 
 /**
- * Preview PNG: landscape 1218 × 812.  This is what the operator sees —
- * exactly what will appear on the finished label (before it's stuck on).
+ * Preview PNG: landscape 1218×812.
+ * What the operator sees on screen — the finished sticker appearance.
  */
 async function renderPreviewPng(
   c: SubLot, workOrderBarcode: string, skuCode: string | null, skuName: string,
 ): Promise<string> {
-  const out = await drawStickerCanvas(c, workOrderBarcode, skuCode, skuName);
-  return out.toDataURL('image/png').split(',')[1];
+  const canvas = await drawStickerCanvas(c, workOrderBarcode, skuCode, skuName);
+  return canvas.toDataURL('image/png').split(',')[1];
 }
 
 /**
- * Print PNG: portrait 812 × 1218 (landscape design rotated 90° CCW).
- * The GP-1324D feeds the w4h6 label portrait; this PNG fills it exactly.
- * When the printed label is rotated 90° CW on the product, the design reads
- * left-to-right normally (barcode on left, form fields on right).
+ * Print PNG: portrait 812×1218 (landscape design rotated 90° CCW).
+ * Submitted to CUPS with -o media=w4h6.  Peel the label and rotate it 90° CW
+ * to read the design correctly.
  */
 async function renderPrintPng(
   c: SubLot, workOrderBarcode: string, skuCode: string | null, skuName: string,
 ): Promise<string> {
   const landscape = await drawStickerCanvas(c, workOrderBarcode, skuCode, skuName);
-  const W2 = landscape.width;   // 1218
-  const H2 = landscape.height;  // 812
-
-  // Rotate 90° CCW: landscape (W2 × H2) → portrait (H2 × W2)
+  const W = landscape.width;   // 1218
+  const H = landscape.height;  // 812
   const rot = document.createElement('canvas');
-  rot.width  = H2;   // 812
-  rot.height = W2;   // 1218
+  rot.width  = H;  // 812
+  rot.height = W;  // 1218
   const rctx = rot.getContext('2d')!;
-  rctx.translate(0, W2);       // anchor bottom-left
-  rctx.rotate(-Math.PI / 2);   // 90° CCW
+  rctx.translate(0, W);
+  rctx.rotate(-Math.PI / 2);  // 90° CCW
+  rctx.imageSmoothingEnabled = false;
   rctx.drawImage(landscape, 0, 0);
   return rot.toDataURL('image/png').split(',')[1];
 }
@@ -307,31 +281,47 @@ export function CartStickerSheet({
 }: Props) {
   const doPrint = async () => {
     const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    const t0 = performance.now();
+    const log = (msg: string) => console.log(`[Print +${(performance.now()-t0).toFixed(0)}ms] ${msg}`);
+
+    log(`START isTauri=${isTauri} carts=${carts.length}`);
 
     if (isTauri) {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
-        let printer = 'Gprinter_GP_1324D';
-        try {
-          const dp = await invoke<string>('get_default_printer');
-          if (dp?.trim()) printer = dp.trim();
-        } catch { /* keep default */ }
+        // Use the printer saved on the dashboard; fall back to auto-detect then hardcoded default.
+        let printer = getSavedPrinter();
+        log(`savedPrinter="${printer ?? '(none)'}"`);
+        if (!printer) {
+          try {
+            const dp = await invoke<string>('get_default_printer');
+            if (dp?.trim()) printer = dp.trim();
+            log(`get_default_printer → "${printer}"`);
+          } catch (e) {
+            log(`get_default_printer error: ${e}`);
+          }
+        }
+        printer = printer || 'Gprinter_GP_1324D';
+        log(`using printer: "${printer}"`);
 
         for (const c of carts) {
-          // Send the PORTRAIT PNG so the label fills the full 4×6 in.
+          log(`rendering ${c.sub_lot_code}…`);
           const pngBase64 = await renderPrintPng(c, workOrderBarcode, skuCode, skuName);
-          await invoke('print_png', { pngBase64, printer });
+          log(`rendered (${pngBase64.length} chars) — invoking print_png…`);
+          const result = await invoke<string>('print_png', { pngBase64, printer });
+          log(`print_png returned: "${result}"`);
         }
+        log('ALL DONE ✓');
         return;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        log(`ERROR: ${msg}`);
         alert(`打印失败: ${msg}\n\n请确认打印机已连接，然后重试。`);
-        console.error('Direct print failed:', e);
         return;
       }
     }
 
-    // Browser fallback — prints the landscape <img> elements visible in the DOM
+    log('not Tauri → window.print()');
     window.print();
   };
 
