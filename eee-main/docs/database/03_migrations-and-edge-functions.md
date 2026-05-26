@@ -1635,6 +1635,48 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+> **以下 M-096～M-099 为 Warehouse Sprint 0 的 4 个 migration**。它们文件名日期较早（`20260524*`），但在本索引重排后遗漏，现按「追加到末尾」补登（编号晚于文件日期，属事后对账，不代表执行顺序）。它们均已应用到线上库。
+
+### M-096 `20260524000002_warehouse_seed_locations.sql`
+**用途**: Warehouse 模块起步 — seed 主工厂仓库 `WH-MAIN` 及 7 个逻辑库区（决策 D-W01，`docs/Warehouse模块开发计划书.md` §5.1）。
+
+**变更**:
+- `warehouse` INSERT `WH-MAIN`（`ON CONFLICT (code) DO NOTHING`）
+- `location` INSERT 7 行：`LOC-RM`/storage、`LOC-PRE-DRY`/production、`LOC-DRY-WIP`/production、`LOC-QC-PENDING`/quarantine、`LOC-PACK-STAGE`/storage、`LOC-NG`/quarantine、`LOC-FG`/storage（`ON CONFLICT (warehouse_id, code) DO NOTHING`）
+
+**特性**: 幂等。复用既有 `location_type` CHECK，未改 schema。**依赖**: M-001。
+
+---
+
+### M-097 `20260524000003_qc_product_sku_add_item_id.sql`
+**用途**: 桥接 QC SKU 与 ERP item（Sprint 0 决议 1）。给 `qc_product_sku` 加可空 FK `item_id bigint REFERENCES item(id)` + 索引。
+
+**变更**: `ADD COLUMN IF NOT EXISTS item_id` + `CREATE INDEX IF NOT EXISTS idx_qc_product_sku_item`。
+
+> ⚠️ **已被取代**: 本列（一对一）在 M-087（`qc_sku_item` 联结表，一对多）中被 **DROP**。后续 QC↔item 桥接用 `qc_sku_item` + `qc_production_lot.packaging_item_id`。详见 `docs/Warehouse模块-Sprint0决议.md` §1.5/§5.6。
+
+**特性**: 幂等。**依赖**: M-001（`item`）、`qc_product_sku`。
+
+---
+
+### M-098 `20260524000004_warehouse_seed_uom.sql`
+**用途**: seed 基础计量单位。`uom` 表自 M-001 起从未 seed，而 `item.base_uom_id` 是 NOT NULL FK — 不先 seed 就无法创建任何 item，此 migration 解除 Items 表单阻塞。
+
+**变更**: `uom` INSERT 9 行（KG/G/TON、L/ML、EACH/BAG/BOX/PALLET），`ON CONFLICT (code) DO NOTHING`。不 seed `uom_conversion`。
+
+**特性**: 幂等。**依赖**: M-001（`uom`）。
+
+---
+
+### M-099 `20260524000005_warehouse_permission_seed.sql`
+**用途**: 给管理员 `tianzuohuang@crave-cook.com` 授予 Warehouse 模块访问 + 全部 warehouse 资源权限（仿 QC 模块 seed）。
+
+**变更**: `user_module_access` INSERT `warehouse`；`user_permission_grant` INSERT warehouse 全量 (resource, permission) — `module_permissions.manage`、`items.{view,create,edit,delete}`、`locations.{view,edit}`、`lots.{view,release,reject}`、`goods_receipt.{view,create,post,cancel}`、`inventory.{view,receive,transfer,adjust}`。
+
+**特性**: 幂等。**契约**: resource/permission 字符串必须与 `src/lib/permissionStructure.ts` warehouse 段逐字一致，否则 `can()` 静默返回 false。**依赖**: 权限系统、M-096。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1715,7 +1757,11 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-093 | 20260525000014_qc_production_pipeline_summary.sql |
 | M-094 | 20260525000015_permission_move_to_production_module.sql |
 | M-095 | 20260526000001_qc_create_lot_with_packaging.sql |
-| **M-096** | _(下一个)_ |
+| M-096 | 20260524000002_warehouse_seed_locations.sql （Warehouse S0，事后补登） |
+| M-097 | 20260524000003_qc_product_sku_add_item_id.sql （已被 M-087 取代） |
+| M-098 | 20260524000004_warehouse_seed_uom.sql |
+| M-099 | 20260524000005_warehouse_permission_seed.sql |
+| **M-100** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

@@ -27,7 +27,7 @@
 > 2. **QC↔ERP 桥接模型已演进**：我的 M-080（`qc_product_sku.item_id` 一对一）被 **M-087（`qc_sku_item` 联结表，一对多）回退替换**，并新增 `qc_production_lot.packaging_item_id`（每工单选定的最终产品 item）。决议文档 §1.5/§5.6 已同步。**S1–S3 不受影响；S4 按 §5.6 实现。**
 > 3. **新出现的 "Production 模块" 是 QC 界面重组**（把 QC 的 Production/Trace/Products/TestTypes 搬进新壳，权限仍 `qc.*`，**不碰库存/lot**），**≠** 蓝图里的制造模块（formula/BOM/production_order）。本计划 §14.1「Warehouse→Production」指的是后者。
 > 4. **库存账本仍是空地**：全库无任何 `inventory_transaction`/ERP `lot` 写入，S1 内核 `_wh_apply_transaction` 从零开始。
-> 5. **migration 编号**：当前索引最大 **M-096**，S1 起的新 migration 从 **M-097** 接续（下方 S1–S5 表中的 M-0xx 仅为**相对顺序示意**，实际号在创建时分配）。
+> 5. **migration 编号**：Warehouse S0 的 4 个 migration 已补登为 **M-096～M-099**（追加到索引末尾），S1 起的新 migration 从 **M-100** 接续（下方 S1–S5 表中的 M-0xx 仅为**相对顺序示意**，实际号在创建时分配）。
 
 ---
 
@@ -47,7 +47,7 @@
 
 | 项 | 约定 |
 |----|------|
-| 下一个 migration 编号 | **M-097 起**（当前索引最大 M-096）；文件名 `YYYYMMDDNNNNNN_<desc>.sql`。下方 S1–S5 表的 M-0xx 为相对示意，创建时按实际顺延 |
+| 下一个 migration 编号 | **M-100 起**（M-096～M-099 已分配给 Warehouse S0 补登）；文件名 `YYYYMMDDNNNNNN_<desc>.sql`。下方 S1–S5 表的 M-0xx 为相对示意，创建时按实际顺延 |
 | RPC 命名 | 写操作 `wh_*`；内部共享 `_wh_*`；QC 集成 `wh_sync_*` |
 | 内部事务内核 | `_wh_apply_transaction(...)` — 统一 UOM 换算、批控、负库存、BR-W4 双条件校验 |
 | API 层文件 | `src/services/warehouseApi.ts` |
