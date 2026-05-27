@@ -15,6 +15,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { usePermissions } from '../contexts/PermissionContext';
+import { PrinterSettingsPopover } from '../components/PrinterSettingsPopover';
 
 interface Module {
   id: string;
@@ -253,7 +254,9 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
             Select a module to get started
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <PrinterSettingsPopover />
+          <div className="w-px h-5 bg-slate-200" />
           <button
             onClick={() => onNavigate('account-settings')}
             className="text-right group"
