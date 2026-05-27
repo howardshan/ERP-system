@@ -6,6 +6,7 @@ import {
   listUoms,
   listLocations,
   postReceipt,
+  cancelGrn,
   GoodsReceiptRow,
   WarehouseItem,
   Uom,
@@ -35,6 +36,7 @@ const emptyLine = (): FormLine => ({
 export default function GoodsReceiptPage() {
   const { can } = usePermissions();
   const canCreate = can('warehouse', 'goods_receipt', 'create');
+  const canCancel = can('warehouse', 'goods_receipt', 'cancel');
 
   const [receipts, setReceipts] = useState<GoodsReceiptRow[]>([]);
   const [items, setItems] = useState<WarehouseItem[]>([]);
@@ -47,6 +49,18 @@ export default function GoodsReceiptPage() {
   const [busy, setBusy] = useState(false);
 
   const load = () => listGoodsReceipts().then(setReceipts).catch((e) => setError(e.message));
+
+  const doCancel = async (r: GoodsReceiptRow) => {
+    if (!confirm(`冲销收货单 ${r.grn_number}？将写入反向流水并把状态置为 cancelled。`)) return;
+    setError(''); setMsg('');
+    try {
+      const res = await cancelGrn(r.id);
+      setMsg(`已冲销 ${res.grn_number}（反冲 ${res.lines_reversed} 行）`);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '冲销失败');
+    }
+  };
 
   useEffect(() => {
     load();
@@ -219,6 +233,7 @@ export default function GoodsReceiptPage() {
               <th className="text-left font-semibold px-4 py-2.5">类型</th>
               <th className="text-left font-semibold px-4 py-2.5">日期</th>
               <th className="text-left font-semibold px-4 py-2.5">状态</th>
+              <th className="text-right font-semibold px-4 py-2.5">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -234,10 +249,18 @@ export default function GoodsReceiptPage() {
                 </td>
                 <td className="px-4 py-2.5 text-slate-700">{r.receipt_date}</td>
                 <td className="px-4 py-2.5 text-slate-600">{r.status}</td>
+                <td className="px-4 py-2.5 text-right">
+                  {canCancel && r.status === 'posted' && (
+                    <button type="button" onClick={() => doCancel(r)}
+                      className="text-rose-600 hover:text-rose-700 text-xs font-bold px-2 py-1">
+                      冲销
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {receipts.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-500">暂无收货单</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">暂无收货单</td></tr>
             )}
           </tbody>
         </table>

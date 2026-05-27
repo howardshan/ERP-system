@@ -125,18 +125,21 @@
 
 | 类型 | 任务 | 状态 |
 |------|------|------|
-| 🔌 | M-088 `wh_post_transfer`（双流水原子性：transfer_out + transfer_in） | 🔲 |
-| 🔌 | M-089 `wh_post_adjustment`（原因码；受控负库存例外，BR-5） | 🔲 |
-| 🔌 | M-090 `wh_cancel_grn`（冲销收货，写反向 adjustment，不删流水） | 🔲 |
-| 🧩 | warehouseApi：`postTransfer` / `postAdjustment` / `cancelGrn` / `getLotTimeline` | 🔲 |
-| 🖥️ | Transfer 调拨页、Adjustment 调整页 | 🔲 |
-| 🖥️ | Lot 批次详情页 + 流水时间线（读 `wh_list_transactions` by lot） | 🔲 |
-| 📄 | 文档：M-088~090 + 调拨/调整章节 | 🔲 |
+| 🔌 | **M-105** `wh_post_transfer`（双流水原子性）+ `wh_post_adjustment`（原因→notes，严守 BR-5）+ `wh_cancel_grn`（反向 adjustment，不删流水）+ `wh_rebuild_balance`（提前到 S2） | 🟢 |
+| 🧩 | warehouseApi：`postTransfer` / `postAdjustment` / `cancelGrn` / `rebuildBalance` / `getLot`；时间线复用 `listTransactions({lotId})` | 🟢 |
+| 🖥️ | Lots 列表页 + 批次详情页（各库位余额 + 流水时间线 + **内联调拨/调整**表单） | 🟢 |
+| 🖥️ | Balance 批次号可点进详情；GR 列表加「冲销」按钮 | 🟢 |
+| 📄 | 文档：M-105 索引 + 11_warehouse S2 章节 | 🟢 |
 
-**✅ 验证门 M2：**
+> **编号落定**：S2 实占 **M-105**（`20260527000001`）。下一个 migration 从 **M-106** 起。
+> **入口决策**：调拨/调整从批次详情页发起（无独立 Transfer/Adjustment 导航页）；调整严守 BR-5。
+
+**✅ 验证门 M2：**（migration 待 push 后走查）
 - 调拨一笔 `LOC-RM → LOC-PRE-DRY`：源减目标增、两条流水、余额一致
-- 调整 + 冲销收货后，`wh_rebuild_balance` 重算结果与流水 SUM 一致
-- 批次详情页时间线按时间正确展示所有流水
+- 调整盘盈成功；超量负调被 BR-5 拒
+- 冲销 posted 收货单 → 状态 cancelled、余额回 0、原流水留存 + 反向 adjustment；货已调走的冲销被 BR-5 拒
+- 批次详情页时间线按时间正确展示 receipt/transfer/adjustment
+- `wh_rebuild_balance()` 重算结果 = 流水 SUM
 
 ---
 
