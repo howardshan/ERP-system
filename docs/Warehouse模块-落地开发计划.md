@@ -110,10 +110,12 @@
 > **编号落定**：S1 实占 **M-100~M-104**（`20260526000003`~`007`）。下一个 migration 从 **M-105** 起。
 > **M1 范围限定**：仅批次控制物料可收货（`inventory_balance` PK 含 lot_id）；收货为一次性 post，draft/冲销/调拨留 S2。
 
-**✅ 验证门 M1：**（migration 待 push 后走查）
-- 无 PO 收货一笔 → `LOC-RM`，余额页正确显示，`goods_receipt.receipt_type='direct'` 且 UI 有 DIRECT 标签
-- 尝试手动 `UPDATE inventory_transaction` → 被 `trg_invtxn_append_only` 拒绝
-- 内核守护（SQL 直调）：批控物料无 lot → BR-3 拒；出库使 balance<0 → BR-5 拒；从 quarantine 出 issue/ship → BR-W4 拒
+**✅ 验证门 M1：已通过（2026-05-27 验证）**
+- ✅ 无 PO 收货一笔 → `LOC-RM`，余额页正确显示，`goods_receipt.receipt_type='direct'` 且 UI 有 DIRECT 标签
+- ✅ 手动 `UPDATE inventory_transaction` → 被 `trg_invtxn_append_only` 拒绝
+- ✅ 内核守护：批控物料无 lot → BR-3 拒；出库使 balance<0 → BR-5 拒；从 quarantine 出 issue/ship → BR-W4 拒
+- ✅ 余额 = 流水累加（对账 0 差异）
+- 修复记录：前端 `postReceipt` 对 `receipt_date` 传 null 触发 NOT NULL（SQL 参数 DEFAULT 对显式 null 不生效），已在 warehouseApi 默认填今天解决（无需 push）
 
 ---
 
