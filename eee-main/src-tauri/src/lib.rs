@@ -22,6 +22,8 @@ fn print_png(png_base64: String, printer: String) -> Result<String, String> {
         let out = Command::new("lp")
             .arg("-d").arg(&printer)
             .arg("-o").arg("media=w4h6")
+            .arg("-o").arg("fit-to-page=false")
+            .arg("-o").arg("print-scaling=none")
             .arg(temp_path.to_str().unwrap())
             .output()
             .map_err(|e| e.to_string())?;
