@@ -1173,6 +1173,19 @@ export async function createDispositionGroup(input: {
   remark: string | null;
   redry_expected_dry_minutes: number | null;
 }): Promise<void> {
+  // Retest is a group-level action: a single qc_create_disposition call
+  // normalises the whole group around one champion (M-106). Calling it per
+  // cart would race/shatter the group, so fire it exactly once. Every other
+  // disposition type (scrap / redry / room-temp) is genuinely per-cart.
+  if (input.type === 'retest') {
+    await createDisposition({
+      drying_sub_lot_id: input.sub_lot_ids[0],
+      type: input.type,
+      remark: input.remark,
+      redry_expected_dry_minutes: input.redry_expected_dry_minutes,
+    });
+    return;
+  }
   await Promise.all(
     input.sub_lot_ids.map(id =>
       createDisposition({
