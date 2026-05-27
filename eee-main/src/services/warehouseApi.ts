@@ -257,9 +257,11 @@ export interface GoodsReceiptRow {
 
 export async function postReceipt(input: ReceiptInput): Promise<PostReceiptResult> {
   if (!input.lines || input.lines.length === 0) throw new Error('至少需要一行收货明细');
+  // receipt_date must not be null (NOT NULL column). The SQL param DEFAULT only
+  // applies when the arg is omitted, not when null is passed — so default here.
   return rpc<PostReceiptResult>('wh_post_receipt', {
     p_lines: input.lines,
-    p_receipt_date: input.receipt_date ?? null,
+    p_receipt_date: input.receipt_date ?? new Date().toISOString().slice(0, 10),
     p_supplier_id: input.supplier_id ?? null,
     p_warehouse_id: input.warehouse_id ?? null,
     p_notes: input.notes ?? null,
