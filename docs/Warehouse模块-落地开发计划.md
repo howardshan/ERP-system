@@ -22,6 +22,13 @@
 
 **结论：** S0 已完成约 30%（两个 migration），可直接从 S0 剩余项接续。
 
+> **现状更新（2026-05-26）**：
+> 1. **Sprint 0 已全部完成并验证通过**（物料 CRUD、库区、QC↔item 关联、UOM seed、权限）。
+> 2. **QC↔ERP 桥接模型已演进**：我的 M-080（`qc_product_sku.item_id` 一对一）被 **M-087（`qc_sku_item` 联结表，一对多）回退替换**，并新增 `qc_production_lot.packaging_item_id`（每工单选定的最终产品 item）。决议文档 §1.5/§5.6 已同步。**S1–S3 不受影响；S4 按 §5.6 实现。**
+> 3. **新出现的 "Production 模块" 是 QC 界面重组**（把 QC 的 Production/Trace/Products/TestTypes 搬进新壳，权限仍 `qc.*`，**不碰库存/lot**），**≠** 蓝图里的制造模块（formula/BOM/production_order）。本计划 §14.1「Warehouse→Production」指的是后者。
+> 4. **库存账本仍是空地**：全库无任何 `inventory_transaction`/ERP `lot` 写入，S1 内核 `_wh_apply_transaction` 从零开始。
+> 5. **migration 编号**：Warehouse S0 的 4 个 migration 已补登为 **M-096～M-099**（追加到索引末尾），S1 起的新 migration 从 **M-100** 接续（下方 S1–S5 表中的 M-0xx 仅为**相对顺序示意**，实际号在创建时分配）。
+
 ---
 
 ## 2. 全局执行原则（每个 Sprint 都适用）
@@ -40,7 +47,7 @@
 
 | 项 | 约定 |
 |----|------|
-| 下一个 migration 编号 | **M-081 起**；文件名 `YYYYMMDDNNNNNN_<desc>.sql` |
+| 下一个 migration 编号 | **M-100 起**（M-096～M-099 已分配给 Warehouse S0 补登）；文件名 `YYYYMMDDNNNNNN_<desc>.sql`。下方 S1–S5 表的 M-0xx 为相对示意，创建时按实际顺延 |
 | RPC 命名 | 写操作 `wh_*`；内部共享 `_wh_*`；QC 集成 `wh_sync_*` |
 | 内部事务内核 | `_wh_apply_transaction(...)` — 统一 UOM 换算、批控、负库存、BR-W4 双条件校验 |
 | API 层文件 | `src/services/warehouseApi.ts` |
@@ -72,8 +79,8 @@
 | 🖥️ | QC `ProductManagement.tsx` 加"关联 ERP 物料"下拉（写 `qc_product_sku.item_id`，决议 §5.5） | 🟢 |
 | 📄 | 新建 `docs/modules/11_warehouse-inventory.md` 骨架 + 录入 §5 跨决议细则 | 🟢 |
 
-> **编号顺延**：S0 实际占用 M-081（UOM seed）、M-082（权限 seed）。下方 S1 起的 M-082+ 顺延为 **M-083+**。
-> **关联读取实现**：`item_id` 通过 `listProductItemLinks()` 直查 `qc_product_sku.id,item_id`（不改 `qc_list_products` RPC，避免 S0 多一次 push）。
+> **编号顺延（2026-05-26 更正）**：S0 占用 M-081（UOM seed）、M-082（权限 seed）。其后 QC/production/notification 又用掉一批号，当前索引最大 **M-096**，**S1 起从 M-097 接续**（下表 M-0xx 为相对示意）。
+> **关联读取实现（已演进）**：`item_id` 一对一已被 `qc_sku_item` 联结表取代（M-087）；`listProductItemLinks()` 现读 junction 返回一对多，并新增 `addSkuItemLink`/`removeSkuItemLink`。
 > **RLS**：`item`/`uom`/`location`/`lot` 现无 RLS（世界可写），S5 收紧。
 
 **✅ 验证门 M0：**
@@ -90,21 +97,25 @@
 
 | 类型 | 任务 | 状态 |
 |------|------|------|
-| ⚙️ | M-082 append-only 守护触发器：禁止 `UPDATE`/`DELETE` `inventory_transaction`（BR-1，计划书 §8.1） | 🔲 |
-| ⚙️ | M-083 balance 维护触发器：`inventory_transaction` AFTER INSERT → upsert `inventory_balance`（BR-4） | 🔲 |
-| 🔌 | M-084 `_wh_apply_transaction(...)`：UOM 换算 + 批控(BR-3) + 负库存(BR-5) + **BR-W4 双条件校验**（决议 §5.2） | 🔲 |
-| 🔌 | M-085 `wh_generate_lot_number(p_item_id, p_source_type)`（占位规则，计划书 §9） | 🔲 |
-| 🔌 | M-086 `wh_create_lot` / `wh_post_receipt`（含 `receipt_type='direct'`，BR-W2/D-W03） | 🔲 |
-| 🔌 | M-087 查询：`wh_list_balance` / `wh_list_transactions`（或 view） | 🔲 |
-| 🧩 | warehouseApi：`postReceipt` / `listBalance` / `listTransactions` / `createLot` | 🔲 |
-| 🖥️ | Balance 余额页（按 item/lot/location 三维） | 🔲 |
-| 🖥️ | GR 收货单 list + form，**Direct 醒目标签**（BR-W2） | 🔲 |
-| 📄 | 文档：M-082~087 条目 + 11_warehouse-inventory.md 收货章节 | 🔲 |
+| ⚙️ | **M-100** append-only 守护触发器 + balance 维护触发器（BR-1/BR-4） | 🟢 |
+| ⚙️ | **M-101** `goods_receipt.supplier_id` 可空 + `receipt_type`（BR-W2） | 🟢 |
+| 🔌 | **M-102** `_wh_apply_transaction`（UOM 换算 + BR-3 批控 + BR-5 负库存 + BR-W4 双条件）+ `wh_next_grn_number` + `wh_generate_lot_number`（§9） | 🟢 |
+| 🔌 | **M-103** `wh_create_lot` / `wh_post_receipt`（一次性 direct 收货） | 🟢 |
+| 🔌 | **M-104** `wh_list_balance` / `wh_list_transactions` | 🟢 |
+| 🧩 | warehouseApi：rpc helper + `postReceipt` / `listBalance` / `listTransactions` / `listGoodsReceipts` | 🟢 |
+| 🖥️ | Balance 余额页（按 item/lot/location 三维 + 库区筛选） | 🟢 |
+| 🖥️ | GR 收货单 list + 多行 form，**DIRECT 醒目标签** | 🟢 |
+| 📄 | 文档：M-100~104 索引 + 11_warehouse-inventory.md 内核/收货章节 | 🟢 |
 
-**✅ 验证门 M1：**
-- 无 PO 收货一笔 → `LOC-RM`，余额页正确显示，`goods_receipt.receipt_type='direct'` 且 UI 有标签
-- 尝试手动 `UPDATE inventory_transaction` → 被触发器拒绝
-- 收货数量为负或无 lot（lot 控制物料）→ 被 RPC 拒绝
+> **编号落定**：S1 实占 **M-100~M-104**（`20260526000003`~`007`）。下一个 migration 从 **M-105** 起。
+> **M1 范围限定**：仅批次控制物料可收货（`inventory_balance` PK 含 lot_id）；收货为一次性 post，draft/冲销/调拨留 S2。
+
+**✅ 验证门 M1：已通过（2026-05-27 验证）**
+- ✅ 无 PO 收货一笔 → `LOC-RM`，余额页正确显示，`goods_receipt.receipt_type='direct'` 且 UI 有 DIRECT 标签
+- ✅ 手动 `UPDATE inventory_transaction` → 被 `trg_invtxn_append_only` 拒绝
+- ✅ 内核守护：批控物料无 lot → BR-3 拒；出库使 balance<0 → BR-5 拒；从 quarantine 出 issue/ship → BR-W4 拒
+- ✅ 余额 = 流水累加（对账 0 差异）
+- 修复记录：前端 `postReceipt` 对 `receipt_date` 传 null 触发 NOT NULL（SQL 参数 DEFAULT 对显式 null 不生效），已在 warehouseApi 默认填今天解决（无需 push）
 
 ---
 
@@ -114,18 +125,21 @@
 
 | 类型 | 任务 | 状态 |
 |------|------|------|
-| 🔌 | M-088 `wh_post_transfer`（双流水原子性：transfer_out + transfer_in） | 🔲 |
-| 🔌 | M-089 `wh_post_adjustment`（原因码；受控负库存例外，BR-5） | 🔲 |
-| 🔌 | M-090 `wh_cancel_grn`（冲销收货，写反向 adjustment，不删流水） | 🔲 |
-| 🧩 | warehouseApi：`postTransfer` / `postAdjustment` / `cancelGrn` / `getLotTimeline` | 🔲 |
-| 🖥️ | Transfer 调拨页、Adjustment 调整页 | 🔲 |
-| 🖥️ | Lot 批次详情页 + 流水时间线（读 `wh_list_transactions` by lot） | 🔲 |
-| 📄 | 文档：M-088~090 + 调拨/调整章节 | 🔲 |
+| 🔌 | **M-105** `wh_post_transfer`（双流水原子性）+ `wh_post_adjustment`（原因→notes，严守 BR-5）+ `wh_cancel_grn`（反向 adjustment，不删流水）+ `wh_rebuild_balance`（提前到 S2） | 🟢 |
+| 🧩 | warehouseApi：`postTransfer` / `postAdjustment` / `cancelGrn` / `rebuildBalance` / `getLot`；时间线复用 `listTransactions({lotId})` | 🟢 |
+| 🖥️ | Lots 列表页 + 批次详情页（各库位余额 + 流水时间线 + **内联调拨/调整**表单） | 🟢 |
+| 🖥️ | Balance 批次号可点进详情；GR 列表加「冲销」按钮 | 🟢 |
+| 📄 | 文档：M-105 索引 + 11_warehouse S2 章节 | 🟢 |
 
-**✅ 验证门 M2：**
+> **编号落定**：S2 实占 **M-105**（`20260527000001`）。下一个 migration 从 **M-106** 起。
+> **入口决策**：调拨/调整从批次详情页发起（无独立 Transfer/Adjustment 导航页）；调整严守 BR-5。
+
+**✅ 验证门 M2：**（migration 待 push 后走查）
 - 调拨一笔 `LOC-RM → LOC-PRE-DRY`：源减目标增、两条流水、余额一致
-- 调整 + 冲销收货后，`wh_rebuild_balance` 重算结果与流水 SUM 一致
-- 批次详情页时间线按时间正确展示所有流水
+- 调整盘盈成功；超量负调被 BR-5 拒
+- 冲销 posted 收货单 → 状态 cancelled、余额回 0、原流水留存 + 反向 adjustment；货已调走的冲销被 BR-5 拒
+- 批次详情页时间线按时间正确展示 receipt/transfer/adjustment
+- `wh_rebuild_balance()` 重算结果 = 流水 SUM
 
 ---
 
@@ -155,9 +169,9 @@
 
 | 类型 | 任务 | 状态 |
 |------|------|------|
-| ⚙️ | M-093 `qc_production_lot.lot_id`（FK→lot）+ 索引（决议 §4.5 Migration A） | 🔲 |
-| ⚙️ | M-094 `qc_drying_sub_lot.lot_id` 冗余 + 同步触发器 `qc_sync_sub_lot_lot_id`（决议 §4.5 Migration B）+ 历史 backfill | 🔲 |
-| 🔌 | M-095 建车时写 lot：`qc_production_lot` 创建时调 `wh_create_lot` 并回填 `lot_id`；校验 `item_id IS NOT NULL` 否则拒绝（决议 §5.5） | 🔲 |
+| ⚙️ | `qc_production_lot.lot_id`（FK→lot）+ 索引（决议 §4.5 Migration A） | 🔲 |
+| ⚙️ | `qc_drying_sub_lot.lot_id` 冗余 + 同步触发器 `qc_sync_sub_lot_lot_id`（决议 §4.5 Migration B）+ 历史 backfill | 🔲 |
+| 🔌 | 建车时写 lot：`qc_create_production_lot_with_sub_lots`（M-095 已收 `p_packaging_item_id`）成功后，用 **`packaging_item_id`** 调 `wh_create_lot`（ERP lot.item_id = 成品 item）并回填 `lot_id`；校验 **`packaging_item_id IS NOT NULL`** 否则拒绝（决议 §5.6，已取代原 §5.5 的 item_id 写法） | 🔲 |
 | 🔌 | M-096 `wh_recompute_lot_status(p_lot_id)`：全车终态聚合（决议 §5.1） | 🔲 |
 | 🔌 | M-097 `wh_sync_release_from_qc(p_sub_lot_id)`：放行 transfer PENDING→PACK-STAGE + 调 recompute（计划书 §8.2，BR-W3） | 🔲 |
 | 🔌 | M-098 hold 同步：QC hold/disposing → transfer →LOC-NG + recompute | 🔲 |
@@ -170,7 +184,7 @@
 - 无 PO 收货 → 待检 → QC 放行 → 待包装，数量端到端正确
 - `wh_sync_release_from_qc` 故意失败时，QC sub_lot **不**变 closed（无"已放行但无 lot"脏数据）
 - 部分合格车：合格进 PACK-STAGE、不合格进 LOC-NG、lot.status=available（决议 §3.5 数据流示例可复现）
-- 未关联 item 的 SKU 建车被拒绝
+- 未选 `packaging_item_id` 的建车被拒绝（决议 §5.6；原"未关联 item 的 SKU 被拒"已按 junction 模型调整）
 
 ---
 
@@ -254,3 +268,4 @@ S0(主数据) ──► S1(流水内核) ──► S2(库内作业) ──► S3
 | 日期 | 修订者 | 内容 |
 |------|--------|------|
 | 2026-05-24 | 初稿 | 基于计划书 v1.0 + Sprint0 决议（全选方案 A）制定执行级落地计划 |
+| 2026-05-26 | 现状同步 | S0 完成；QC↔ERP 桥接演进为 `qc_sku_item` 联结表 + `packaging_item_id`（M-087/M-092/M-095）；migration 编号更正为 M-097 起；S4 改按决议 §5.6；澄清 "Production 模块" 为 QC 界面重组（非制造模块） |

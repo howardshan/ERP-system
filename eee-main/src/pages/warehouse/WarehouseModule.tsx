@@ -6,11 +6,18 @@ import {
   LayoutGrid,
   HelpCircle,
   ArrowLeft,
+  Layers,
+  Truck,
+  Tags,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
 import ItemsPage from './ItemsPage';
 import LocationsPage from './LocationsPage';
+import BalancePage from './BalancePage';
+import GoodsReceiptPage from './GoodsReceiptPage';
+import LotsListPage from './LotsListPage';
+import LotDetailPage from './LotDetailPage';
 
 interface Props {
   onHome: () => void;
@@ -45,14 +52,25 @@ function NavSection({ title }: { title: string }) {
 export default function WarehouseModule({ onHome }: Props) {
   const { can } = usePermissions();
   const [screen, setScreen] = useState('home');
+  const [selectedLotId, setSelectedLotId] = useState<number | null>(null);
 
   const canViewItems = can('warehouse', 'items', 'view');
   const canViewLocations = can('warehouse', 'locations', 'view');
+  const canViewInventory = can('warehouse', 'inventory', 'view');
+  const canViewReceipts = can('warehouse', 'goods_receipt', 'view');
+  const canViewLots = can('warehouse', 'lots', 'view');
 
   const isActive = (id: string) => screen === id || screen.startsWith(id + ':');
   const navigate = (s: string) => setScreen(s);
+  const openLot = (lotId: number) => { setSelectedLotId(lotId); setScreen('lot-detail'); };
 
   function renderContent() {
+    if (screen === 'balance' && canViewInventory) return <BalancePage onOpenLot={canViewLots ? openLot : undefined} />;
+    if (screen === 'goods-receipt' && canViewReceipts) return <GoodsReceiptPage />;
+    if (screen === 'lots' && canViewLots) return <LotsListPage onOpenLot={openLot} />;
+    if (screen === 'lot-detail' && canViewLots && selectedLotId != null) {
+      return <LotDetailPage lotId={selectedLotId} onBack={() => navigate('lots')} />;
+    }
     if (screen === 'items' && canViewItems) return <ItemsPage />;
     if (screen === 'locations' && canViewLocations) return <LocationsPage />;
     return <WarehouseHome />;
@@ -80,6 +98,17 @@ export default function WarehouseModule({ onHome }: Props) {
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 pb-4">
           <NavItem icon={Package} label="Overview" isActive={isActive('home')} onClick={() => navigate('home')} />
+
+          {(canViewInventory || canViewReceipts) && <NavSection title="Inventory" />}
+          {canViewInventory && (
+            <NavItem icon={Layers} label="Balance" isActive={isActive('balance')} onClick={() => navigate('balance')} />
+          )}
+          {canViewReceipts && (
+            <NavItem icon={Truck} label="Goods Receipt" isActive={isActive('goods-receipt')} onClick={() => navigate('goods-receipt')} />
+          )}
+          {canViewLots && (
+            <NavItem icon={Tags} label="Lots" isActive={isActive('lots') || isActive('lot-detail')} onClick={() => navigate('lots')} />
+          )}
 
           {(canViewItems || canViewLocations) && <NavSection title="Master Data" />}
           {canViewItems && (
