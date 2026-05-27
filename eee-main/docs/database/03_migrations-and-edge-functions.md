@@ -1748,6 +1748,22 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-107 `20260527000004_qc_needs_attention_dedup_by_group.sql`
+**用途**: 修复 QC Home「Needs attention」同一组重复出卡。
+
+**根因**: `qc_overview` 的 needs_attention 子查询是「每条今日 `qc_inspection_record` 一行」,从不按组去重(注释写着 ONE ROW PER GROUP 但实现没做)。每次 retest 失败都写一条新的 fail inspection,于是同一组一天累积多张卡(截图三张卡车号 006/007/008 互相重叠即同组多次失败叠出)。
+
+**变更**: needs_attention 用 `DISTINCT ON (group_key)` 按组去重,每组(solo 车按 sub-lot)只留**最新一次**检测。最新检测本就驱动正确的当前车列表(disposition 过滤相对 `ir.submitted_at`),故留存的卡反映该组当前状态。仅改 needs_attention 块,stats 与 M-096 一致。
+
+**配合 M-106**: retest 现复用同组、不再裂变新组,故未来同组多次 retest 收敛为一张卡。
+
+**业务规则**:
+- **BR-Q66** QC Home「Needs attention」每个抽样组只显示一张卡(取该组当日最新检测);solo 车每车一张。
+
+**依赖**: M-096(20260526000002)。**关联文档**: `docs/modules/09_qc.md`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1834,7 +1850,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-099 | 20260527000002_qc_trace_scanned_only.sql |
 | M-100~105 | _(Warehouse S2 — 见 docs/modules/11_warehouse-inventory.md)_ |
 | M-106 | 20260527000003_qc_group_retest_normalize.sql |
-| **M-107** | _(下一个)_ |
+| M-107 | 20260527000004_qc_needs_attention_dedup_by_group.sql |
+| **M-108** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
