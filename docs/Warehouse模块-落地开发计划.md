@@ -110,10 +110,12 @@
 > **编号落定**：S1 实占 **M-100~M-104**（`20260526000003`~`007`）。下一个 migration 从 **M-105** 起。
 > **M1 范围限定**：仅批次控制物料可收货（`inventory_balance` PK 含 lot_id）；收货为一次性 post，draft/冲销/调拨留 S2。
 
-**✅ 验证门 M1：**（migration 待 push 后走查）
-- 无 PO 收货一笔 → `LOC-RM`，余额页正确显示，`goods_receipt.receipt_type='direct'` 且 UI 有 DIRECT 标签
-- 尝试手动 `UPDATE inventory_transaction` → 被 `trg_invtxn_append_only` 拒绝
-- 内核守护（SQL 直调）：批控物料无 lot → BR-3 拒；出库使 balance<0 → BR-5 拒；从 quarantine 出 issue/ship → BR-W4 拒
+**✅ 验证门 M1：已通过（2026-05-27 验证）**
+- ✅ 无 PO 收货一笔 → `LOC-RM`，余额页正确显示，`goods_receipt.receipt_type='direct'` 且 UI 有 DIRECT 标签
+- ✅ 手动 `UPDATE inventory_transaction` → 被 `trg_invtxn_append_only` 拒绝
+- ✅ 内核守护：批控物料无 lot → BR-3 拒；出库使 balance<0 → BR-5 拒；从 quarantine 出 issue/ship → BR-W4 拒
+- ✅ 余额 = 流水累加（对账 0 差异）
+- 修复记录：前端 `postReceipt` 对 `receipt_date` 传 null 触发 NOT NULL（SQL 参数 DEFAULT 对显式 null 不生效），已在 warehouseApi 默认填今天解决（无需 push）
 
 ---
 
@@ -123,18 +125,21 @@
 
 | 类型 | 任务 | 状态 |
 |------|------|------|
-| 🔌 | M-088 `wh_post_transfer`（双流水原子性：transfer_out + transfer_in） | 🔲 |
-| 🔌 | M-089 `wh_post_adjustment`（原因码；受控负库存例外，BR-5） | 🔲 |
-| 🔌 | M-090 `wh_cancel_grn`（冲销收货，写反向 adjustment，不删流水） | 🔲 |
-| 🧩 | warehouseApi：`postTransfer` / `postAdjustment` / `cancelGrn` / `getLotTimeline` | 🔲 |
-| 🖥️ | Transfer 调拨页、Adjustment 调整页 | 🔲 |
-| 🖥️ | Lot 批次详情页 + 流水时间线（读 `wh_list_transactions` by lot） | 🔲 |
-| 📄 | 文档：M-088~090 + 调拨/调整章节 | 🔲 |
+| 🔌 | **M-105** `wh_post_transfer`（双流水原子性）+ `wh_post_adjustment`（原因→notes，严守 BR-5）+ `wh_cancel_grn`（反向 adjustment，不删流水）+ `wh_rebuild_balance`（提前到 S2） | 🟢 |
+| 🧩 | warehouseApi：`postTransfer` / `postAdjustment` / `cancelGrn` / `rebuildBalance` / `getLot`；时间线复用 `listTransactions({lotId})` | 🟢 |
+| 🖥️ | Lots 列表页 + 批次详情页（各库位余额 + 流水时间线 + **内联调拨/调整**表单） | 🟢 |
+| 🖥️ | Balance 批次号可点进详情；GR 列表加「冲销」按钮 | 🟢 |
+| 📄 | 文档：M-105 索引 + 11_warehouse S2 章节 | 🟢 |
 
-**✅ 验证门 M2：**
+> **编号落定**：S2 实占 **M-105**（`20260527000001`）。下一个 migration 从 **M-106** 起。
+> **入口决策**：调拨/调整从批次详情页发起（无独立 Transfer/Adjustment 导航页）；调整严守 BR-5。
+
+**✅ 验证门 M2：**（migration 待 push 后走查）
 - 调拨一笔 `LOC-RM → LOC-PRE-DRY`：源减目标增、两条流水、余额一致
-- 调整 + 冲销收货后，`wh_rebuild_balance` 重算结果与流水 SUM 一致
-- 批次详情页时间线按时间正确展示所有流水
+- 调整盘盈成功；超量负调被 BR-5 拒
+- 冲销 posted 收货单 → 状态 cancelled、余额回 0、原流水留存 + 反向 adjustment；货已调走的冲销被 BR-5 拒
+- 批次详情页时间线按时间正确展示 receipt/transfer/adjustment
+- `wh_rebuild_balance()` 重算结果 = 流水 SUM
 
 ---
 

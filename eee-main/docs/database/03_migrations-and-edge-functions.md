@@ -1737,6 +1737,21 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-105 `20260527000001_wh_inventory_operations.sql`
+**用途**: Warehouse S2 库内作业 — 调拨 / 调整 / 冲销收货 / 余额重建。全部经 `_wh_apply_transaction`（M-102），账本只增。
+
+**变更**:
+| 对象 | 说明 |
+|------|------|
+| `wh_post_transfer(...)` | 一事务两腿 `transfer_out`(-qty)+`transfer_in`(+qty)；qty>0、from≠to；BR-5 在出腿；transfer 不受 BR-W4 限 |
+| `wh_post_adjustment(...)` | reason 必填→notes；`adjustment` 类型；**严守 BR-5**（不可调负） |
+| `wh_cancel_grn(p_grn_id)` | 仅 `posted` 可冲销；逐行写反向 `adjustment`（`reference_type='goods_receipt'`）+ GRN→`cancelled`；货已调走则 BR-5 拒、整单回滚 |
+| `wh_rebuild_balance()` | `DELETE inventory_balance` + 从流水按 (item,lot,location) SUM 重灌（`HAVING sum<>0`，allocated 归 0） |
+
+**特性**: 幂等。无 schema 变更（reason 走 notes，`cancelled` 状态已存在）。**依赖**: M-100、M-102。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1826,7 +1841,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-102 | 20260526000005_wh_kernel_and_generators.sql |
 | M-103 | 20260526000006_wh_create_lot_and_post_receipt.sql |
 | M-104 | 20260526000007_wh_balance_queries.sql |
-| **M-105** | _(下一个)_ |
+| M-105 | 20260527000001_wh_inventory_operations.sql |
+| **M-106** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

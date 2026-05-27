@@ -10,7 +10,7 @@ const LOT_STATUS_BADGE: Record<string, string> = {
   consumed: 'bg-slate-100 text-slate-500',
 };
 
-export default function BalancePage() {
+export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number) => void }) {
   const [rows, setRows] = useState<WarehouseBalance[]>([]);
   const [locations, setLocations] = useState<WarehouseLocation[]>([]);
   const [locationId, setLocationId] = useState<number | ''>('');
@@ -69,7 +69,17 @@ export default function BalancePage() {
                   <div className="text-xs text-slate-500 font-mono">{r.item_sku}</div>
                 </td>
                 <td className="px-4 py-2.5">
-                  <span className="font-mono text-slate-800">{r.lot_number ?? '—'}</span>
+                  {r.lot_id != null && onOpenLot ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenLot(r.lot_id as number)}
+                      className="font-mono text-emerald-700 hover:text-emerald-800 hover:underline"
+                    >
+                      {r.lot_number ?? '—'}
+                    </button>
+                  ) : (
+                    <span className="font-mono text-slate-800">{r.lot_number ?? '—'}</span>
+                  )}
                   {r.lot_status && (
                     <span className={`ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded ${LOT_STATUS_BADGE[r.lot_status] ?? 'bg-slate-100 text-slate-600'}`}>
                       {r.lot_status}

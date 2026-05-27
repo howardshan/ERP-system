@@ -257,9 +257,11 @@ export interface GoodsReceiptRow {
 
 export async function postReceipt(input: ReceiptInput): Promise<PostReceiptResult> {
   if (!input.lines || input.lines.length === 0) throw new Error('至少需要一行收货明细');
+  // receipt_date must not be null (NOT NULL column). The SQL param DEFAULT only
+  // applies when the arg is omitted, not when null is passed — so default here.
   return rpc<PostReceiptResult>('wh_post_receipt', {
     p_lines: input.lines,
-    p_receipt_date: input.receipt_date ?? null,
+    p_receipt_date: input.receipt_date ?? new Date().toISOString().slice(0, 10),
     p_supplier_id: input.supplier_id ?? null,
     p_warehouse_id: input.warehouse_id ?? null,
     p_notes: input.notes ?? null,
@@ -292,4 +294,88 @@ export async function listGoodsReceipts(): Promise<GoodsReceiptRow[]> {
     .order('id', { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as GoodsReceiptRow[];
+}
+
+// ── In-warehouse operations (Sprint 2) ──────────────────────────────────────
+
+export interface LotHeader {
+  id: number;
+  lot_number: string;
+  item_id: number;
+  item_sku: string | null;
+  item_name: string | null;
+  base_uom_id: number | null;
+  supplier_lot_number: string | null;
+  manufacture_date: string | null;
+  expiry_date: string | null;
+  source_type: 'purchased' | 'produced';
+  source_doc_type: string | null;
+  source_doc_id: number | null;
+  status: LotStatus;
+  created_at: string;
+}
+
+export async function postTransfer(input: {
+  itemId: number; lotId: number; fromLocationId: number; toLocationId: number;
+  quantity: number; uomId: number; notes?: string | null;
+}): Promise<{ transfer_out_id: number; transfer_in_id: number }> {
+  return rpc('wh_post_transfer', {
+    p_item_id: input.itemId,
+    p_lot_id: input.lotId,
+    p_from_location_id: input.fromLocationId,
+    p_to_location_id: input.toLocationId,
+    p_quantity: input.quantity,
+    p_uom_id: input.uomId,
+    p_notes: input.notes ?? null,
+  });
+}
+
+export async function postAdjustment(input: {
+  itemId: number; lotId: number; locationId: number;
+  quantityDelta: number; uomId: number; reason: string;
+}): Promise<number> {
+  return rpc<number>('wh_post_adjustment', {
+    p_item_id: input.itemId,
+    p_lot_id: input.lotId,
+    p_location_id: input.locationId,
+    p_quantity_delta: input.quantityDelta,
+    p_uom_id: input.uomId,
+    p_reason: input.reason,
+  });
+}
+
+export async function cancelGrn(grnId: number): Promise<{ grn_id: number; grn_number: string; lines_reversed: number }> {
+  return rpc('wh_cancel_grn', { p_grn_id: grnId });
+}
+
+export async function rebuildBalance(): Promise<{ rebuilt_rows: number }> {
+  return rpc('wh_rebuild_balance', {});
+}
+
+// Lot header for the detail page (embeds item via FK).
+export async function getLot(lotId: number): Promise<LotHeader> {
+  const { data, error } = await supabase
+    .from('lot')
+    .select('id, lot_number, item_id, supplier_lot_number, manufacture_date, expiry_date, source_type, source_doc_type, source_doc_id, status, created_at, item:item_id(sku, name, base_uom_id)')
+    .eq('id', lotId)
+    .single();
+  if (error) throw new Error(error.message);
+  const row = data as Record<string, unknown>;
+  const itemEmbed = row.item as { sku: string; name: string; base_uom_id: number } | null;
+  return {
+    id: row.id as number,
+    lot_number: row.lot_number as string,
+    item_id: row.item_id as number,
+    item_sku: itemEmbed?.sku ?? null,
+    item_name: itemEmbed?.name ?? null,
+    base_uom_id: itemEmbed?.base_uom_id ?? null,
+    supplier_lot_number: (row.supplier_lot_number as string) ?? null,
+    manufacture_date: (row.manufacture_date as string) ?? null,
+    expiry_date: (row.expiry_date as string) ?? null,
+    source_type: row.source_type as 'purchased' | 'produced',
+    source_doc_type: (row.source_doc_type as string) ?? null,
+    source_doc_id: (row.source_doc_id as number) ?? null,
+    status: row.status as LotStatus,
+    created_at: row.created_at as string,
+  };
 }
