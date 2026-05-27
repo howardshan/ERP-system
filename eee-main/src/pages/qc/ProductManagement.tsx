@@ -19,9 +19,11 @@ import { listItems, WarehouseItem } from '../../services/warehouseApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { SelectAllCheckbox } from './components/SelectAllCheckbox';
 import { PermissionDenied } from './components/PermissionDenied';
+import { DecimalField } from '../../components/ui/DecimalField';
 import { cn, fmtDays, daysToMinutes, minutesToDays, MINUTES_PER_DAY } from '../../lib/utils';
 
 const emptyForm = (): ProductInput => ({
+  code: '',
   name: '',
   standard_drying_minutes: MINUTES_PER_DAY,
   sample_every_n_carts: 1,
@@ -30,6 +32,7 @@ const emptyForm = (): ProductInput => ({
 
 function productToForm(p: Product): ProductInput {
   return {
+    code: p.code,
     name: p.name,
     standard_drying_minutes: p.standard_drying_minutes,
     sample_every_n_carts: p.sample_every_n_carts ?? 1,
@@ -131,15 +134,35 @@ export default function ProductManagement() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    // Validate limits — DecimalField emits NaN for empty/partial input, so we
+    // reject here instead of letting NaN propagate to the backend.
+    for (const t of form.templates) {
+      if (!Number.isFinite(t.lower_limit) || !Number.isFinite(t.upper_limit)) {
+        setError('Each test needs a lower and upper limit.');
+        return;
+      }
+      if (t.lower_limit > t.upper_limit) {
+        setError('Lower limit must be ≤ upper limit.');
+        return;
+      }
+    }
+    // Normalise the SKU code: empty string means "auto" on create, and "keep
+    // existing" on edit — strip it so updateProduct's PATCH doesn't blank out
+    // a perfectly good code, and so createProduct's `if (!code)` branch fires
+    // and calls qc_next_sku_code.
+    const payload: ProductInput = {
+      ...form,
+      code: form.code && form.code.trim() ? form.code.trim() : undefined,
+    };
     try {
       let skuId: string;
       if (editingId) {
-        await updateProduct(editingId, form);
+        await updateProduct(editingId, payload);
         skuId = editingId;
         setMsg('Product updated');
         setEditingId(null);
       } else {
-        const created = await createProduct(form);
+        const created = await createProduct(payload);
         skuId = created.id;
         setMsg('Product created');
         setCreating(false);
@@ -395,44 +418,55 @@ function ProductFormFields({
   const addTemplate = (typeId: number) => {
     setForm({
       ...form,
-      templates: [...form.templates, { test_type_id: typeId, lower_limit: 0, upper_limit: 1 }],
+      // Start empty (NaN) so operator types fresh values; submit validates.
+      templates: [...form.templates, { test_type_id: typeId, lower_limit: NaN, upper_limit: NaN }],
     });
   };
 
   return (
     <>
-      <label className="block">
-        <span className="text-xs font-medium text-slate-700">Product name</span>
-        <input
-          className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
-        />
-        <span className="mt-0.5 block text-[10px] text-slate-500">
-          SKU code is auto-generated (SKU-NNNN).
-        </span>
-      </label>
+      <div className="grid sm:grid-cols-[180px_1fr] gap-3">
+        <label className="block">
+          <span className="text-xs font-medium text-slate-700">SKU code</span>
+          <input
+            className="mt-1 w-full border rounded-lg px-3 py-2 text-sm font-mono"
+            value={form.code ?? ''}
+            onChange={(e) => setForm({ ...form, code: e.target.value })}
+            placeholder="auto"
+            spellCheck={false}
+          />
+          <span className="mt-0.5 block text-[10px] text-slate-500">
+            Leave blank to auto-generate (SKU-NNNN).
+          </span>
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-slate-700">Product name</span>
+          <input
+            className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            required
+          />
+        </label>
+      </div>
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
           <span className="text-xs font-medium text-slate-700">Reference dry time (days, SOP)</span>
-          <input
-            type="number" min={0.1} step={0.1}
+          <DecimalField
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-            value={daysValue ?? ''}
-            onChange={(e) =>
-              setForm({ ...form, standard_drying_minutes: e.target.value ? daysToMinutes(Number(e.target.value)) : null })
+            value={daysValue ?? NaN}
+            onChange={(n) =>
+              setForm({ ...form, standard_drying_minutes: Number.isFinite(n) ? daysToMinutes(n) : null })
             }
           />
         </label>
         <label className="block">
           <span className="text-xs font-medium text-slate-700">Sampling rate (1 per N carts)</span>
-          <input
-            type="number" min={1} step={1}
+          <DecimalField
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-            value={form.sample_every_n_carts ?? 1}
-            onChange={(e) =>
-              setForm({ ...form, sample_every_n_carts: Math.max(1, Number(e.target.value) || 1) })
+            value={form.sample_every_n_carts ?? NaN}
+            onChange={(n) =>
+              setForm({ ...form, sample_every_n_carts: Number.isFinite(n) ? Math.max(1, Math.floor(n)) : undefined })
             }
           />
           <span className="mt-0.5 block text-[10px] text-slate-500">
@@ -471,22 +505,20 @@ function ProductFormFields({
               <div className="grid grid-cols-2 gap-2">
                 <label className="block">
                   <span className="text-[11px] text-slate-600">Lower limit</span>
-                  <input
-                    type="number" step="0.0001"
+                  <DecimalField
+                    allowNegative
                     className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
                     value={tmpl.lower_limit}
-                    onChange={e => updateTemplate(idx, { lower_limit: Number(e.target.value) })}
-                    required
+                    onChange={(n) => updateTemplate(idx, { lower_limit: n })}
                   />
                 </label>
                 <label className="block">
                   <span className="text-[11px] text-slate-600">Upper limit</span>
-                  <input
-                    type="number" step="0.0001"
+                  <DecimalField
+                    allowNegative
                     className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
                     value={tmpl.upper_limit}
-                    onChange={e => updateTemplate(idx, { upper_limit: Number(e.target.value) })}
-                    required
+                    onChange={(n) => updateTemplate(idx, { upper_limit: n })}
                   />
                 </label>
               </div>

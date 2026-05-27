@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Clock, LogOut, Package, QrCode, CheckSquare, ArrowRightLeft, AlertCircle, X } from 'lucide-react';
 import {
+  scanCartForCheckIn,
   listAwaitingCheckIn,
   listAwaitingRecheck,
   listSubLotsByDryer,
@@ -153,12 +154,28 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
 
   // Dialog stays open after each scan (keepOpen mode); operator clicks Done
   // to close.  Each handler only updates internal state — no setScanOpen(false).
-  const handleScanned = (sl: SubLot) => {
+  //
+  // M-098: for a brand-new `created` cart, the scan ALSO stamps
+  // scanned_for_check_in_at so the cart enters the Awaiting queue.  RPC is
+  // idempotent — re-scanning an already-stamped cart is a silent no-op.
+  // For `awaiting_recheck` (re-dried) carts we skip the stamp; they're a
+  // different lifecycle and qualify without the scan gate.
+  const handleScanned = async (sl: SubLot) => {
     setError('');
     if (sl.status === 'created' || sl.status === 'awaiting_recheck') {
       if (scannedIn.has(sl.sub_lot_code)) {
         setDupScan({ sl, side: 'in' });
         return;
+      }
+      if (sl.status === 'created') {
+        try {
+          await scanCartForCheckIn(sl.id);
+          // Refresh the eligible list so the freshly-stamped cart appears.
+          await load();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : `Failed to register ${sl.sub_lot_code}`);
+          return;
+        }
       }
       acceptScannedForIn(sl);
     } else if (sl.status === 'drying') {
