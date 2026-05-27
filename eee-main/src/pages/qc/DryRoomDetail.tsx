@@ -9,6 +9,7 @@ import {
   checkOutSubLot,
   moveSubLot,
   formatQcDateTime,
+  scanCartForCheckIn,
   SubLot,
   DryingLocation,
 } from '../../services/qcApi';
@@ -213,20 +214,27 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
   };
 
   // QR scan → decide what to do based on the scanned sub-lot's status & location.
-  const handleScanned = (sl: SubLot) => {
+  // M-098: for a freshly-created cart, also stamp scanned_for_check_in_at so
+  // it shows up in the side panel's Awaiting list.  Idempotent.
+  const handleScanned = async (sl: SubLot) => {
     setScanOpen(false);
     setError('');
     // (a) Not in any dryer yet → enter place mode
     if (sl.status === 'created' || sl.status === 'awaiting_recheck') {
+      if (sl.status === 'created') {
+        try {
+          await scanCartForCheckIn(sl.id);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : `Failed to register ${sl.sub_lot_code}`);
+          return;
+        }
+      }
       setMode({
         kind: 'place',
         subLotId: sl.id,
         source: sl.status === 'awaiting_recheck' ? 'recheck' : 'created',
       });
       setMsg(`${sl.sub_lot_code} ready to place — click a green cell`);
-      // Make sure the appropriate side panel will include the scanned sub-lot;
-      // load() will pick it up shortly. Until then we already have setMode pointing
-      // at the right id.
       load();
       return;
     }

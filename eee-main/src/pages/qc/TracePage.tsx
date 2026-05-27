@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, History, Plus, Printer } from 'lucide-react';
-import { productionLotDetail, ProductionLotDetail, formatQcDateTime, SubLot } from '../../services/qcApi';
+import { productionLotDetail, ProductionLotDetail, formatQcDateTime, SubLot, listSubLotsForLot } from '../../services/qcApi';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { PermissionDenied } from './components/PermissionDenied';
 import { AddCartsDialog } from './components/AddCartsDialog';
@@ -34,6 +34,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
   // Dialog state
   const [addOpen, setAddOpen] = useState(false);
   const [reprintOpen, setReprintOpen] = useState(false);
+  const [allSubLots, setAllSubLots] = useState<SubLot[]>([]);
   const [printCarts, setPrintCarts] = useState<SubLot[] | null>(null);
   // After "Add carts" succeeds we stash the newly-added subset here, then
   // pop a Yes/No confirm asking the operator whether to print stickers for
@@ -50,10 +51,14 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
 
   useEffect(() => { loadDetail(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [lotId]);
 
-  const maxSeq = useMemo(
-    () => (detail ? detail.sub_lots.reduce((m, s) => Math.max(m, parseSeq(s.sub_lot_code)), 0) : 0),
-    [detail],
-  );
+  // Prefer the server-computed max_seq (covers unscanned carts too, since
+  // M-099 hides them from sub_lots). Fall back to the visible sub_lots only
+  // if the RPC didn't emit it (e.g. stale build).
+  const maxSeq = useMemo(() => {
+    if (!detail) return 0;
+    if (typeof detail.lot.max_seq === 'number') return detail.lot.max_seq;
+    return detail.sub_lots.reduce((m, s) => Math.max(m, parseSeq(s.sub_lot_code)), 0);
+  }, [detail]);
 
   if (!canView) {
     return <PermissionDenied permission="production.trace.view" feature="Batch Trace" />;
@@ -78,7 +83,26 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
 
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Trace · {detail.lot.lot_number}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Trace · {detail.lot.lot_number}
+            {typeof detail.lot.scanned_count === 'number' && typeof detail.lot.total_count === 'number' && (
+              <span
+                className={
+                  'ml-2 align-middle text-xs font-bold font-mono px-2 py-0.5 rounded ' +
+                  (detail.lot.total_count > 0 && detail.lot.scanned_count >= detail.lot.total_count
+                    ? 'bg-slate-100 text-slate-500'
+                    : 'bg-amber-100 text-amber-800')
+                }
+                title={
+                  detail.lot.scanned_count >= detail.lot.total_count
+                    ? 'All carts scanned in'
+                    : `${detail.lot.total_count - detail.lot.scanned_count} cart(s) still on production floor`
+                }
+              >
+                {detail.lot.scanned_count}/{detail.lot.total_count}
+              </span>
+            )}
+          </h1>
           <p className="text-slate-600 mt-1 text-sm">{detail.lot.sku_name}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -94,8 +118,12 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
           {canReprint && (
             <button
               type="button"
-              onClick={() => setReprintOpen(true)}
-              disabled={detail.sub_lots.length === 0}
+              onClick={async () => {
+                const lots = await listSubLotsForLot(detail.lot.id).catch(() => detail.sub_lots);
+                setAllSubLots(lots.length > 0 ? lots : detail.sub_lots);
+                setReprintOpen(true);
+              }}
+              disabled={maxSeq === 0}
               className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-40"
             >
               <Printer size={12} /> Reprint sticker
@@ -203,7 +231,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
 
       <ReprintPickerDialog
         open={reprintOpen}
-        subLots={detail.sub_lots}
+        subLots={allSubLots}
         onClose={() => setReprintOpen(false)}
         onConfirm={(picked) => {
           setReprintOpen(false);

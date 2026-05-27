@@ -1635,120 +1635,97 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
-> **以下 M-096～M-099 为 Warehouse Sprint 0 的 4 个 migration**。它们文件名日期较早（`20260524*`），但在本索引重排后遗漏，现按「追加到末尾」补登（编号晚于文件日期，属事后对账，不代表执行顺序）。它们均已应用到线上库。
+### M-096 `20260526000002_qc_needs_attention_today_not_24h.sql`
+**用途**: 把 `qc_overview` 的「Needs attention」窗口从滚动 24 小时改成「今天 00:00 起」的日历日。
 
-### M-096 `20260524000002_warehouse_seed_locations.sql`
-**用途**: Warehouse 模块起步 — seed 主工厂仓库 `WH-MAIN` 及 7 个逻辑库区（决策 D-W01，`docs/Warehouse模块开发计划书.md` §5.1）。
-
-**变更**:
-- `warehouse` INSERT `WH-MAIN`（`ON CONFLICT (code) DO NOTHING`）
-- `location` INSERT 7 行：`LOC-RM`/storage、`LOC-PRE-DRY`/production、`LOC-DRY-WIP`/production、`LOC-QC-PENDING`/quarantine、`LOC-PACK-STAGE`/storage、`LOC-NG`/quarantine、`LOC-FG`/storage（`ON CONFLICT (warehouse_id, code) DO NOTHING`）
-
-**特性**: 幂等。复用既有 `location_type` CHECK，未改 schema。**依赖**: M-001。
-
----
-
-### M-097 `20260524000003_qc_product_sku_add_item_id.sql`
-**用途**: 桥接 QC SKU 与 ERP item（Sprint 0 决议 1）。给 `qc_product_sku` 加可空 FK `item_id bigint REFERENCES item(id)` + 索引。
-
-**变更**: `ADD COLUMN IF NOT EXISTS item_id` + `CREATE INDEX IF NOT EXISTS idx_qc_product_sku_item`。
-
-> ⚠️ **已被取代**: 本列（一对一）在 M-087（`qc_sku_item` 联结表，一对多）中被 **DROP**。后续 QC↔item 桥接用 `qc_sku_item` + `qc_production_lot.packaging_item_id`。详见 `docs/Warehouse模块-Sprint0决议.md` §1.5/§5.6。
-
-**特性**: 幂等。**依赖**: M-001（`item`）、`qc_product_sku`。
-
----
-
-### M-098 `20260524000004_warehouse_seed_uom.sql`
-**用途**: seed 基础计量单位。`uom` 表自 M-001 起从未 seed，而 `item.base_uom_id` 是 NOT NULL FK — 不先 seed 就无法创建任何 item，此 migration 解除 Items 表单阻塞。
-
-**变更**: `uom` INSERT 9 行（KG/G/TON、L/ML、EACH/BAG/BOX/PALLET），`ON CONFLICT (code) DO NOTHING`。不 seed `uom_conversion`。
-
-**特性**: 幂等。**依赖**: M-001（`uom`）。
-
----
-
-### M-099 `20260524000005_warehouse_permission_seed.sql`
-**用途**: 给管理员 `tianzuohuang@crave-cook.com` 授予 Warehouse 模块访问 + 全部 warehouse 资源权限（仿 QC 模块 seed）。
-
-**变更**: `user_module_access` INSERT `warehouse`；`user_permission_grant` INSERT warehouse 全量 (resource, permission) — `module_permissions.manage`、`items.{view,create,edit,delete}`、`locations.{view,edit}`、`lots.{view,release,reject}`、`goods_receipt.{view,create,post,cancel}`、`inventory.{view,receive,transfer,adjust}`。
-
-**特性**: 幂等。**契约**: resource/permission 字符串必须与 `src/lib/permissionStructure.ts` warehouse 段逐字一致，否则 `can()` 静默返回 false。**依赖**: 权限系统、M-096。
-
----
-
-> **以下 M-100～M-104 为 Warehouse Sprint 1（库存流水内核 / 可收货入账）。**
-
-### M-100 `20260526000003_wh_ledger_triggers.sql`
-**用途**: 库存账本守护与派生余额维护（BR-1 / BR-4）。
+**问题**: 之前用 `ir.submitted_at >= now() - interval '24 hours'`,过了午夜还会显示昨天的 inspection,操作员当日早会看到的列表既有今天的也有昨天的,容易混淆「今天该处理什么」。
 
 **变更**:
-| 对象 | 操作 | 说明 |
-|------|------|------|
-| `wh_invtxn_append_only()` + `trg_invtxn_append_only` | CREATE | BEFORE UPDATE/DELETE ON `inventory_transaction` → `RAISE EXCEPTION`（只增账本，BR-1） |
-| `wh_invtxn_maintain_balance()` + `trg_invtxn_maintain_balance` | CREATE | AFTER INSERT → upsert `inventory_balance`（`quantity_on_hand += NEW.quantity`，BR-4）；`lot_id IS NULL` 时报错（balance 主键含 lot_id） |
+- 局部变量 `day_start := date_trunc('day', now())` / `day_end := day_start + interval '1 day'`
+- `passed_today` / `failed_today` 统计窗口同步用 `day_start ≤ submitted_at < day_end`
+- `needs_attention` 列表的过滤改成 `ir.submitted_at >= day_start`,并显式按 `submitted_at DESC` 排序,`LIMIT 50` 保持不变
+- 「group-aware action filter」(M-077 引入的)逻辑保持不动:只保留组内**仍在 passed/hold 且尚未被 disposition 跟上**的成员
 
-**特性**: 幂等。**依赖**: M-001。
-
----
-
-### M-101 `20260526000004_wh_goods_receipt_schema.sql`
-**用途**: 为无 PO「direct」收货准备 `goods_receipt`（BR-W2）。
-
-**变更**: `supplier_id` 去 NOT NULL（direct 收货供应商选填）；`ADD COLUMN receipt_type text NOT NULL DEFAULT 'direct' CHECK (po|direct)`。
-
-**特性**: 幂等。**依赖**: M-001。
+**业务规则**:
+- **BR-Q57** Needs Attention 列表以**自然日**(server local day,UTC)为窗口,过了 00:00 自动清空昨天的条目,不再用 24 小时滚动窗口。
 
 ---
 
-### M-102 `20260526000005_wh_kernel_and_generators.sql`
-**用途**: 库存流水内核 + 编号生成器。
+### M-097 `20260526000005_qc_retest_reset_group_siblings.sql`
+**用途**: 修复组(test_group)champion 走 retest 时,其他已被 group-fail 推到 `hold` 的 siblings 不会随之回到测试流的 bug。
+
+**问题流程**(修复前):
+1. 2 车一组,champion FAIL → M-056 group-fail 把 sibling 也推到 `hold`。
+2. 操作员对 champion 点 Retest → `qc_create_disposition` 的 retest 分支去找 `awaiting_group_result` 的 sibling 当新 champion,但 sibling 已经在 `hold`,**找不到**。
+3. 回退到「保留原 cart 当 champion,送回 pending」,sibling 留在 `hold` 不动。
+4. champion 重测的新样本 PASS → M-055 propagation 只动 `awaiting_group_result` 的 siblings → sibling 永远卡在 `hold`。
+
+**症状**: Analysis → Retest 详情里 sibling 永远显示 "in progress"(没有后续 inspection);QC Home Needs Attention 出现「champion 等待 release / sibling 等待 dispose」的混合状态,无法整组一起释放。
+
+**变更**: `qc_create_disposition` 的 retest 分支,当**没有** `awaiting_group_result` sibling 可以接 champion 棒(亦即保留 this cart 当 champion 回 pending)时,把组内**所有**当前在 `hold` 的 siblings 重置回 `awaiting_group_result`。其他状态(closed / dispatched / disposing / awaiting_recheck / room_temp_drying / passed)**不动**——那些已经过了测试阶段,不应该被拽回去。
+
+返回 jsonb 加 `siblings_reset_count` 字段,disposition_completed 事件 payload 同步带这个数;每个被重置的 sibling 都写一条 `group_retest_reset` 事件(payload 含 reset_from/reset_to/champion_id/disposition_id),便于审计。
+
+**业务规则**:
+- **BR-Q58** Champion 走 retest 且没有 `awaiting_group_result` sibling 可以替补时,所有 `hold` 状态的 siblings 必须回到 `awaiting_group_result`,以便 retest 结果在组内传播。
+- **BR-Q59** retest 触发的 sibling 重置只动 `hold`;`closed / dispatched / disposing / awaiting_recheck / room_temp_drying / passed` 这些已经过了测试阶段的状态保留不动。
+
+---
+
+### M-098 `20260527000001_qc_scan_for_check_in.sql`
+**用途**: 把「Awaiting check-in」队列从「work order 一建好就出现」改成「现场扫码后才出现」。
+
+**旧逻辑**: 创建 work order 后,sub_lot 落到 `status='created'`,DryRoomDetail 侧栏的 Awaiting 面板立刻显示。操作员从列表里挑出来 check in 到 dryer cell。
+
+**新逻辑**(本次变更):
+1. work order 创建 → sub_lot 落到 `status='created'`,但 **不在** Awaiting 列表里(车还在生产线,还没推到 dryer)。
+2. 操作员把车物理推到 dryer 门口扫码 → 后端给该 sub_lot 盖戳 `scanned_for_check_in_at = now()`。这时它才出现在 Awaiting 列表里。
+3. 操作员在侧栏多选(常按 work order 分组)→ 走 BulkCheckInDialog → 一批送进 dryer cells。
 
 **变更**:
-| 对象 | 说明 |
-|------|------|
-| `wh_next_grn_number()` | `GRN-NNNNNN`，max+1 正则 |
-| `wh_generate_lot_number(item, source_type)` | 占位规则（§9）：purchased→`RM-YYYYMMDD-SEQ4`；produced→`FG-{sku}-YYYYMMDD-SEQ4` |
-| `_wh_apply_transaction(...)` SECURITY DEFINER | **所有库存写操作唯一入口**：BR-3 批控 + BR-2 UOM→base 换算 + BR-W4 双条件（issue/ship/consume）+ BR-5 负库存（`FOR UPDATE` 行锁）；INSERT 签名流水，余额由 M-100 触发器维护 |
+- `qc_drying_sub_lot` 新增 `scanned_for_check_in_at timestamptz` 可空列(NULL = 还没扫,盖戳 = 在 Awaiting 列表)
+- 部分索引 `idx_qc_sub_lot_awaiting_check_in` (`status='created' AND scanned_for_check_in_at IS NOT NULL`)加速 Awaiting 查询
+- **回填**: 把现有 `status='created'` 的车 `scanned_for_check_in_at` 设为 `COALESCE(created_at, now())`,迁移瞬间不要让正在进行的工作消失
+- 新 RPC `qc_scan_cart_for_check_in(p_sub_lot_id uuid)` — 幂等,只在 `status='created' AND scanned_for_check_in_at IS NULL` 时盖戳;其他状态(已扫 / 已进 dryer / closed / ...)是 no-op,把当前状态原样返回给前端。盖戳时写 `scanned_for_check_in` quality event
+- 新 RPC `qc_list_awaiting_check_in()` — 替换前端原本 `qc_list_sub_lots → 前端 filter status=created` 的写法,直接在 SQL 里过滤 `status='created' AND scanned_for_check_in_at IS NOT NULL`,这样不必把新列加进 `qc_sub_lot_to_json` 的 schema
 
-**设计**: BR-W4 仅对 `issue/ship/production_consume` 生效——`transfer` 出 quarantine 是合法的（QC 放行调拨），故不拦。`SET search_path = public, pg_temp`。**特性**: 幂等。**依赖**: M-001、M-100。
+**前端配套**:
+- `src/services/qcApi.ts` — `listAwaitingCheckIn` 改调新 RPC `qc_list_awaiting_check_in`;新增 `scanCartForCheckIn(subLotId)` wrapper
+- `src/pages/qc/components/DryRoomListMode.tsx` — `handleScanned` 改 async;对 `status='created'` 的扫码先 `await scanCartForCheckIn(sl.id)` → `await load()` → 再走 `acceptScannedForIn`;`awaiting_recheck` 的车不走盖戳(那是另一套生命周期)
+- `src/pages/qc/DryRoomDetail.tsx` — `handleScanned` 同步改 async;`created` 走盖戳 + 然后进 place 模式,`awaiting_recheck` 直接进 place 模式
+
+**业务规则**:
+- **BR-Q60** 新建 work order 后,sub_lot 默认**不可见**于 DryRoomDetail 的 Awaiting 队列;只有现场扫码盖戳 `scanned_for_check_in_at` 后才进入队列。
+- **BR-Q61** 扫码盖戳操作必须幂等:重复扫同一个 sub_lot 不会重复写 quality event,也不会改变盖戳时间。
+
+**未做**:
+- 服务端不强制扫码必须发生在「物理位于 dryer 门口」;盖戳信任前端 + 扫码枪。
+- BulkCheckInDialog 暂未加「按 work order 分组多选」,操作员仍按 sub_lot 单选/多选(列表本身按 scanned_for_check_in_at 排序,自然把同一 work order 的车聚在一起)。后续如需可再加。
 
 ---
 
-### M-103 `20260526000006_wh_create_lot_and_post_receipt.sql`
-**用途**: 建批 + 一次性直接收货。
+### M-099 `20260527000002_qc_trace_scanned_only.sql`
+**用途**: 配合 M-098 的「扫码后才进队列」语义,把 Batch Trace 也对齐——只展示已扫码进 dryer 的车,并在 work order 旁打 `scanned/total` 角标。
+
+**问题**: M-098 把「未扫码的 created 车」从 dry room awaiting 队列里隐藏掉了,但 Batch Trace 还是把它们一起列出来。操作员看到的车数 ≠ 已进入烘干流程的车数,容易误判现场进度;同时无从知晓某个 WO 到底还有多少车没推到 dryer。
 
 **变更**:
-| 对象 | 说明 |
-|------|------|
-| `wh_create_lot(...)` SECURITY DEFINER | lot_number 空则调生成器；BR-6 由 `shelf_life_days` 推 expiry；默认 status=`available` |
-| `wh_post_receipt(p_lines jsonb, ...)` SECURITY DEFINER | 一次性：生成 GRN（`status=posted`,`receipt_type=direct`,`po_id=NULL`,supplier 选填）→ 每行建 lot + `goods_receipt_line` + `_wh_apply_transaction('receipt', +qty)`；返回 `{grn_id, grn_number, line_count, lot_ids}` |
+- `qc_list_production_lots` 每个 lot 多返 `scanned_count`(`scanned_for_check_in_at IS NOT NULL` 的车数)和 `total_count`(全部车数)
+- `qc_production_lot_detail`:
+  - `sub_lots` 列表过滤 `scanned_for_check_in_at IS NOT NULL`(未扫的车不进 trace 视图)
+  - `lot` 对象多 `scanned_count` / `total_count` / `max_seq` 三个字段
+  - `max_seq` 是**所有车**(含未扫)`sub_lot_code` 后 3 位的最大值,给 Add-carts 对话框默认 start_seq 用,避免和未扫车撞 seq
+  - `events` 列表不动——历史事件即便绑在未扫车上也要可见
 
-**特性**: 幂等。draft/`wh_cancel_grn` 留 S2。**依赖**: M-102。
+**前端配套**:
+- `src/services/qcApi.ts` — `ProductionLot` 接口加 `scanned_count? / total_count? / max_seq?` 三个可选字段
+- `src/pages/qc/TraceListPage.tsx` — 每个 work order 行加 `scanned/total` 角标:全部扫完时灰色(slate),还有未扫时琥珀色(amber),hover 提示「N cart(s) not yet scanned」
+- `src/pages/qc/TracePage.tsx` — 标题旁同款角标;`maxSeq` 优先取 `detail.lot.max_seq`(服务端口径),fallback 才用本地可见 sub_lots 算
 
----
-
-### M-104 `20260526000007_wh_balance_queries.sql`
-**用途**: 查询函数（只读，`LANGUAGE sql STABLE`）。
-
-**变更**: `wh_list_balance(p_location_id, p_item_id)`（join item/lot/location，含 available=on_hand-allocated、lot.status）；`wh_list_transactions(p_item_id, p_lot_id, p_location_id, p_limit)`（按 date desc）。
-
-**特性**: 幂等。**依赖**: M-001。
-
----
-
-### M-105 `20260527000001_wh_inventory_operations.sql`
-**用途**: Warehouse S2 库内作业 — 调拨 / 调整 / 冲销收货 / 余额重建。全部经 `_wh_apply_transaction`（M-102），账本只增。
-
-**变更**:
-| 对象 | 说明 |
-|------|------|
-| `wh_post_transfer(...)` | 一事务两腿 `transfer_out`(-qty)+`transfer_in`(+qty)；qty>0、from≠to；BR-5 在出腿；transfer 不受 BR-W4 限 |
-| `wh_post_adjustment(...)` | reason 必填→notes；`adjustment` 类型；**严守 BR-5**（不可调负） |
-| `wh_cancel_grn(p_grn_id)` | 仅 `posted` 可冲销；逐行写反向 `adjustment`（`reference_type='goods_receipt'`）+ GRN→`cancelled`；货已调走则 BR-5 拒、整单回滚 |
-| `wh_rebuild_balance()` | `DELETE inventory_balance` + 从流水按 (item,lot,location) SUM 重灌（`HAVING sum<>0`，allocated 归 0） |
-
-**特性**: 幂等。无 schema 变更（reason 走 notes，`cancelled` 状态已存在）。**依赖**: M-100、M-102。
+**业务规则**:
+- **BR-Q62** Batch Trace detail 页的 sub-lots 列表只展示扫码过的车(`scanned_for_check_in_at IS NOT NULL`);未扫的 created 车保持隐藏直到现场扫码盖戳。
+- **BR-Q63** Trace list 页的 work order 行必须显示 `scanned/total` 角标,让操作员一眼看到「这个 WO 还有多少车没推到 dryer」。
+- **BR-Q64** Add-carts 对话框的 default start_seq 用 server-side `max_seq + 1`,不能依赖前端可见的 sub_lots 列表(未扫车被过滤掉会算错)。
 
 ---
 
@@ -1832,17 +1809,11 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-093 | 20260525000014_qc_production_pipeline_summary.sql |
 | M-094 | 20260525000015_permission_move_to_production_module.sql |
 | M-095 | 20260526000001_qc_create_lot_with_packaging.sql |
-| M-096 | 20260524000002_warehouse_seed_locations.sql （Warehouse S0，事后补登） |
-| M-097 | 20260524000003_qc_product_sku_add_item_id.sql （已被 M-087 取代） |
-| M-098 | 20260524000004_warehouse_seed_uom.sql |
-| M-099 | 20260524000005_warehouse_permission_seed.sql |
-| M-100 | 20260526000003_wh_ledger_triggers.sql |
-| M-101 | 20260526000004_wh_goods_receipt_schema.sql |
-| M-102 | 20260526000005_wh_kernel_and_generators.sql |
-| M-103 | 20260526000006_wh_create_lot_and_post_receipt.sql |
-| M-104 | 20260526000007_wh_balance_queries.sql |
-| M-105 | 20260527000001_wh_inventory_operations.sql |
-| **M-106** | _(下一个)_ |
+| M-096 | 20260526000002_qc_needs_attention_today_not_24h.sql |
+| M-097 | 20260526000005_qc_retest_reset_group_siblings.sql |
+| M-098 | 20260527000001_qc_scan_for_check_in.sql |
+| M-099 | 20260527000002_qc_trace_scanned_only.sql |
+| **M-100** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

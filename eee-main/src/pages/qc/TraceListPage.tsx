@@ -78,23 +78,44 @@ export default function TraceListPage({ onSelectLot }: Props) {
               {/* Working orders list */}
               {isOpen && (
                 <div className="border-t border-slate-100 divide-y divide-slate-100">
-                  {g.lots.map(lot => (
-                    <button
-                      key={lot.id}
-                      type="button"
-                      onClick={() => onSelectLot(lot.id)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50/40 text-left transition-colors"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-blue-700">{lot.work_order_barcode}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {lot.lot_number !== lot.work_order_barcode ? `${lot.lot_number} · ` : ''}
-                          {new Date(lot.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <ChevronRight size={14} className="text-slate-300" />
-                    </button>
-                  ))}
+                  {g.lots.map(lot => {
+                    // M-099: scanned/total badge. scanned_count = carts brought
+                    // to the dryer (scanned_for_check_in_at stamped); total =
+                    // every cart created for this WO.  Highlight in amber when
+                    // there are still unscanned carts so ops notice unfinished
+                    // production-floor work; muted slate when all scanned.
+                    const scanned = lot.scanned_count ?? 0;
+                    const total = lot.total_count ?? 0;
+                    const allScanned = total > 0 && scanned >= total;
+                    return (
+                      <button
+                        key={lot.id}
+                        type="button"
+                        onClick={() => onSelectLot(lot.id)}
+                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-blue-50/40 text-left transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="text-sm font-semibold text-blue-700">{lot.work_order_barcode}</p>
+                          <span
+                            className={
+                              'text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ' +
+                              (allScanned
+                                ? 'bg-slate-100 text-slate-500'
+                                : 'bg-amber-100 text-amber-800')
+                            }
+                            title={allScanned ? 'All carts scanned in' : `${total - scanned} cart(s) not yet scanned`}
+                          >
+                            {scanned}/{total}
+                          </span>
+                          <p className="text-xs text-slate-400 truncate">
+                            {lot.lot_number !== lot.work_order_barcode ? `· ${lot.lot_number} ` : ''}
+                            · {new Date(lot.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <ChevronRight size={14} className="text-slate-300 shrink-0" />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>

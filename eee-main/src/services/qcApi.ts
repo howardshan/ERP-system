@@ -56,6 +56,15 @@ export interface ProductionLot {
   sku_name: string | null;
   expected_dry_minutes: number;  // M-050: required at lot creation (BR-Q29)
   created_at: string;
+  // M-099: counts for the "scanned / total" badge on Batch Trace.
+  // scanned_count = carts with scanned_for_check_in_at IS NOT NULL.
+  // Optional because some legacy callers don't go through the M-099 RPC.
+  scanned_count?: number;
+  total_count?: number;
+  // M-099: max -NNN suffix across ALL carts (incl. unscanned), so AddCarts
+  // can default start_seq = max_seq + 1 even when unscanned carts are hidden
+  // from the detail page's sub_lots list. Only emitted by lot_detail RPC.
+  max_seq?: number;
 }
 
 export interface TestType {
@@ -614,10 +623,24 @@ export async function getAppSetting<T = unknown>(key: string): Promise<T | null>
   return (data ?? null) as T | null;
 }
 
-// List sub-lots awaiting check-in (status = 'created')
+// M-098: list only carts that have been physically scanned at the dryer
+// (status='created' AND scanned_for_check_in_at IS NOT NULL).  Server-side
+// filter via qc_list_awaiting_check_in() so we don't ship a full list to
+// the client just to throw most of it away.
 export async function listAwaitingCheckIn(): Promise<SubLot[]> {
-  const list = await rpc<SubLot[]>('qc_list_sub_lots');
-  return list.filter(s => s.status === 'created');
+  return rpc<SubLot[]>('qc_list_awaiting_check_in');
+}
+
+// M-098: stamp a cart as physically present at the dryer.  Idempotent —
+// re-scanning a cart that's already stamped is a silent no-op.  Returns the
+// updated sub-lot's id / code / status / scanned_for_check_in_at.
+export async function scanCartForCheckIn(subLotId: string): Promise<{
+  sub_lot_id: string;
+  sub_lot_code: string;
+  status: SubLotStatus;
+  scanned_for_check_in_at: string | null;
+}> {
+  return rpc('qc_scan_cart_for_check_in', { p_sub_lot_id: subLotId });
 }
 
 // List sub-lots in awaiting_recheck (displaced, paused)

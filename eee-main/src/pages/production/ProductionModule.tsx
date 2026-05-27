@@ -24,6 +24,7 @@ import ProductManagement from '../qc/ProductManagement';
 import TestTypesPage from '../qc/TestTypesPage';
 import SubLotHistoryDrawer from '../qc/SubLotHistoryDrawer';
 import ProductionDashboard from './ProductionDashboard';
+import { PrinterSettingsPopover } from '../../components/PrinterSettingsPopover';
 
 interface Props {
   onHome: () => void;
@@ -175,9 +176,12 @@ export default function ProductionModule({ onHome }: Props) {
           >
             <ArrowLeft size={14} /> Module Hub
           </button>
-          <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
-            Production &amp; Manufacturing
-          </span>
+          <div className="flex items-center gap-3">
+            <PrinterSettingsPopover />
+            <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
+              Production &amp; Manufacturing
+            </span>
+          </div>
         </header>
         <div className="flex-1">
           {renderContent()}
