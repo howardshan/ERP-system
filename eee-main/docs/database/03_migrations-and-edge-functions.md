@@ -1729,6 +1729,25 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-106 `20260527000003_qc_group_retest_normalize.sql`
+**用途**: 修复「champion 检测结果没有代表抽样组其它车」的 bug(操作员反馈 + `qc_quality_event` 时间线实证)。
+
+**根因**: 失败组「Dispose all N → retest」时,前端 `createDispositionGroup` 用 `Promise.all` 逐车调 `qc_create_disposition`。retest 分支把**非 champion 兄弟车**置成 `pending`(可单独被测)而非 `awaiting_group_result`;且兄弟车先被改成 pending 后,champion 的 retest 分支再也找不到 `awaiting_group_result` 兄弟来保持分组 → 整组被打散成独立 pending 车,champion 后续结果 `group_members_propagated=0`,谁也没代表。
+
+**变更**:
+- `qc_create_disposition` retest 分支重写为**整组归一化**:被 retest 的车设为唯一 champion(`pending`),同组其余仍在测试态(hold/disposing/pending/inspecting/awaiting_group_result)的车 → `awaiting_group_result` 且 `is_test_champion=false`,并重开 group(`status='sampling'`, `resolved_at=NULL`)。锁 `qc_test_group` 行串行化。solo 车仍直接 → pending。
+- `qc_submit_inspection` 传播兜底:兄弟匹配从 `status='awaiting_group_result'` 放宽到 `status IN ('awaiting_group_result','pending') AND is_test_champion=false`,任何残留 pending 兄弟也能继承 champion 结果。
+- **历史数据修复**:把现存「带组号却是非 champion `pending`」的孤儿兄弟车,按 champion 当前状态重新对齐(hold→hold / passed→passed / pending·inspecting→awaiting_group_result),写 `group_orphan_repaired` 审计事件。
+
+**前端配套**: `src/services/qcApi.ts` — `createDispositionGroup` 对 `type==='retest'` **只调一次**(消除并发死锁/竞态),其余处置类型保持逐车 `Promise.all`。
+
+**业务规则**:
+- **BR-Q65** retest 是**组级动作**:对组内任意车 retest 都把该车设为唯一 champion、其余兄弟回 `awaiting_group_result`,使一次重测结果覆盖全组。仅 retest 如此;scrap/redry/room_temp 仍逐车独立处置。
+
+**依赖**: M-055(20260522000013 传播)、M-097(20260526000005 `qc_create_disposition`)。**关联文档**: `docs/modules/09_qc.md`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1813,7 +1832,9 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-097 | 20260526000005_qc_retest_reset_group_siblings.sql |
 | M-098 | 20260527000001_qc_scan_for_check_in.sql |
 | M-099 | 20260527000002_qc_trace_scanned_only.sql |
-| **M-100** | _(下一个)_ |
+| M-100~105 | _(Warehouse S2 — 见 docs/modules/11_warehouse-inventory.md)_ |
+| M-106 | 20260527000003_qc_group_retest_normalize.sql |
+| **M-107** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
