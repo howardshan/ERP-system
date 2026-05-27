@@ -300,6 +300,16 @@ function TestWorkflow({
           <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Testing</p>
           <h2 className="text-xl font-mono font-bold text-slate-900">{subLot.sub_lot_code}</h2>
           <p className="text-xs text-slate-500 mt-0.5">{subLot.sku_name ?? ''}</p>
+          {(subLot.produced_at || subLot.out_time) && (
+            <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 text-[11px] text-slate-500">
+              {subLot.produced_at && (
+                <span>Produced <span className="font-medium text-slate-700">{formatQcDateTime(subLot.produced_at)}</span></span>
+              )}
+              {subLot.out_time && (
+                <span>Drying done <span className="font-medium text-slate-700">{formatQcDateTime(subLot.out_time)}</span></span>
+              )}
+            </div>
+          )}
         </div>
         <button
           type="button"

@@ -17,6 +17,7 @@ export interface SubLot {
   cell_number: number | null;
   in_time: string | null;
   out_time: string | null;
+  produced_at?: string | null;
   status: SubLotStatus;
   expected_dry_minutes: number | null;
   expected_finish_at: string | null;

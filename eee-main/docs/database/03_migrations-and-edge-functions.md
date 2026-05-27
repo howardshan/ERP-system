@@ -1764,6 +1764,17 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-108 `20260527000005_qc_sub_lot_produced_at.sql`
+**用途**: 在 `qc_sub_lot_to_json` 输出里新增 `produced_at` 字段(= `qc_production_lot.created_at`),供 Testing 头部显示「生产完成 / 烘干完成」时间。
+
+**说明**: 烘干完成时间用现有 `out_time`;schema 没有专门的生产完成时间戳,用工单建立时间 `qc_production_lot.created_at` 作代理。纯 additive,只多一个字段,不影响既有调用方。
+
+**前端配套**: `src/services/qcApi.ts` `SubLot` 加 `produced_at?`;`src/pages/qc/TestingPage.tsx` 头部卡片在 SKU 名下方加一行 `Produced <时间> · Drying done <时间>`。
+
+**依赖**: M-067(20260523000017 `qc_sub_lot_to_json`)。**关联文档**: `docs/modules/09_qc.md`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1851,7 +1862,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-100~105 | _(Warehouse S2 — 见 docs/modules/11_warehouse-inventory.md)_ |
 | M-106 | 20260527000003_qc_group_retest_normalize.sql |
 | M-107 | 20260527000004_qc_needs_attention_dedup_by_group.sql |
-| **M-108** | _(下一个)_ |
+| M-108 | 20260527000005_qc_sub_lot_produced_at.sql |
+| **M-109** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
