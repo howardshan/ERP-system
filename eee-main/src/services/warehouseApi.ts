@@ -379,3 +379,92 @@ export async function getLot(lotId: number): Promise<LotHeader> {
     created_at: row.created_at as string,
   };
 }
+
+// ── Lot lifecycle (Sprint 3) ────────────────────────────────────────────────
+
+export type CoaResult = 'pass' | 'fail' | 'conditional' | 'pending';
+
+export interface Coa {
+  id: number;
+  coa_number: string;
+  lot_id: number;
+  test_date: string;
+  result: CoaResult;
+  tested_by: string | null;
+  document_ref: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ReleaseLotResult {
+  lot_id: number;
+  lot_number: string;
+  new_status: LotStatus;
+  coa_id: number;
+  coa_number: string;
+}
+
+export interface ExpiringLot {
+  lot_id: number;
+  lot_number: string;
+  item_id: number;
+  item_sku: string;
+  item_name: string;
+  base_uom: string;
+  lot_status: LotStatus;
+  expiry_date: string;
+  days_until_expiry: number;   // negative = already expired
+  total_on_hand: number;
+}
+
+export async function releaseLot(input: {
+  lotId: number;
+  testDate?: string | null;
+  testedBy?: string | null;
+  documentRef?: string | null;
+  notes?: string | null;
+}): Promise<ReleaseLotResult> {
+  return rpc<ReleaseLotResult>('wh_release_lot', {
+    p_lot_id: input.lotId,
+    p_test_date: input.testDate ?? null,
+    p_tested_by: input.testedBy ?? null,
+    p_document_ref: input.documentRef ?? null,
+    p_notes: input.notes ?? null,
+  });
+}
+
+export async function rejectLot(input: {
+  lotId: number;
+  reason: string;
+  testDate?: string | null;
+  testedBy?: string | null;
+  documentRef?: string | null;
+}): Promise<ReleaseLotResult> {
+  if (!input.reason || !input.reason.trim()) throw new Error('拒收原因必填');
+  return rpc<ReleaseLotResult>('wh_reject_lot', {
+    p_lot_id: input.lotId,
+    p_reason: input.reason.trim(),
+    p_test_date: input.testDate ?? null,
+    p_tested_by: input.testedBy ?? null,
+    p_document_ref: input.documentRef ?? null,
+  });
+}
+
+export async function expireLots(): Promise<{ expired_count: number; lot_ids: number[] }> {
+  return rpc('wh_expire_lots', {});
+}
+
+export async function listExpiring(daysAhead: number = 30): Promise<ExpiringLot[]> {
+  return rpc<ExpiringLot[]>('wh_list_expiring', { p_days_ahead: daysAhead });
+}
+
+// List COA history for a single lot (read; direct query is allowed).
+export async function listLotCoa(lotId: number): Promise<Coa[]> {
+  const { data, error } = await supabase
+    .from('coa')
+    .select('id, coa_number, lot_id, test_date, result, tested_by, document_ref, notes, created_at')
+    .eq('lot_id', lotId)
+    .order('id', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Coa[];
+}

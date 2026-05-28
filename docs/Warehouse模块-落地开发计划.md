@@ -149,17 +149,24 @@
 
 | 类型 | 任务 | 状态 |
 |------|------|------|
-| 🔌 | M-091 `wh_release_lot` / `wh_reject_lot`（`lot.status` 流转，BR-6a） | 🔲 |
-| 🔌 | M-092 `wh_rebuild_balance`（运维重建，BR-4） | 🔲 |
-| 🧩 | warehouseApi：`releaseLot` / `rejectLot` / `rebuildBalance` / `listExpiring` | 🔲 |
-| 🖥️ | 批次放行/拒收操作 + COA 简表录入（计划书 §6.1） | 🔲 |
-| 🖥️ | 临期预警列表（`expiry_date`，P1） | 🔲 |
-| 📄 | 文档：M-091~092 + 批次生命周期章节 | 🔲 |
+| 🔌 | **M-110** `wh_release_lot`（quarantine→available + COA pass）+ `wh_reject_lot`（quarantine/available→rejected + COA fail）+ `wh_expire_lots`（一键标定）+ `wh_list_expiring`（含已过期未标定）+ `wh_next_coa_number` | 🟢 |
+| 🧩 | warehouseApi：`releaseLot` / `rejectLot` / `expireLots` / `listExpiring` / `listLotCoa`；类型 `Coa`/`ExpiringLot` | 🟢 |
+| 🖥️ | LotDetailPage 加放行/拒收按钮 + 内联表单 + 底部「质检记录（COA）」表 | 🟢 |
+| 🖥️ | ExpiringPage（临期预警）：天数阈值 7/30/60/90 + 一键标定过期按钮 + 已过期红色高亮 | 🟢 |
+| 📄 | 文档：M-110 索引 + 11_warehouse S3 章节 | 🟢 |
 
-**✅ 验证门 M3：**
-- 手动放行一个 quarantine lot → `available`，余额位置/状态正确
-- 拒收 → `rejected`，且后续出库被 BR-W4 拒绝
-- 临期列表能按 `expiry_date` 排序高亮
+> **编号落定**：S3 实占 **M-110**（`20260527000007_wh_lot_lifecycle.sql`，团队同期加了 M-106~109 的 QC migrations）。下一个 migration 从 **M-111** 起。
+> **入口决策**：放行/拒收从批次详情发起；调整严守 BR-5 已在 S2；S3 状态机仅 quarantine→available（释放）与 quarantine/available→rejected（拒收），on_hold 不做。
+> **过期处理**：UI 红色徽章 + RPC 一键标定（手动触发）；自动定时任务留 v1.1。
+> **`wh_rebuild_balance`** 已在 S2 提前实现（M-105），不再列入 S3。
+
+**✅ 验证门 M3：**（migration 待 push 后走查）
+- 建一笔 quarantine lot → 详情页"放行" → status=available，COA 表新增 result=pass 一行；详情页底部"质检记录"显示
+- 同批次再次放行 → RPC 报错"not in quarantine"
+- 一个 available 批次"拒收"（reason 必填）→ status=rejected；SQL 直调内核 `_wh_apply_transaction` 做 issue → BR-W4 拒
+- 收一笔保质期已过的批次 → Expiring 页显示红色"已过期" + 负的剩余天数
+- 点"一键标定过期" → 提示已标定 N 条，状态变 expired；后续 issue → BR-W4 拒
+- 阈值切换 7/30/60/90 → 表格刷新
 
 ---
 
