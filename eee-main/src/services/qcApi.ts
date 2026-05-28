@@ -160,6 +160,8 @@ export interface InspectionResult {
   id: string;
   drying_sub_lot_id: string;
   result: 'pass' | 'fail';
+  suggested?: 'pass' | 'fail' | null;
+  remark?: string | null;
   values_json: { aw: number };
   submitted_at: string;
   new_status: SubLotStatus;
@@ -755,11 +757,15 @@ export async function submitInspection(
   subLotId: string,
   aw: number,
   samplePk?: string | null,
+  result?: 'pass' | 'fail' | null,
+  remark?: string | null,
 ): Promise<InspectionResult> {
   return rpc<InspectionResult>('qc_submit_inspection', {
     p_sub_lot_id: subLotId,
     p_aw: aw,
     p_sample_pk: samplePk ?? null,
+    p_result: result ?? null,
+    p_remark: remark ?? null,
   });
 }
 
@@ -878,6 +884,7 @@ export interface SubLotFullHistory {
     id: string;
     result: 'pass' | 'fail';
     aw: number | null;
+    remark: string | null;
     submitted_at: string;
     sample_id: string | null;
   }>;

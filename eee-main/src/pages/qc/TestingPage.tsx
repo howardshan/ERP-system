@@ -53,7 +53,7 @@ export default function TestingPage({ onOpenHistory }: Props) {
     <div className="p-6 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">Testing</h1>
       <p className="text-xs text-slate-500 mb-4">
-        Sub-lots checked out of the dryer · take a sample → enter WA → confirm Pass/Fail · auto-judged by SKU template (BR-Q1)
+        Sub-lots checked out of the dryer · take a sample → enter WA (system suggests Pass/Fail) → operator decides + optional remark (BR-Q1)
       </p>
 
       {/* Tab toggle — Dashboard tab only shown when user has view_dashboard. */}
@@ -212,7 +212,9 @@ function TestWorkflow({
   const [limits, setLimits] = useState<{ item_name: string; lower_limit: number; upper_limit: number } | null>(null);
   const [aw, setAw] = useState('');
   const [busy, setBusy] = useState(false);
-  const [judged, setJudged] = useState<'pass' | 'fail' | null>(null);
+  const [judged, setJudged] = useState<'pass' | 'fail' | null>(null);      // system suggestion (reference)
+  const [decision, setDecision] = useState<'pass' | 'fail' | null>(null);  // operator's final call
+  const [remark, setRemark] = useState('');
   const [finalResult, setFinalResult] = useState<'pass' | 'fail' | null>(null);
   const [groupMembers, setGroupMembers] = useState<Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>>([]);
 
@@ -246,13 +248,16 @@ function TestWorkflow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subLot.id]);
 
-  // Auto-judge live as aw input changes
+  // System suggestion live as aw changes; default the operator's decision to it
+  // (the operator can still override below).
   useEffect(() => {
     if (phase !== 'measure') return;
-    if (!aw || !limits) { setJudged(null); return; }
+    if (!aw) { setJudged(null); setDecision(null); return; }
     const v = parseFloat(aw);
-    if (!Number.isFinite(v)) { setJudged(null); return; }
-    setJudged(v >= limits.lower_limit && v <= limits.upper_limit ? 'pass' : 'fail');
+    if (!Number.isFinite(v) || !limits) { setJudged(null); return; }
+    const sug = v >= limits.lower_limit && v <= limits.upper_limit ? 'pass' : 'fail';
+    setJudged(sug);
+    setDecision(sug);
   }, [aw, limits, phase]);
 
   const handleTakeSample = async () => {
@@ -276,14 +281,15 @@ function TestWorkflow({
     // Clear the WA reading so the operator can re-enter without losing the sample.
     setAw('');
     setJudged(null);
+    setDecision(null);
   };
 
   const handleConfirm = async () => {
-    if (!activeSample || !aw) return;
+    if (!activeSample || !aw || !decision) return;
     setBusy(true);
     try {
       const v = parseFloat(aw);
-      const res = await submitInspection(subLot.id, v, activeSample.id);
+      const res = await submitInspection(subLot.id, v, activeSample.id, decision, remark.trim() || null);
       setFinalResult(res.result as 'pass' | 'fail');
       setPhase('done');
     } catch (e) {
@@ -382,37 +388,89 @@ function TestWorkflow({
         </Step>
       )}
 
-      {/* Step 2: measure WA — auto-judged live; bottom is Redo / Confirm */}
-      {phase === 'measure' && activeSample && limits && (
-        <Step number={2} title={`Measure ${limits.item_name}`} active>
-          <div className="flex items-center gap-3 mb-3">
+      {/* Step 2: enter reading → system suggests → operator decides + remark */}
+      {phase === 'measure' && activeSample && (
+        <Step number={2} title={`Measure ${limits?.item_name ?? 'water activity'}`} active>
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
             <span className="text-[11px] text-slate-500">Sample</span>
             <code className="text-xs font-mono font-bold text-slate-900">{activeSample.sample_id}</code>
-            <span className="text-[11px] text-slate-400">·</span>
-            <span className="text-[11px] text-slate-500">
-              Spec range: <code className="font-mono text-slate-700">[{limits.lower_limit}, {limits.upper_limit}]</code>
-            </span>
+            {limits && (
+              <>
+                <span className="text-[11px] text-slate-400">·</span>
+                <span className="text-[11px] text-slate-500">
+                  Spec range: <code className="font-mono text-slate-700">[{limits.lower_limit}, {limits.upper_limit}]</code>
+                </span>
+              </>
+            )}
           </div>
+
+          {/* Reading — coloured by the operator's decision */}
           <div className={cn(
             'rounded-2xl border-2 p-5 text-center mb-3 transition-colors',
-            judged === 'pass' ? 'border-emerald-400 bg-emerald-50'
-              : judged === 'fail' ? 'border-red-400 bg-red-50'
+            decision === 'pass' ? 'border-emerald-400 bg-emerald-50'
+              : decision === 'fail' ? 'border-red-400 bg-red-50'
               : 'border-slate-200 bg-white',
           )}>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{limits.item_name}</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{limits?.item_name ?? 'Aw'}</p>
             <p className={cn(
               'text-5xl font-bold tabular-nums my-2',
-              judged === 'pass' ? 'text-emerald-700' : judged === 'fail' ? 'text-red-700' : 'text-slate-900',
+              decision === 'pass' ? 'text-emerald-700' : decision === 'fail' ? 'text-red-700' : 'text-slate-900',
             )}>
               {aw || '—'}
             </p>
             {judged && (
-              <p className={cn('text-sm font-bold', judged === 'pass' ? 'text-emerald-700' : 'text-red-700')}>
-                {judged === 'pass' ? '✓ Within spec — Pass' : '✗ Out of spec — Fail'}
+              <p className="text-[11px] text-slate-500">
+                System suggests{' '}
+                <span className={cn('font-bold', judged === 'pass' ? 'text-emerald-700' : 'text-red-700')}>
+                  {judged === 'pass' ? 'PASS' : 'FAIL'}
+                </span>
+                {decision && decision !== judged && <span className="text-amber-600 font-medium"> · overridden</span>}
               </p>
             )}
           </div>
           <NumericKeypad value={aw} onChange={setAw} />
+
+          {/* Operator's final judgment (defaults to the suggestion, overridable) */}
+          <div className="mt-4">
+            <p className="text-xs font-bold text-slate-700 mb-1.5">Final judgment</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDecision('pass')}
+                disabled={!aw}
+                className={cn(
+                  'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40',
+                  decision === 'pass' ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 text-slate-700 hover:border-emerald-400',
+                )}
+              >
+                Pass
+              </button>
+              <button
+                type="button"
+                onClick={() => setDecision('fail')}
+                disabled={!aw}
+                className={cn(
+                  'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40',
+                  decision === 'fail' ? 'border-red-500 bg-red-600 text-white' : 'border-slate-200 text-slate-700 hover:border-red-400',
+                )}
+              >
+                Fail
+              </button>
+            </div>
+          </div>
+
+          {/* Remark (optional) */}
+          <div className="mt-3">
+            <p className="text-xs font-bold text-slate-700 mb-1.5">
+              Remark <span className="font-normal text-slate-400">(optional)</span>
+            </p>
+            <textarea
+              value={remark}
+              onChange={e => setRemark(e.target.value)}
+              placeholder="Notes supporting this judgment…"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm min-h-[56px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
 
           <div className="mt-4 grid grid-cols-[140px_1fr] gap-2">
             <button
@@ -426,21 +484,21 @@ function TestWorkflow({
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={busy || !canSubmit || !judged}
+              disabled={busy || !canSubmit || !decision || !aw}
               className={cn(
                 'px-4 py-3 rounded-lg text-sm font-bold text-white disabled:opacity-50 transition-colors',
-                judged === 'pass'
+                decision === 'pass'
                   ? 'bg-emerald-600 hover:bg-emerald-500'
-                  : judged === 'fail'
+                  : decision === 'fail'
                     ? 'bg-red-600 hover:bg-red-500'
                     : 'bg-slate-300 cursor-not-allowed',
               )}
             >
               {busy
                 ? 'Submitting…'
-                : judged
-                  ? `Confirm ${judged === 'pass' ? 'PASS' : 'FAIL'} & persist`
-                  : 'Enter a reading first'}
+                : decision
+                  ? `Confirm ${decision === 'pass' ? 'PASS' : 'FAIL'} & persist`
+                  : 'Choose Pass or Fail'}
             </button>
           </div>
         </Step>

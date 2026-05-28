@@ -1775,6 +1775,27 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-109 `20260527000006_qc_manual_judgment_and_remark.sql`
+**用途**: 检测裁定从「系统自动判定」改为「系统给建议 + 人工拍板 + 备注」(测试负责人反馈:水活之外还有其它数据综合判断,需人工裁定)。
+
+**变更**:
+- `qc_inspection_record` 加 `remark text` 列。
+- `qc_submit_inspection` 加 `p_result`(人工最终结果)和 `p_remark` 两参数:
+  - 模板仍算出**建议结果** `suggested`(存 `values_json.suggested` + 事件 payload),仅供参考。
+  - 最终 `result = COALESCE(p_result, suggested)`;`p_result` 为空时退回旧的自动判定(批量提交等遗留路径不受影响)。
+  - 模板变为**可选**:无模板也能人工裁定(此时 suggested 为 NULL)。
+  - 事件 payload 增 `suggested` / `manual_override`(人工是否覆盖了建议)/ `remark`。
+- `qc_sub_lot_full_history` 的 inspections 数组增 `remark`,供 Full History 抽屉展示。
+
+**前端配套**: `submitInspection(subLotId, aw, samplePk?, result?, remark?)`;`TestingPage` 录数后显示「System suggests PASS/FAIL」,操作员用 Pass/Fail 两个按钮拍板(默认跟随建议、可覆盖)+ 选填 Remark 文本框;`SubLotHistoryDrawer` 在 inspection 行显示 remark。
+
+**业务规则**:
+- **BR-Q67** 检测最终合格与否由**操作员裁定**;系统依 SKU 模板给出建议(可被覆盖,覆盖记 `manual_override`)。Remark 选填,经 `qc_inspection_record.remark` 持久化,Full History 可调取。
+
+**依赖**: M-106(20260527000003 `qc_submit_inspection`)、M-067(20260523000017 `qc_sub_lot_full_history`)。**关联文档**: `docs/modules/09_qc.md`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1863,7 +1884,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-106 | 20260527000003_qc_group_retest_normalize.sql |
 | M-107 | 20260527000004_qc_needs_attention_dedup_by_group.sql |
 | M-108 | 20260527000005_qc_sub_lot_produced_at.sql |
-| **M-109** | _(下一个)_ |
+| M-109 | 20260527000006_qc_manual_judgment_and_remark.sql |
+| **M-110** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
