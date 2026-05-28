@@ -69,7 +69,8 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
         ts: ir.submitted_at,
         kind: 'inspection',
         title: `Inspection ${ir.result.toUpperCase()} · Aw ${ir.aw ?? '—'}`,
-        description: ir.sample_id ? `Sample ${ir.sample_id}` : undefined,
+        description: [ir.sample_id ? `Sample ${ir.sample_id}` : null, ir.remark ? `Remark: ${ir.remark}` : null]
+          .filter(Boolean).join(' · ') || undefined,
       });
     }
     for (const d of data.dispositions) {

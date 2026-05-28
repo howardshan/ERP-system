@@ -1729,6 +1729,73 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-106 `20260527000003_qc_group_retest_normalize.sql`
+**用途**: 修复「champion 检测结果没有代表抽样组其它车」的 bug(操作员反馈 + `qc_quality_event` 时间线实证)。
+
+**根因**: 失败组「Dispose all N → retest」时,前端 `createDispositionGroup` 用 `Promise.all` 逐车调 `qc_create_disposition`。retest 分支把**非 champion 兄弟车**置成 `pending`(可单独被测)而非 `awaiting_group_result`;且兄弟车先被改成 pending 后,champion 的 retest 分支再也找不到 `awaiting_group_result` 兄弟来保持分组 → 整组被打散成独立 pending 车,champion 后续结果 `group_members_propagated=0`,谁也没代表。
+
+**变更**:
+- `qc_create_disposition` retest 分支重写为**整组归一化**:被 retest 的车设为唯一 champion(`pending`),同组其余仍在测试态(hold/disposing/pending/inspecting/awaiting_group_result)的车 → `awaiting_group_result` 且 `is_test_champion=false`,并重开 group(`status='sampling'`, `resolved_at=NULL`)。锁 `qc_test_group` 行串行化。solo 车仍直接 → pending。
+- `qc_submit_inspection` 传播兜底:兄弟匹配从 `status='awaiting_group_result'` 放宽到 `status IN ('awaiting_group_result','pending') AND is_test_champion=false`,任何残留 pending 兄弟也能继承 champion 结果。
+- **历史数据修复**:把现存「带组号却是非 champion `pending`」的孤儿兄弟车,按 champion 当前状态重新对齐(hold→hold / passed→passed / pending·inspecting→awaiting_group_result),写 `group_orphan_repaired` 审计事件。
+
+**前端配套**: `src/services/qcApi.ts` — `createDispositionGroup` 对 `type==='retest'` **只调一次**(消除并发死锁/竞态),其余处置类型保持逐车 `Promise.all`。
+
+**业务规则**:
+- **BR-Q65** retest 是**组级动作**:对组内任意车 retest 都把该车设为唯一 champion、其余兄弟回 `awaiting_group_result`,使一次重测结果覆盖全组。仅 retest 如此;scrap/redry/room_temp 仍逐车独立处置。
+
+**依赖**: M-055(20260522000013 传播)、M-097(20260526000005 `qc_create_disposition`)。**关联文档**: `docs/modules/09_qc.md`。
+
+---
+
+### M-107 `20260527000004_qc_needs_attention_dedup_by_group.sql`
+**用途**: 修复 QC Home「Needs attention」同一组重复出卡。
+
+**根因**: `qc_overview` 的 needs_attention 子查询是「每条今日 `qc_inspection_record` 一行」,从不按组去重(注释写着 ONE ROW PER GROUP 但实现没做)。每次 retest 失败都写一条新的 fail inspection,于是同一组一天累积多张卡(截图三张卡车号 006/007/008 互相重叠即同组多次失败叠出)。
+
+**变更**: needs_attention 用 `DISTINCT ON (group_key)` 按组去重,每组(solo 车按 sub-lot)只留**最新一次**检测。最新检测本就驱动正确的当前车列表(disposition 过滤相对 `ir.submitted_at`),故留存的卡反映该组当前状态。仅改 needs_attention 块,stats 与 M-096 一致。
+
+**配合 M-106**: retest 现复用同组、不再裂变新组,故未来同组多次 retest 收敛为一张卡。
+
+**业务规则**:
+- **BR-Q66** QC Home「Needs attention」每个抽样组只显示一张卡(取该组当日最新检测);solo 车每车一张。
+
+**依赖**: M-096(20260526000002)。**关联文档**: `docs/modules/09_qc.md`。
+
+---
+
+### M-108 `20260527000005_qc_sub_lot_produced_at.sql`
+**用途**: 在 `qc_sub_lot_to_json` 输出里新增 `produced_at` 字段(= `qc_production_lot.created_at`),供 Testing 头部显示「生产完成 / 烘干完成」时间。
+
+**说明**: 烘干完成时间用现有 `out_time`;schema 没有专门的生产完成时间戳,用工单建立时间 `qc_production_lot.created_at` 作代理。纯 additive,只多一个字段,不影响既有调用方。
+
+**前端配套**: `src/services/qcApi.ts` `SubLot` 加 `produced_at?`;`src/pages/qc/TestingPage.tsx` 头部卡片在 SKU 名下方加一行 `Produced <时间> · Drying done <时间>`。
+
+**依赖**: M-067(20260523000017 `qc_sub_lot_to_json`)。**关联文档**: `docs/modules/09_qc.md`。
+
+---
+
+### M-109 `20260527000006_qc_manual_judgment_and_remark.sql`
+**用途**: 检测裁定从「系统自动判定」改为「系统给建议 + 人工拍板 + 备注」(测试负责人反馈:水活之外还有其它数据综合判断,需人工裁定)。
+
+**变更**:
+- `qc_inspection_record` 加 `remark text` 列。
+- `qc_submit_inspection` 加 `p_result`(人工最终结果)和 `p_remark` 两参数:
+  - 模板仍算出**建议结果** `suggested`(存 `values_json.suggested` + 事件 payload),仅供参考。
+  - 最终 `result = COALESCE(p_result, suggested)`;`p_result` 为空时退回旧的自动判定(批量提交等遗留路径不受影响)。
+  - 模板变为**可选**:无模板也能人工裁定(此时 suggested 为 NULL)。
+  - 事件 payload 增 `suggested` / `manual_override`(人工是否覆盖了建议)/ `remark`。
+- `qc_sub_lot_full_history` 的 inspections 数组增 `remark`,供 Full History 抽屉展示。
+
+**前端配套**: `submitInspection(subLotId, aw, samplePk?, result?, remark?)`;`TestingPage` 录数后显示「System suggests PASS/FAIL」,操作员用 Pass/Fail 两个按钮拍板(默认跟随建议、可覆盖)+ 选填 Remark 文本框;`SubLotHistoryDrawer` 在 inspection 行显示 remark。
+
+**业务规则**:
+- **BR-Q67** 检测最终合格与否由**操作员裁定**;系统依 SKU 模板给出建议(可被覆盖,覆盖记 `manual_override`)。Remark 选填,经 `qc_inspection_record.remark` 持久化,Full History 可调取。
+
+**依赖**: M-106(20260527000003 `qc_submit_inspection`)、M-067(20260523000017 `qc_sub_lot_full_history`)。**关联文档**: `docs/modules/09_qc.md`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1813,7 +1880,12 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-097 | 20260526000005_qc_retest_reset_group_siblings.sql |
 | M-098 | 20260527000001_qc_scan_for_check_in.sql |
 | M-099 | 20260527000002_qc_trace_scanned_only.sql |
-| **M-100** | _(下一个)_ |
+| M-100~105 | _(Warehouse S2 — 见 docs/modules/11_warehouse-inventory.md)_ |
+| M-106 | 20260527000003_qc_group_retest_normalize.sql |
+| M-107 | 20260527000004_qc_needs_attention_dedup_by_group.sql |
+| M-108 | 20260527000005_qc_sub_lot_produced_at.sql |
+| M-109 | 20260527000006_qc_manual_judgment_and_remark.sql |
+| **M-110** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

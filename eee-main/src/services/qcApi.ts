@@ -17,6 +17,7 @@ export interface SubLot {
   cell_number: number | null;
   in_time: string | null;
   out_time: string | null;
+  produced_at?: string | null;
   status: SubLotStatus;
   expected_dry_minutes: number | null;
   expected_finish_at: string | null;
@@ -159,6 +160,8 @@ export interface InspectionResult {
   id: string;
   drying_sub_lot_id: string;
   result: 'pass' | 'fail';
+  suggested?: 'pass' | 'fail' | null;
+  remark?: string | null;
   values_json: { aw: number };
   submitted_at: string;
   new_status: SubLotStatus;
@@ -754,11 +757,15 @@ export async function submitInspection(
   subLotId: string,
   aw: number,
   samplePk?: string | null,
+  result?: 'pass' | 'fail' | null,
+  remark?: string | null,
 ): Promise<InspectionResult> {
   return rpc<InspectionResult>('qc_submit_inspection', {
     p_sub_lot_id: subLotId,
     p_aw: aw,
     p_sample_pk: samplePk ?? null,
+    p_result: result ?? null,
+    p_remark: remark ?? null,
   });
 }
 
@@ -877,6 +884,7 @@ export interface SubLotFullHistory {
     id: string;
     result: 'pass' | 'fail';
     aw: number | null;
+    remark: string | null;
     submitted_at: string;
     sample_id: string | null;
   }>;
@@ -1173,6 +1181,19 @@ export async function createDispositionGroup(input: {
   remark: string | null;
   redry_expected_dry_minutes: number | null;
 }): Promise<void> {
+  // Retest is a group-level action: a single qc_create_disposition call
+  // normalises the whole group around one champion (M-106). Calling it per
+  // cart would race/shatter the group, so fire it exactly once. Every other
+  // disposition type (scrap / redry / room-temp) is genuinely per-cart.
+  if (input.type === 'retest') {
+    await createDisposition({
+      drying_sub_lot_id: input.sub_lot_ids[0],
+      type: input.type,
+      remark: input.remark,
+      redry_expected_dry_minutes: input.redry_expected_dry_minutes,
+    });
+    return;
+  }
   await Promise.all(
     input.sub_lot_ids.map(id =>
       createDisposition({
