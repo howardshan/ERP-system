@@ -1,5 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react';
-import { ArrowLeft, ArrowLeftRight, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, SlidersHorizontal, CheckCircle2, XCircle } from 'lucide-react';
 import {
   getLot,
   listBalance,
@@ -7,10 +7,14 @@ import {
   listLocations,
   postTransfer,
   postAdjustment,
+  releaseLot,
+  rejectLot,
+  listLotCoa,
   LotHeader,
   WarehouseBalance,
   WarehouseTransaction,
   WarehouseLocation,
+  Coa,
 } from '../../services/warehouseApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn } from '../../lib/utils';
@@ -28,12 +32,15 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
   const { can } = usePermissions();
   const canTransfer = can('warehouse', 'inventory', 'transfer');
   const canAdjust = can('warehouse', 'inventory', 'adjust');
+  const canRelease = can('warehouse', 'lots', 'release');
+  const canReject = can('warehouse', 'lots', 'reject');
 
   const [lot, setLot] = useState<LotHeader | null>(null);
   const [balances, setBalances] = useState<WarehouseBalance[]>([]);
   const [txns, setTxns] = useState<WarehouseTransaction[]>([]);
   const [locations, setLocations] = useState<WarehouseLocation[]>([]);
-  const [mode, setMode] = useState<'none' | 'transfer' | 'adjust'>('none');
+  const [mode, setMode] = useState<'none' | 'transfer' | 'adjust' | 'release' | 'reject'>('none');
+  const [coaHistory, setCoaHistory] = useState<Coa[]>([]);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -46,18 +53,26 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
   const [adjLoc, setAdjLoc] = useState<number | ''>('');
   const [delta, setDelta] = useState('');
   const [reason, setReason] = useState('');
+  // release / reject forms (shared fields)
+  const [testDate, setTestDate] = useState('');
+  const [testedBy, setTestedBy] = useState('');
+  const [documentRef, setDocumentRef] = useState('');
+  const [releaseNotes, setReleaseNotes] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
 
   const load = async () => {
     setError('');
     try {
       const l = await getLot(lotId);
       setLot(l);
-      const [bal, tx] = await Promise.all([
+      const [bal, tx, coas] = await Promise.all([
         listBalance({ itemId: l.item_id }),
         listTransactions({ lotId }),
+        listLotCoa(lotId),
       ]);
       setBalances(bal.filter((b) => b.lot_id === lotId));
       setTxns(tx);
+      setCoaHistory(coas);
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败');
     }
@@ -70,7 +85,13 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
   }, [lotId]);
 
   const baseUom = balances[0]?.base_uom ?? '';
-  const closeForms = () => { setMode('none'); setFromLoc(''); setToLoc(''); setQty(''); setAdjLoc(''); setDelta(''); setReason(''); };
+  const closeForms = () => {
+    setMode('none');
+    setFromLoc(''); setToLoc(''); setQty('');
+    setAdjLoc(''); setDelta(''); setReason('');
+    setTestDate(''); setTestedBy(''); setDocumentRef('');
+    setReleaseNotes(''); setRejectReason('');
+  };
 
   const submitTransfer = async (e: FormEvent) => {
     e.preventDefault();
@@ -113,6 +134,49 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
     setBusy(false);
   };
 
+  const submitRelease = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      const res = await releaseLot({
+        lotId,
+        testDate: testDate || null,
+        testedBy: testedBy.trim() || null,
+        documentRef: documentRef.trim() || null,
+        notes: releaseNotes.trim() || null,
+      });
+      setMsg(`已放行（COA ${res.coa_number}），状态 → available`);
+      closeForms();
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '放行失败');
+    }
+    setBusy(false);
+  };
+
+  const submitReject = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!rejectReason.trim()) { setError('拒收原因必填'); return; }
+    setBusy(true);
+    try {
+      const res = await rejectLot({
+        lotId,
+        reason: rejectReason.trim(),
+        testDate: testDate || null,
+        testedBy: testedBy.trim() || null,
+        documentRef: documentRef.trim() || null,
+      });
+      setMsg(`已拒收（COA ${res.coa_number}），状态 → rejected`);
+      closeForms();
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '拒收失败');
+    }
+    setBusy(false);
+  };
+
   const stockedLocs = balances.filter((b) => b.quantity_on_hand > 0);
 
   return (
@@ -139,7 +203,19 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
                 {lot.expiry_date ? ` · 保质期至 ${lot.expiry_date}` : ''}
               </p>
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+              {canRelease && lot.status === 'quarantine' && (
+                <button onClick={() => { closeForms(); setMode('release'); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white">
+                  <CheckCircle2 size={13} /> 放行
+                </button>
+              )}
+              {canReject && (lot.status === 'quarantine' || lot.status === 'available') && (
+                <button onClick={() => { closeForms(); setMode('reject'); }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white">
+                  <XCircle size={13} /> 拒收
+                </button>
+              )}
               {canTransfer && (
                 <button onClick={() => { closeForms(); setMode('transfer'); }}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white">
@@ -218,6 +294,68 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
             </form>
           )}
 
+          {mode === 'release' && (
+            <form onSubmit={submitRelease} className="bg-white border-2 border-emerald-400 rounded-xl p-4 mb-5 space-y-3">
+              <h2 className="font-semibold text-emerald-800 text-sm">放行（COA result=pass，状态 quarantine → available）</h2>
+              <div className="grid sm:grid-cols-4 gap-3">
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700">检测日期</span>
+                  <input type="date" className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
+                    value={testDate} onChange={(e) => setTestDate(e.target.value)} />
+                  <span className="text-[10px] text-slate-500">留空=今天</span>
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700">检测员（可空）</span>
+                  <input className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
+                    value={testedBy} onChange={(e) => setTestedBy(e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700">单据号（可空）</span>
+                  <input className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
+                    placeholder="如检测报告 PDF 文件名" value={documentRef} onChange={(e) => setDocumentRef(e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700">备注（可空）</span>
+                  <input className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
+                    value={releaseNotes} onChange={(e) => setReleaseNotes(e.target.value)} />
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={busy} className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50">{busy ? '提交中…' : '确认放行'}</button>
+                <button type="button" onClick={closeForms} className="px-4 py-2 rounded-lg border text-sm">取消</button>
+              </div>
+            </form>
+          )}
+
+          {mode === 'reject' && (
+            <form onSubmit={submitReject} className="bg-white border-2 border-rose-400 rounded-xl p-4 mb-5 space-y-3">
+              <h2 className="font-semibold text-rose-800 text-sm">拒收（COA result=fail，状态 → rejected；后续 issue/ship/consume 将被 BR-W4 拦截）</h2>
+              <div className="grid sm:grid-cols-4 gap-3">
+                <label className="block sm:col-span-2">
+                  <span className="text-xs font-medium text-slate-700">拒收原因 *</span>
+                  <input className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
+                    placeholder="如：密封破损 / 含菌超标"
+                    value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} required />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700">检测日期</span>
+                  <input type="date" className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
+                    value={testDate} onChange={(e) => setTestDate(e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-700">检测员（可空）</span>
+                  <input className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
+                    value={testedBy} onChange={(e) => setTestedBy(e.target.value)} />
+                </label>
+              </div>
+              <p className="text-[10px] text-slate-500">注：物理库存留在原位置，需手动调拨到 LOC-NG。</p>
+              <div className="flex gap-2">
+                <button type="submit" disabled={busy} className="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium disabled:opacity-50">{busy ? '提交中…' : '确认拒收'}</button>
+                <button type="button" onClick={closeForms} className="px-4 py-2 rounded-lg border text-sm">取消</button>
+              </div>
+            </form>
+          )}
+
           {/* current balances by location */}
           <h2 className="text-sm font-bold text-slate-700 mb-2">当前库存（按库位）</h2>
           <div className="overflow-hidden rounded-xl border bg-white mb-6">
@@ -275,6 +413,46 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
               </tbody>
             </table>
           </div>
+
+          {/* COA history (release/reject records for this lot) */}
+          {coaHistory.length > 0 && (
+            <>
+              <h2 className="text-sm font-bold text-slate-700 mb-2 mt-6">质检记录（COA）</h2>
+              <div className="overflow-hidden rounded-xl border bg-white">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                    <tr>
+                      <th className="text-left font-semibold px-4 py-2.5">COA 号</th>
+                      <th className="text-left font-semibold px-4 py-2.5">日期</th>
+                      <th className="text-left font-semibold px-4 py-2.5">结果</th>
+                      <th className="text-left font-semibold px-4 py-2.5">检测员</th>
+                      <th className="text-left font-semibold px-4 py-2.5">单据</th>
+                      <th className="text-left font-semibold px-4 py-2.5">备注</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {coaHistory.map((c) => (
+                      <tr key={c.id}>
+                        <td className="px-4 py-2 font-mono text-slate-800">{c.coa_number}</td>
+                        <td className="px-4 py-2 text-slate-700">{c.test_date}</td>
+                        <td className="px-4 py-2">
+                          <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded',
+                            c.result === 'pass' ? 'bg-emerald-100 text-emerald-700'
+                            : c.result === 'fail' ? 'bg-rose-100 text-rose-700'
+                            : 'bg-slate-100 text-slate-600')}>
+                            {c.result}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-slate-700">{c.tested_by ?? '—'}</td>
+                        <td className="px-4 py-2 text-slate-500 text-xs">{c.document_ref ?? '—'}</td>
+                        <td className="px-4 py-2 text-slate-500">{c.notes ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

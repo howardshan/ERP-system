@@ -9,6 +9,7 @@ import {
   Layers,
   Truck,
   Tags,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -18,6 +19,7 @@ import BalancePage from './BalancePage';
 import GoodsReceiptPage from './GoodsReceiptPage';
 import LotsListPage from './LotsListPage';
 import LotDetailPage from './LotDetailPage';
+import ExpiringPage from './ExpiringPage';
 
 interface Props {
   onHome: () => void;
@@ -71,6 +73,7 @@ export default function WarehouseModule({ onHome }: Props) {
     if (screen === 'lot-detail' && canViewLots && selectedLotId != null) {
       return <LotDetailPage lotId={selectedLotId} onBack={() => navigate('lots')} />;
     }
+    if (screen === 'expiring' && canViewLots) return <ExpiringPage onOpenLot={openLot} />;
     if (screen === 'items' && canViewItems) return <ItemsPage />;
     if (screen === 'locations' && canViewLocations) return <LocationsPage />;
     return <WarehouseHome />;
@@ -108,6 +111,9 @@ export default function WarehouseModule({ onHome }: Props) {
           )}
           {canViewLots && (
             <NavItem icon={Tags} label="Lots" isActive={isActive('lots') || isActive('lot-detail')} onClick={() => navigate('lots')} />
+          )}
+          {canViewLots && (
+            <NavItem icon={AlertTriangle} label="Expiring" isActive={isActive('expiring')} onClick={() => navigate('expiring')} />
           )}
 
           {(canViewItems || canViewLocations) && <NavSection title="Master Data" />}

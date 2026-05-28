@@ -1796,6 +1796,30 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-110 `20260527000007_wh_lot_lifecycle.sql`
+**用途**: Warehouse S3 批次生命周期 — 放行 / 拒收 / 一键标定过期 / 临期查询。BR-6a 状态机 + BR-11 COA 门控；不改 S1 内核（BR-W4 已含 `expired`/`rejected` 拦截）。
+
+**变更**:
+
+| 对象 | 说明 |
+|------|------|
+| `wh_next_coa_number()` | `COA-NNNNNN`，max+1 正则（仿 `wh_next_grn_number`） |
+| `wh_release_lot(p_lot_id, p_test_date?, p_tested_by?, p_document_ref?, p_notes?)` | 仅 `quarantine` → `available`；写 `coa(result='pass')`；返回 `{lot_id, new_status, coa_id, coa_number}` |
+| `wh_reject_lot(p_lot_id, p_reason, p_test_date?, p_tested_by?, p_document_ref?)` | `quarantine` 或 `available` → `rejected`；`reason` 必填→`coa.notes`；result='fail' |
+| `wh_expire_lots()` | 管理函数：把 `expiry_date < today AND status NOT IN ('consumed','rejected','expired')` 的批次 status 改为 `expired`；返回 `{expired_count, lot_ids}` |
+| `wh_list_expiring(p_days_ahead int DEFAULT 30)` | `LANGUAGE sql STABLE`：返回 (已过期未标定 OR 未来 N 天到期) 的 lots；join `item` + 跨库位 SUM 在库；含 `days_until_expiry`（负=已过期） |
+
+**特性**: 幂等（`CREATE OR REPLACE`）。无 schema 变更，`coa` 表来自 M-001。
+
+**前端配套**:
+- `src/services/warehouseApi.ts` — `releaseLot` / `rejectLot` / `expireLots` / `listExpiring` / `listLotCoa`；`Coa` / `ExpiringLot` 类型
+- `src/pages/warehouse/LotDetailPage.tsx` — 加「放行」（仅 quarantine + canRelease）/「拒收」（quarantine 或 available + canReject）按钮 + 内联表单 + 底部「质检记录（COA）」表
+- `src/pages/warehouse/ExpiringPage.tsx` — 新页：天数阈值（7/30/60/90）+ 一键标定过期按钮 + 表格
+
+**依赖**: M-001（lot/coa 表）、M-102（`_wh_apply_transaction` BR-W4 已含 expired/rejected 检查）。**关联文档**: `docs/modules/11_warehouse-inventory.md`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1885,7 +1909,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-107 | 20260527000004_qc_needs_attention_dedup_by_group.sql |
 | M-108 | 20260527000005_qc_sub_lot_produced_at.sql |
 | M-109 | 20260527000006_qc_manual_judgment_and_remark.sql |
-| **M-110** | _(下一个)_ |
+| M-110 | 20260527000007_wh_lot_lifecycle.sql |
+| **M-111** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
