@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, ChevronDown, Search } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import {
   listBalance,
   listLocations,
@@ -221,9 +222,17 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500">
                       {g.lotCount} 批次 · {g.locationCount} 库位
+                      {g.totalOnHand > g.totalAvailable && (
+                        <span className="ml-1 text-amber-700 font-semibold">
+                          · 冻结 {g.totalOnHand - g.totalAvailable}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-bold text-emerald-700">{g.totalOnHand}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-emerald-700">{g.totalAvailable}</td>
+                    <td className={cn(
+                      'px-4 py-3 text-right tabular-nums font-semibold',
+                      g.totalAvailable < g.totalOnHand ? 'text-amber-700' : 'text-emerald-700',
+                    )}>{g.totalAvailable}</td>
                     <td className="px-4 py-3 pl-3 text-slate-600">{g.baseUom}</td>
                   </tr>
 

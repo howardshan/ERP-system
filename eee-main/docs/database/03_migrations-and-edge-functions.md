@@ -1820,6 +1820,17 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-111 `20260527000008_wh_balance_status_aware_available.sql`
+**用途**: Warehouse 微调 — `wh_list_balance` 的 `quantity_available` 改为**状态感知**。S3 验证时发现：rejected/expired 批次的"可用"列仍按 `on_hand - allocated` 算，与 BR-W4 拦截语义不符（实际不能动用）。
+
+**变更**: `CREATE OR REPLACE FUNCTION wh_list_balance(...)` 同签名替换；`quantity_available = CASE WHEN lot.status='available' THEN on_hand - allocated ELSE 0 END`。`quantity_on_hand` 保持物理数量不变。
+
+**前端配套**: `BalancePage.tsx` 物料汇总行：`totalAvailable < totalOnHand` 时"可用"列变琥珀色 + 旁注"· 冻结 N"。
+
+**特性**: 幂等（同签名 CREATE OR REPLACE）。**依赖**: M-104（原 `wh_list_balance`）。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1910,7 +1921,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-108 | 20260527000005_qc_sub_lot_produced_at.sql |
 | M-109 | 20260527000006_qc_manual_judgment_and_remark.sql |
 | M-110 | 20260527000007_wh_lot_lifecycle.sql |
-| **M-111** | _(下一个)_ |
+| M-111 | 20260527000008_wh_balance_status_aware_available.sql |
+| **M-112** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
