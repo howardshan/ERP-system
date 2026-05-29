@@ -123,7 +123,7 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
   const allExpanded = filteredGroups.length > 0 && filteredGroups.every((g) => expanded.has(g.itemId));
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="p-8 max-w-7xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">Inventory Balance</h1>
       <p className="text-slate-600 mb-4 text-sm">按物料 / 批次 / 库位的实时余额（派生自只增流水）。</p>
 
@@ -139,17 +139,6 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
           >
             <option value="">全部物料</option>
             {items.map((i) => <option key={i.id} value={i.id}>{i.sku} · {i.name}</option>)}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-slate-700">库区筛选</label>
-          <select
-            className="border rounded-lg px-3 py-1.5 text-sm bg-white"
-            value={locationId}
-            onChange={(e) => setLocationId(e.target.value ? Number(e.target.value) : '')}
-          >
-            <option value="">全部库区</option>
-            {locations.map((l) => <option key={l.id} value={l.id}>{l.code} · {l.name}</option>)}
           </select>
         </div>
         {(itemId || locationId) && (
@@ -189,7 +178,8 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
         </span>
       </div>
 
-      <div className="overflow-hidden rounded-xl border bg-white">
+      <div className="flex gap-4 items-start">
+        <div className="flex-1 overflow-hidden rounded-xl border bg-white">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
             <tr>
@@ -276,7 +266,72 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
             )}
           </tbody>
         </table>
+        </div>
+
+        {/* Location tabs (replaces the dropdown filter) */}
+        <aside className="w-44 shrink-0 sticky top-4">
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">库位</div>
+          <div className="rounded-xl border bg-white overflow-hidden">
+            <LocationTab label="全部" isActive={locationId === ''} onClick={() => setLocationId('')} />
+            <div className="h-px bg-slate-100" />
+            {locations.map((l) => (
+              <LocationTab
+                key={l.id}
+                code={l.code}
+                name={l.name ?? ''}
+                type={l.location_type}
+                isActive={locationId === l.id}
+                onClick={() => setLocationId(l.id)}
+              />
+            ))}
+          </div>
+        </aside>
       </div>
     </div>
+  );
+}
+
+const TYPE_DOT: Record<string, string> = {
+  storage: 'bg-emerald-400',
+  production: 'bg-amber-400',
+  quarantine: 'bg-rose-400',
+  receiving: 'bg-sky-400',
+  shipping: 'bg-violet-400',
+};
+
+function LocationTab({
+  code, name, type, label, isActive, onClick,
+}: {
+  code?: string;
+  name?: string;
+  type?: string;
+  label?: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full text-left px-3 py-2 text-sm transition-colors relative block',
+        isActive
+          ? 'bg-emerald-50 text-emerald-900 font-semibold'
+          : 'text-slate-700 hover:bg-slate-50',
+      )}
+    >
+      {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />}
+      {label ? (
+        <span>{label}</span>
+      ) : (
+        <div className="flex items-center gap-2">
+          {type && <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', TYPE_DOT[type] ?? 'bg-slate-300')} />}
+          <div className="min-w-0 flex-1">
+            <div className="font-mono text-xs">{code}</div>
+            {name && <div className="text-[10px] text-slate-500 truncate">{name}</div>}
+          </div>
+        </div>
+      )}
+    </button>
   );
 }
