@@ -29,6 +29,13 @@
 > 4. **库存账本仍是空地**：全库无任何 `inventory_transaction`/ERP `lot` 写入，S1 内核 `_wh_apply_transaction` 从零开始。
 > 5. **migration 编号**：Warehouse S0 的 4 个 migration 已补登为 **M-096～M-099**（追加到索引末尾），S1 起的新 migration 从 **M-100** 接续（下方 S1–S5 表中的 M-0xx 仅为**相对顺序示意**，实际号在创建时分配）。
 
+> **现状更新（2026-05-27，S4 前置审计）**：
+> 1. **S0~S3 全部已 push 并验证**（M-079/080/081/082/100~104/105/110/111）；S2 加 BR-5 双条件可视化 (M-111) 已完成
+> 2. **S4 假设全部成立**（审计 2026-05-27 完成）：`qc_production_lot.packaging_item_id` 已存在并由 M-095 写入；`qc_production_lot.lot_id` 和 `qc_drying_sub_lot.lot_id` 仍是 greenfield；`qc_release_passed_sub_lot` (M-068 幂等版) 与 `qc_create_production_lot_with_sub_lots` (M-095) 均未调任何 wh_*
+> 3. **审计新明确的 hold 同步 hook**：`qc_submit_inspection` (M-109) + `qc_create_disposition`（不是含糊的"QC hold/disposing"）。**Group propagation** 必须处理（champion fail 连带组内多车）
+> 4. **历史 packaging_item_id NULL 兼容策略**（决议 §5.7 新增）：单关联自动回填 / 多关联前端弹窗 / 0 关联报错；**不做一次性 backfill migration**
+> 5. **S4 migration 从 M-112 起**（M-111 之后无新 migration，基线干净）
+
 ---
 
 ## 2. 全局执行原则（每个 Sprint 都适用）
@@ -178,20 +185,34 @@
 |------|------|------|
 | ⚙️ | `qc_production_lot.lot_id`（FK→lot）+ 索引（决议 §4.5 Migration A） | 🔲 |
 | ⚙️ | `qc_drying_sub_lot.lot_id` 冗余 + 同步触发器 `qc_sync_sub_lot_lot_id`（决议 §4.5 Migration B）+ 历史 backfill | 🔲 |
-| 🔌 | 建车时写 lot：`qc_create_production_lot_with_sub_lots`（M-095 已收 `p_packaging_item_id`）成功后，用 **`packaging_item_id`** 调 `wh_create_lot`（ERP lot.item_id = 成品 item）并回填 `lot_id`；校验 **`packaging_item_id IS NOT NULL`** 否则拒绝（决议 §5.6，已取代原 §5.5 的 item_id 写法） | 🔲 |
-| 🔌 | M-096 `wh_recompute_lot_status(p_lot_id)`：全车终态聚合（决议 §5.1） | 🔲 |
-| 🔌 | M-097 `wh_sync_release_from_qc(p_sub_lot_id)`：放行 transfer PENDING→PACK-STAGE + 调 recompute（计划书 §8.2，BR-W3） | 🔲 |
-| 🔌 | M-098 hold 同步：QC hold/disposing → transfer →LOC-NG + recompute | 🔲 |
-| 🔌 | M-099 改造 `qc_release_passed_sub_lot`：事务内调 `wh_sync_release_from_qc`，失败则整体回滚（不更新为 closed） | 🔲 |
-| 🧩 | warehouseApi：`syncReleaseFromQc`（如需前端触发）；QC 侧无感 | 🔲 |
-| 🧪 | 20 条联调用例（happy path + 部分合格 + 失败回滚 + 并发同 SKU 两车放行） | 🔲 |
-| 📄 | 文档：M-093~099 + 09_qc.md 放行改造说明 + 11 集成章节 | 🔲 |
+| 🔌 | 建车时写 lot：改造 `qc_create_production_lot_with_sub_lots`（M-095，已收 `p_packaging_item_id`）→ 成功后用 `packaging_item_id` 调 `wh_create_lot` 并回填 `qc_production_lot.lot_id`；校验 **`packaging_item_id IS NOT NULL`** 否则拒绝（决议 §5.6） | 🔲 |
+| 🔌 | 辅助 RPC `qc_set_lot_packaging_item(production_lot_id, item_id)`：仅 NULL→SET，校验 item 在 `qc_sku_item` 关联表里，写 `qc_quality_event`（决议 §5.7） | 🔲 |
+| 🔌 | `wh_recompute_lot_status(p_lot_id)`：全车终态聚合（决议 §5.1） | 🔲 |
+| 🔌 | `wh_sync_release_from_qc(p_sub_lot_id)`：放行 transfer `LOC-QC-PENDING → LOC-PACK-STAGE` + 调 recompute（计划书 §8.2，BR-W3）；**含 §5.7 NULL packaging_item_id 分流**（单关联自动回填、多关联 RAISE `PACKAGING_REQUIRED:` 前端 catch） | 🔲 |
+| 🔌 | **Hold sync** — 改造**两个**函数（审计确认的精确 hook 点）：<br>① `qc_submit_inspection`（M-109）尾部追加 wh_sync_hold：检验 fail 把当前 sub_lot 及**组内连带 sibling**（同 test_group）逐一 transfer 到 LOC-NG + recompute<br>② `qc_create_disposition`（最新版）尾部追加 wh_sync_hold：操作员处置（rework/grind/scrap/concession）触发 status='disposing' 时同步 transfer | 🔲 |
+| 🔌 | 改造 `qc_release_passed_sub_lot`（M-068 幂等版）：**仅 status 实际从 passed→closed 这条路径**调 `wh_sync_release_from_qc`，失败则整体回滚（不更新为 closed）；幂等短路分支（已 closed/dispatched）不调，保留幂等性 | 🔲 |
+| 🧩 | warehouseApi：`syncReleaseFromQc`（前端 catch `PACKAGING_REQUIRED:` 时手动重试）+ `setLotPackagingItem`（弹窗回填用） | 🔲 |
+| 🖥️ | QC 放行入口前端处理：catch `PACKAGING_REQUIRED:` → 弹"为这批选最终产品"模态框 → 选完调 `setLotPackagingItem` + 重试放行（决议 §5.7） | 🔲 |
+| 🧪 | 20+ 条联调用例：happy path / 部分合格 / 失败回滚 / 并发同 SKU 两车放行 / **历史 NULL packaging_item_id 三分流（单关联自动 / 多关联弹窗 / 0 关联报错）** / **组内连带 hold 多车 transfer** | 🔲 |
+| 📄 | 文档：S4 全部 migration 索引 + 09_qc.md 放行/检验/处置改造说明 + 11 集成章节 + 决议 §5.7 落地确认 | 🔲 |
 
-**✅ 验证门 M4（计划书 §4.3 关键项）：**
+> **编号承接**：S3 占到 **M-111**（M-106~109 是团队 QC migrations、M-110~111 是 warehouse）。**S4 从 M-112 起**。S4 大约 7-9 个 migration，按实际创建分配。
+>
+> **审计确认（2026-05-27）的关键 hook 函数**：
+> - 建车 → `qc_create_production_lot_with_sub_lots`（M-095 已收 packaging_item_id）
+> - 放行 → `qc_release_passed_sub_lot`（M-068 幂等版）
+> - **Hold (检验失败)** → `qc_submit_inspection`（M-109 最新版，含 group/manual/retest 分支，改造**只在末尾追加**调用）
+> - **Hold (操作员处置)** → `qc_create_disposition`（处置确认时 status→disposing）
+>
+> **Group propagation 风险**：`qc_submit_inspection` 一次 fail 可能连带组内多车进 hold，sync 必须遍历**所有**受影响 sub_lot 各跑一次 ERP transfer。
+
+**✅ 验证门 M4（计划书 §4.3 关键项 + S4 审计补充）：**
 - 无 PO 收货 → 待检 → QC 放行 → 待包装，数量端到端正确
-- `wh_sync_release_from_qc` 故意失败时，QC sub_lot **不**变 closed（无"已放行但无 lot"脏数据）
+- `wh_sync_release_from_qc` 故意失败时，QC sub_lot **不**变 closed（无"已放行但无 lot"脏数据）；旧的 idempotent no-op 分支不被破坏
 - 部分合格车：合格进 PACK-STAGE、不合格进 LOC-NG、lot.status=available（决议 §3.5 数据流示例可复现）
-- 未选 `packaging_item_id` 的建车被拒绝（决议 §5.6；原"未关联 item 的 SKU 被拒"已按 junction 模型调整）
+- 未选 `packaging_item_id` 的**新建**车被拒绝（决议 §5.6）
+- **历史 NULL packaging_item_id 三分流**（决议 §5.7）：SKU 单关联放行自动回填；多关联触发前端弹窗 → 选完重试放行；0 关联报错
+- **组内连带 hold**：champion 失败后同组 N 车的 ERP 余额都正确移到 LOC-NG，递归不遗漏
 
 ---
 
@@ -276,3 +297,4 @@ S0(主数据) ──► S1(流水内核) ──► S2(库内作业) ──► S3
 |------|--------|------|
 | 2026-05-24 | 初稿 | 基于计划书 v1.0 + Sprint0 决议（全选方案 A）制定执行级落地计划 |
 | 2026-05-26 | 现状同步 | S0 完成；QC↔ERP 桥接演进为 `qc_sku_item` 联结表 + `packaging_item_id`（M-087/M-092/M-095）；migration 编号更正为 M-097 起；S4 改按决议 §5.6；澄清 "Production 模块" 为 QC 界面重组（非制造模块） |
+| 2026-05-27 | S4 前置审计 | S4 计划补充：① hold sync 的精确 hook 锁定为 `qc_submit_inspection` + `qc_create_disposition`（非"hold/disposing"含糊提法）；② 加入 group propagation 必须处理的提醒（test_group 连带 hold）；③ 加入决议 §5.7 历史 NULL `packaging_item_id` 三分流策略 + 辅助 RPC `qc_set_lot_packaging_item`；④ migration 编号承接 M-112 起；⑤ M4 验证门加 2 条新用例（三分流、组内连带） |
