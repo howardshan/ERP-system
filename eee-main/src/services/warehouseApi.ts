@@ -468,3 +468,54 @@ export async function listLotCoa(lotId: number): Promise<Coa[]> {
   if (error) throw new Error(error.message);
   return (data ?? []) as Coa[];
 }
+
+// ── QC ↔ ERP sync (Sprint 4) ────────────────────────────────────────────────
+//
+// These two RPCs are normally invoked indirectly by qcApi.releasePassedSubLot
+// (the release path calls wh_sync_release_from_qc inside the same transaction
+// via M-116). They're exposed here for two cases:
+//   1. setLotPackagingItem — front-end calls this when it catches a
+//      PACKAGING_REQUIRED:<id> error from release, asks the operator to pick
+//      from qc_sku_item links, then retries release.
+//   2. syncReleaseFromQc — manual reconciliation tool (e.g. an admin retrying
+//      a sync after a previous failure was investigated). Not used by the
+//      happy path.
+
+export interface LotReleaseSyncResult {
+  sub_lot_id: string;
+  production_lot_id: string;
+  lot_id: number;
+  item_id: number;
+  yield_quantity: number;
+  transaction_id: number;
+  recompute: {
+    lot_id: number;
+    old_status: LotStatus;
+    new_status: LotStatus;
+    action: string;
+    total: number;
+    pass_terminal?: number;
+    hold_terminal?: number;
+    terminal?: number;
+  };
+}
+
+export async function setLotPackagingItem(input: {
+  productionLotId: string;
+  itemId: number;
+}): Promise<{ production_lot_id: string; packaging_item_id: number }> {
+  return rpc('qc_set_lot_packaging_item', {
+    p_production_lot_id: input.productionLotId,
+    p_item_id: input.itemId,
+  });
+}
+
+export async function syncReleaseFromQc(input: {
+  subLotId: string;
+  yieldQuantity: number;
+}): Promise<LotReleaseSyncResult> {
+  return rpc<LotReleaseSyncResult>('wh_sync_release_from_qc', {
+    p_sub_lot_id: input.subLotId,
+    p_yield_quantity: input.yieldQuantity,
+  });
+}
