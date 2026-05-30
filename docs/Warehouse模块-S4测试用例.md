@@ -6,43 +6,71 @@
 
 ---
 
-## §0 准备测试数据（一次性）
+## §0 准备测试数据（一次性,推荐 UI 操作）
 
-在 Supabase SQL Editor 跑一次。**先确认 SKU `S4-TEST` 不存在**（如重跑，先清掉测试残留，见末尾 §X 清理脚本）。
+可以全程在 UI 操作,不必碰 SQL。下面给两条路径,任选其一。
+
+### 路径 A（推荐）— 全 UI 操作
+
+**A.0 前置查看**:打开 Warehouse → **Items** 页,记下两个 active 的 `packaging` 或 `finished_good` 物料的 **SKU 编码 + 名称**(下面叫它们 **ITEM_A**、**ITEM_B**,后续测试只需用名称识别)。如果没有,先在 Items 页"新建物料"创一个,基础单位选 KG 或 BAG。
+
+**A.1 建 SKU**:QC → **Product Management** → "新建产品":
+- 产品代码:`S4-TEST`
+- 产品名称:`S4 测试 SKU`
+- 标准烘干时间(分钟):`60`
+- 抽样每 N 车一组:`3`(暂留默认值,套件 E2 会临时改成 2)
+- **"关联 ERP 物料"多选下拉**:**只勾 ITEM_A**(套件 D2 时再补勾 ITEM_B)
+- **检验模板**(下方表格):点 "+" 新增一行 → 选 `Aw` 测试类型 → 下限 `0.55` → 上限 `0.65`
+- 保存
+
+**A.2 校验 UI**:列表页那一行应显示:`S4-TEST · S4 测试 SKU`,下方有"测试模板:ITEM_A · [0.55, 0.65]"那种汇总文字,关联物料列表能看到 ITEM_A。
+
+✅ **A 路径准备完成**,跳到 §A 开始测试。
+
+---
+
+### 路径 B — SQL 操作(如果 UI 出问题或想批量)
+
+在 Supabase SQL Editor 跑一次。**先确认 SKU `S4-TEST` 不存在**(如重跑,见 §X 清理脚本)。
 
 ```sql
--- 0.1 拿到几个 location id，后续 SQL 会用
+-- B.1 拿到几个 location id,后续 SQL 会用
 SELECT id, code FROM location WHERE code IN ('LOC-PACK-STAGE','LOC-NG','LOC-RM','LOC-QC-PENDING');
--- 记下 LOC-PACK-STAGE 的 id（后面叫它 :PACK_STAGE_ID）
 
--- 0.2 选两个 active 的 packaging item（任意两个 finished_good / packaging 类型 item）
+-- B.2 选两个 active 的 packaging item
 SELECT id, sku, name, item_type, base_uom_id FROM item
  WHERE status='active' AND item_type IN ('packaging','finished_good')
  ORDER BY id LIMIT 5;
--- 记下两个 id：:ITEM_A_ID（"主包装"）和 :ITEM_B_ID（"次包装"，用于多关联场景）
+-- 记下两个 id::ITEM_A_ID 和 :ITEM_B_ID
 
--- 0.3 建一个 S4 测试专用 SKU（QC 端）
+-- B.3 建 S4 测试 SKU
 INSERT INTO qc_product_sku (code, name, standard_drying_minutes, sample_every_n_carts)
 VALUES ('S4-TEST', 'S4 测试 SKU', 60, 3);
--- 记下返回的 id（:SKU_ID）；下面所有 qc_sku_item 关联都用它
 
--- 0.4 给这个 SKU 关联包装 item（先 1 个，后续套件 E 会演示 2 个/0 个的场景）
-INSERT INTO qc_sku_item (sku_id, item_id) VALUES (:SKU_ID, :ITEM_A_ID);
+-- B.4 关联 1 个包装 item
+INSERT INTO qc_sku_item (sku_id, item_id)
+VALUES ((SELECT id FROM qc_product_sku WHERE code='S4-TEST'), :ITEM_A_ID);
 
--- 0.5 给 SKU 配一个检验模板（Aw 0.55~0.65 合格）
+-- B.5 配检验模板(Aw 0.55~0.65)
 INSERT INTO qc_inspection_template (sku_id, test_type_id, lower_limit, upper_limit)
-SELECT :SKU_ID, id, 0.55, 0.65 FROM qc_test_type WHERE name ILIKE '%Aw%' LIMIT 1;
+SELECT (SELECT id FROM qc_product_sku WHERE code='S4-TEST'),
+       id, 0.55, 0.65
+  FROM qc_test_type WHERE name ILIKE '%Aw%' LIMIT 1;
 ```
 
-校验：
+校验:
 
 ```sql
 SELECT s.code, s.name,
        (SELECT count(*) FROM qc_sku_item WHERE sku_id=s.id) AS link_count,
        (SELECT count(*) FROM qc_inspection_template WHERE sku_id=s.id) AS tmpl_count
 FROM qc_product_sku s WHERE code='S4-TEST';
--- 期望：link_count=1, tmpl_count=1
+-- 期望:link_count=1, tmpl_count=1
 ```
+
+---
+
+> 💡 **测试中的 SQL 工具调用**(`qc_release_passed_sub_lot`、`wh_recompute_lot_status` 等)即便走 A 路径准备,**§B~§G 套件里的 SQL 校验和直测语句还是要在 SQL Editor 里跑** —— 这些是"故意绕过 UI 验内核"的设计(比如 §C3 BR-W3 失败回滚没法在 UI 触发)。
 
 ---
 
@@ -653,21 +681,78 @@ SELECT b.lot_id, b.location_id, b.quantity_on_hand,
 
 ---
 
-## §X 清理脚本（重跑测试前用）
+## §X 清理策略
+
+### 先想清楚:到底要不要清?
+
+**默认建议:不清理**。理由:
+
+1. **当前 Supabase 还是 dev 库**(v1.0 没真上线),S4 测试产生的数据就是"系统的第一批真实业务流水",留着没坏处。
+2. **append-only ledger 的设计哲学**(BR-1)就是绝不动账本——`inventory_transaction` 在 M-100 装了 `trg_invtxn_append_only` 触发器,UPDATE/DELETE 都会被拒。这是有意为之的财务/审计护栏。
+3. **测试间互不污染**:每次新测试用不同的工单条码(`WO-S4-A1` / `WO-S4-E1` / `WO-S4-NEW-XYZ`)就能完全隔离,不需要清旧的。
+
+只有以下情况建议清:
+- 你要把同一个 SKU `S4-TEST` 重新走一遍 §0 准备(SKU 编码 UNIQUE,二次 INSERT 会冲突)
+- 测试残留导致 QC Home 列表/Released Inventory 太乱影响后续测试观察
+- 准备从 dev 库切到 staging/prod 之前的"清场"(那时已经过 v1.0 验收)
+
+### 路径 A — UI 清理(推荐,够用)
+
+UI 能删的部分(按反向依赖顺序):
+
+| 数据 | UI 路径 | 备注 |
+|------|---------|------|
+| **工单(production_lot + sub_lots + 关联 inspection/quality_event/coa)** | QC → **Trace List** → 找到 `WO-S4-XXX` 行 → 删除按钮 | 调 `deleteProductionLots`,级联删 sub_lot + inspection_record + 事件 |
+| **SKU `S4-TEST`** | QC → **Product Management** → 找到 `S4-TEST` 卡片 → 删除 | 但若仍有关联 production_lot 会被 FK 阻止,要先删工单 |
+| **ERP lot** | 无 UI 入口(lot 是流水产物,刻意不暴露删) | 留着不影响 — 没有 inventory_balance 行就看不见 |
+| **inventory_transaction / inventory_balance** | 无 UI 入口 | append-only 故意没删除入口,**正确做法是写"反向 adjustment"流水**(Warehouse → LotDetail 页面有"调整"按钮),让余额回 0,**不删历史**。这才是 BR-1 的本意。 |
+
+**UI 清理的实操步骤**(推荐):
+
+1. QC → **Trace List** → 把所有 `WO-S4-*` 工单行删掉 → 会自动级联清 sub_lot / inspection / quality_event(看 `deleteProductionLots` 实现)
+2. QC → **Product Management** → 删 `S4-TEST` 和 `S4-TEST-NOLINK`(应该没 FK 阻拦了)
+3. (可选)Warehouse → **Lots List** → 看到 status='quarantine' 且 lot_number = 测试工单号的孤儿 lot,目前没 UI 删除入口 — 留着即可。它们没有 inventory_balance 行,所以 Balance 页根本看不到。
+4. (可选,如果要把放行余额回 0)Warehouse → 那批 lot 的 LotDetail → "调整"按钮 → 输入 -100(等于已 +yield 的总量) → 原因 "测试清理"。这样**保留全部历史流水**,但余额回 0,符合 append-only 精神。
+
+✅ **UI 清理走完后**:可以重新跑 §0 准备 + §A~H 全套件,SKU 编码不会冲突,Balance 页也干净。
+
+### 路径 B — SQL 强清(慎用,仅 dev 库)
+
+只有当 UI 不够用(比如想连孤儿 lot 一起抹掉,或快速清场)才用。**生产环境绝对不要执行**。
 
 ```sql
--- 删 S4 测试相关数据（按反向依赖）
+-- ⚠️ 临时禁用 append-only 守护(M-100 的核心保护,只能在 dev 库做!)
+ALTER TABLE inventory_transaction DISABLE TRIGGER trg_invtxn_append_only;
+
+-- 按 FK 反向依赖删
 DELETE FROM qc_quality_event WHERE drying_sub_lot_id IN (
-  SELECT id FROM qc_drying_sub_lot WHERE sub_lot_code LIKE 'WO-S4-%-%'
+  SELECT id FROM qc_drying_sub_lot WHERE production_lot_id IN (
+    SELECT id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%'
+  )
 );
 DELETE FROM qc_inspection_record WHERE drying_sub_lot_id IN (
-  SELECT id FROM qc_drying_sub_lot WHERE sub_lot_code LIKE 'WO-S4-%-%'
+  SELECT id FROM qc_drying_sub_lot WHERE production_lot_id IN (
+    SELECT id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%'
+  )
+);
+DELETE FROM qc_sample WHERE drying_sub_lot_id IN (
+  SELECT id FROM qc_drying_sub_lot WHERE production_lot_id IN (
+    SELECT id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%'
+  )
+);
+DELETE FROM qc_disposition WHERE drying_sub_lot_id IN (
+  SELECT id FROM qc_drying_sub_lot WHERE production_lot_id IN (
+    SELECT id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%'
+  )
 );
 DELETE FROM inventory_transaction WHERE lot_id IN (
-  SELECT lot_id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%'
+  SELECT lot_id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%' AND lot_id IS NOT NULL
 );
 DELETE FROM inventory_balance WHERE lot_id IN (
-  SELECT lot_id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%'
+  SELECT lot_id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%' AND lot_id IS NOT NULL
+);
+DELETE FROM coa WHERE lot_id IN (
+  SELECT lot_id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%' AND lot_id IS NOT NULL
 );
 DELETE FROM qc_drying_sub_lot WHERE production_lot_id IN (
   SELECT id FROM qc_production_lot WHERE work_order_barcode LIKE 'WO-S4-%'
@@ -683,17 +768,21 @@ DELETE FROM qc_sku_item WHERE sku_id IN (
   SELECT id FROM qc_product_sku WHERE code IN ('S4-TEST', 'S4-TEST-NOLINK')
 );
 DELETE FROM qc_product_sku WHERE code IN ('S4-TEST', 'S4-TEST-NOLINK');
-```
 
-⚠️ **append-only 保护**：M-100 的 `trg_invtxn_append_only` 会拒绝 `DELETE inventory_transaction`！如果上面 DELETE 报 BR-1 错误,需要先**临时禁用触发器**：
-
-```sql
-ALTER TABLE inventory_transaction DISABLE TRIGGER trg_invtxn_append_only;
--- ... DELETE ...
+-- ⚠️ 重新启用守护(务必跑!)
 ALTER TABLE inventory_transaction ENABLE TRIGGER trg_invtxn_append_only;
 ```
 
-⚠️ **生产环境绝对不要做**——这是测试环境清场专用。
+⚠️ **务必把最后一行的 `ENABLE TRIGGER` 跑了**,否则 append-only 保护持续失效,后续所有 inventory_transaction UPDATE/DELETE 都不再被拦截 — 这等于撤掉了 BR-1 的整个护栏。
+
+### 哪种路径更合适?
+
+| 情况 | 用哪个 |
+|------|--------|
+| 想再跑一遍 S4 完整测试 | **路径 A**(够用) |
+| dev 库已经测了很多次,数据混乱 | 路径 A 先清工单,再 SQL 删孤儿 lot |
+| 准备切到 staging/prod 前清场 | 路径 B(整库,但建议 `supabase db reset` 更彻底) |
+| 生产已上线后清测试残留 | **都不用** — 用反向 adjustment 流水把余额抹平,留全部历史
 
 ---
 
