@@ -330,6 +330,30 @@ export async function listProductItemLinks(): Promise<Record<string, number[]>> 
   return map;
 }
 
+// S4: minimal production_lot lookup used by ReleaseDialog when it needs to
+// resolve sku_id from a PACKAGING_REQUIRED:<production_lot_id> error.
+export async function getProductionLotSku(productionLotId: string): Promise<{ sku_id: string | null; sku_code: string | null; packaging_item_id: number | null }> {
+  const { data, error } = await supabase
+    .from('qc_production_lot')
+    .select('sku_id, packaging_item_id, sku:sku_id(code)')
+    .eq('id', productionLotId)
+    .single();
+  if (error) throw new Error(error.message);
+  // supabase-js infers embedded selects as arrays even on single-FK joins;
+  // cast through unknown to unwrap.
+  const row = data as unknown as {
+    sku_id: string | null;
+    packaging_item_id: number | null;
+    sku: { code: string } | { code: string }[] | null;
+  };
+  const skuObj = Array.isArray(row.sku) ? row.sku[0] : row.sku;
+  return {
+    sku_id: row.sku_id,
+    sku_code: skuObj?.code ?? null,
+    packaging_item_id: row.packaging_item_id,
+  };
+}
+
 export async function addSkuItem(skuId: string, itemId: number): Promise<void> {
   const { error } = await supabase.from('qc_sku_item').insert({ sku_id: skuId, item_id: itemId });
   if (error) throw new Error(error.message);
@@ -1164,14 +1188,78 @@ export async function getQcOverview(): Promise<QcOverview> {
   return rpc<QcOverview>('qc_overview');
 }
 
-// Release a passed sub-lot to next process (status: passed → closed)
-export async function releasePassedSubLot(subLotId: string): Promise<SubLot> {
-  return rpc<SubLot>('qc_release_passed_sub_lot', { p_sub_lot_id: subLotId });
+// ── Release errors (S4) ──────────────────────────────────────────────────────
+//
+// The release RPC (M-116) calls wh_sync_release_from_qc, which raises one of
+// three named exceptions when something on the warehouse side blocks the sync.
+// We surface them as typed errors so the UI can react: PackagingRequiredError
+// triggers a picker modal; NoPackagingLinkedError points the operator to
+// ProductManagement; YieldRequiredError should never reach the UI (the form
+// guards it) but is here for safety.
+
+export class PackagingRequiredError extends Error {
+  productionLotId: string;
+  constructor(productionLotId: string) {
+    super(`PACKAGING_REQUIRED: ${productionLotId}`);
+    this.name = 'PackagingRequiredError';
+    this.productionLotId = productionLotId;
+  }
 }
 
-/** Release every cart in a sampling group (all are in 'passed' status). */
-export async function releasePassedSubLotsGroup(subLotIds: string[]): Promise<void> {
-  await Promise.all(subLotIds.map(id => releasePassedSubLot(id)));
+export class NoPackagingLinkedError extends Error {
+  skuId: string;
+  constructor(skuId: string) {
+    super(`NO_PACKAGING_LINKED: ${skuId}`);
+    this.name = 'NoPackagingLinkedError';
+    this.skuId = skuId;
+  }
+}
+
+export class YieldRequiredError extends Error {
+  constructor(msg: string = 'YIELD_REQUIRED') {
+    super(msg);
+    this.name = 'YieldRequiredError';
+  }
+}
+
+/**
+ * Release a passed sub-lot to next process (status: passed → closed).
+ *
+ * S4: now requires `yieldQuantity` — the actual produced quantity (in the
+ * packaging item's base UOM) recorded by the operator. The release RPC posts
+ * +yield to LOC-PACK-STAGE via wh_sync_release_from_qc. If sync fails, the
+ * whole RPC rolls back and sub_lot stays in 'passed' (BR-W3).
+ */
+export async function releasePassedSubLot(subLotId: string, yieldQuantity: number): Promise<SubLot> {
+  if (!yieldQuantity || yieldQuantity <= 0) {
+    throw new YieldRequiredError('请填写有效的产出数量');
+  }
+  try {
+    return await rpc<SubLot>('qc_release_passed_sub_lot', {
+      p_sub_lot_id: subLotId,
+      p_yield_quantity: yieldQuantity,
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const packMatch = msg.match(/PACKAGING_REQUIRED:\s*([\w-]+)/);
+    if (packMatch) throw new PackagingRequiredError(packMatch[1]);
+    const noLinkMatch = msg.match(/NO_PACKAGING_LINKED:\s*([\w-]+)/);
+    if (noLinkMatch) throw new NoPackagingLinkedError(noLinkMatch[1]);
+    if (msg.includes('YIELD_REQUIRED')) throw new YieldRequiredError(msg);
+    throw e;
+  }
+}
+
+/**
+ * Release every cart in a sampling group with the SAME per-cart yield.
+ *
+ * Front-end typically opens ReleaseDialog once per group and supplies one
+ * yield value applied to each cart (group members share the same SKU /
+ * packaging item by construction). Per-cart yield variance is rare and can
+ * be handled by releasing carts individually.
+ */
+export async function releasePassedSubLotsGroup(subLotIds: string[], yieldQuantityPerCart: number): Promise<void> {
+  await Promise.all(subLotIds.map(id => releasePassedSubLot(id, yieldQuantityPerCart)));
 }
 
 /** Apply the same disposition to every cart in a sampling group. */

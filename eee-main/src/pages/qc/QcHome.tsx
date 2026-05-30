@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import {
   getQcOverview,
-  releasePassedSubLotsGroup,
   dashboardPassRateForecast,
   getRecentFailedInspections,
   formatQcDateTime,
@@ -19,6 +18,7 @@ import { getInventorySummary, getAvailableCarts, PkgInventorySku, PkgCart } from
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn, dallasToday, dallasDaysAgo } from '../../lib/utils';
 import { DisposeDialog } from './components/DisposeDialog';
+import { ReleaseDialog } from './components/ReleaseDialog';
 import { PermissionDenied } from './components/PermissionDenied';
 
 interface Props {
@@ -45,9 +45,9 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
   const [forecast, setForecast] = useState<PassRateForecastItem[]>([]);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [disposeTarget, setDisposeTarget] = useState<NeedsAttentionItem | null>(null);
+  const [releaseTarget, setReleaseTarget] = useState<NeedsAttentionItem | null>(null);
   const [showFailPanel, setShowFailPanel] = useState(false);
   const [recentFails, setRecentFails] = useState<RecentFailItem[]>([]);
   const [failsLoading, setFailsLoading] = useState(false);
@@ -89,22 +89,22 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
     load();
   };
 
-  const handleRelease = async (item: NeedsAttentionItem) => {
+  const handleRelease = (item: NeedsAttentionItem) => {
     if (!canRelease) return;
-    setBusyId(item.drying_sub_lot_id);
     setError('');
-    try {
-      await releasePassedSubLotsGroup(item.group_sub_lot_ids);
-      const label = item.group_size > 1 ? `${item.group_size} carts` : item.sub_lot_code;
-      setMsg(`${label} released to next process`);
-      removeAttentionItem(item.inspection_id);
-      // Reload so the Released Inventory section picks up the cart immediately,
-      // not after the next 15s auto-refresh tick.
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Release failed');
-    }
-    setBusyId(null);
+    setReleaseTarget(item);
+  };
+
+  const onReleased = () => {
+    const item = releaseTarget;
+    if (!item) return;
+    const label = item.group_size > 1 ? `${item.group_size} carts` : item.sub_lot_code;
+    setMsg(`${label} released to next process`);
+    setReleaseTarget(null);
+    removeAttentionItem(item.inspection_id);
+    // Reload so the Released Inventory section picks up the cart immediately,
+    // not after the next 15s auto-refresh tick.
+    load();
   };
 
   const handleDispose = (item: NeedsAttentionItem) => {
@@ -283,7 +283,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                 <NeedsAttentionRow
                   key={item.inspection_id}
                   item={item}
-                  busy={busyId === item.drying_sub_lot_id}
+                  busy={false}
                   canRelease={canRelease}
                   canDispose={canDisposeAny}
                   onRelease={() => handleRelease(item)}
@@ -351,6 +351,16 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
         permissions={dispositionPerms}
         onClose={() => setDisposeTarget(null)}
         onDisposed={onDisposed}
+      />
+
+      <ReleaseDialog
+        open={releaseTarget !== null}
+        subLotIds={releaseTarget?.group_sub_lot_ids ?? []}
+        subLotCodes={releaseTarget?.group_sub_lot_codes ?? []}
+        skuName={releaseTarget?.sku_name}
+        lotNumber={releaseTarget?.lot_number}
+        onClose={() => setReleaseTarget(null)}
+        onReleased={onReleased}
       />
     </div>
   );
