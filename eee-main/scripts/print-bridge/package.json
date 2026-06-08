@@ -4,7 +4,11 @@
   "description": "Local print bridge — receives PNG from web app and prints via CUPS lp",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "install-service": "bash install-service.sh",
+    "uninstall-service": "bash uninstall-service.sh",
+    "install-service-win": "powershell -ExecutionPolicy Bypass -File install-service-windows.ps1",
+    "uninstall-service-win": "powershell -ExecutionPolicy Bypass -File uninstall-service-windows.ps1"
   },
   "dependencies": {
     "cors": "^2.8.5",
