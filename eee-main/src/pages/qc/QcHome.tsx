@@ -17,6 +17,7 @@ import {
 import { getInventorySummary, getAvailableCarts, PkgInventorySku, PkgCart } from '../../services/pkgApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn, dallasToday, dallasDaysAgo } from '../../lib/utils';
+import { HelpPopover } from '../../components/ui/HelpPopover';
 import { DisposeDialog } from './components/DisposeDialog';
 import { ReleaseDialog } from './components/ReleaseDialog';
 import { PermissionDenied } from './components/PermissionDenied';
@@ -151,56 +152,101 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
       </p>}
       {error && <p className="text-red-600 bg-red-50 p-2 rounded-lg mt-3 text-sm">{error}</p>}
 
-      {/* ── Stat cards ───────────────────────────────────────────────── */}
+      {/* ── Stat cards (grouped: Drying floor + Testing pipeline) ────── */}
       {overview && (
-        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mt-5">
-          <StatCard
-            label="Expected finish today" value={overview.stats.expected_finish_today}
-            icon={Clock} accent="slate"
-          />
-          <StatCard
-            label="Currently drying" value={overview.stats.currently_drying}
-            icon={Flame} accent="amber"
-            onClick={() => onNavigate('dry-rooms')}
-          />
-          <StatCard
-            label="Room temp drying" value={overview.stats.room_temp_drying}
-            icon={Thermometer} accent="orange"
-            onClick={() => onNavigate('room-temp')}
-          />
-          <StatCard
-            label="Awaiting sample" value={overview.stats.awaiting_sample}
-            icon={Hourglass} accent="slate"
-            onClick={() => onNavigate('testing')}
-          />
-          <StatCard
-            label="Awaiting WA result" value={overview.stats.awaiting_wa_result}
-            icon={FlaskConical} accent="blue"
-            onClick={() => onNavigate('testing')}
-          />
-          {/* Pass card */}
-          <StatCard
-            label={`Passed today (${overview.stats.pass_rate_pct ?? '—'}%)`}
-            value={overview.stats.passed_today}
-            icon={CheckCircle2} accent="emerald"
-          />
-          {/* Fail card — clickable, opens detail panel */}
-          <StatCard
-            label="Failed today"
-            value={overview.stats.failed_today}
-            icon={XCircle} accent="red"
-            onClick={() => {
-              setShowFailPanel(v => !v);
-              if (!showFailPanel) {
-                setFailsLoading(true);
-                getRecentFailedInspections(2)
-                  .then(setRecentFails)
-                  .catch(() => {})
-                  .finally(() => setFailsLoading(false));
-              }
-            }}
-          />
-        </section>
+        <>
+          {/* Drying floor */}
+          <section className="mt-5">
+            <SectionHeader
+              title="Drying floor"
+              help={{
+                title: 'Drying floor',
+                content: 'How many carts are in or moving through the dryers right now.',
+              }}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <StatCard
+                label="Currently drying" value={overview.stats.currently_drying}
+                icon={Flame} accent="amber"
+                onClick={() => onNavigate('dry-rooms')}
+                help={{
+                  content: 'Carts inside a dryer at this moment — checked in but not yet checked out. Click to see them dryer by dryer.',
+                }}
+              />
+              <StatCard
+                label="Expected finish today" value={overview.stats.expected_finish_today}
+                icon={Clock} accent="slate"
+                help={{
+                  content: 'Of the carts currently in dryers, how many are expected to come out before the end of today. Based on each cart\'s check-in time plus the drying time you set for it.',
+                }}
+              />
+              <StatCard
+                label="Room temp drying" value={overview.stats.room_temp_drying}
+                icon={Thermometer} accent="orange"
+                onClick={() => onNavigate('room-temp')}
+                help={{
+                  content: 'Carts sitting on the room-temperature rack right now. Carts land here when a batch fails inspection and the operator picks "Room temp dry" as the next step. Click to see them.',
+                }}
+              />
+            </div>
+          </section>
+
+          {/* Testing pipeline */}
+          <section className="mt-4">
+            <SectionHeader
+              title="Testing pipeline"
+              help={{
+                title: 'Testing pipeline',
+                content: 'What\'s happening on the testing bench. The first two are queues waiting for you to do something; the last two are today\'s results so far.',
+              }}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatCard
+                label="Awaiting sample" value={overview.stats.awaiting_sample}
+                icon={Hourglass} accent="slate"
+                onClick={() => onNavigate('testing')}
+                help={{
+                  content: 'Carts that have come out of the dryer but no one has taken a sample yet. Click to open Testing and start sampling.',
+                }}
+              />
+              <StatCard
+                label="Awaiting WA result" value={overview.stats.awaiting_wa_result}
+                icon={FlaskConical} accent="blue"
+                onClick={() => onNavigate('testing')}
+                help={{
+                  content: 'Carts whose sample has already been taken, but the water-activity reading hasn\'t been entered yet. Click to open Testing and finish them off.',
+                }}
+              />
+              <StatCard
+                label={`Passed today (${overview.stats.pass_rate_pct ?? '—'}%)`}
+                value={overview.stats.passed_today}
+                icon={CheckCircle2} accent="emerald"
+                help={{
+                  title: 'Passed today',
+                  content: 'How many carts have passed inspection since this morning. The percentage in parentheses is today\'s overall pass rate — passes divided by total tests done today.',
+                }}
+              />
+              <StatCard
+                label="Failed today"
+                value={overview.stats.failed_today}
+                icon={XCircle} accent="red"
+                onClick={() => {
+                  setShowFailPanel(v => !v);
+                  if (!showFailPanel) {
+                    setFailsLoading(true);
+                    getRecentFailedInspections(2)
+                      .then(setRecentFails)
+                      .catch(() => {})
+                      .finally(() => setFailsLoading(false));
+                  }
+                }}
+                help={{
+                  content: 'How many carts have failed inspection since this morning. Click the card to see what failed in the last two days (cart code + reading).',
+                }}
+              />
+            </div>
+          </section>
+        </>
       )}
 
       {/* ── Fail detail panel ────────────────────────────────────────── */}
@@ -220,6 +266,19 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <TrendingUp size={14} className="text-emerald-600" />
               Predicted passes (in-flight × today's pass rate)
+              <HelpPopover
+                size={13}
+                triggerClass="text-emerald-700"
+                content={
+                  <>
+                    A rough estimate of how many more carts will pass by the end of today, broken out per product.
+                    <br /><br />
+                    We count every cart that doesn&apos;t have a final result yet — anything still drying, waiting to be tested, mid-inspection, on the room-temp rack, or being re-dried — and multiply by today&apos;s pass rate so far.
+                    <br /><br />
+                    If nothing has been tested yet today, we assume 100% to stay optimistic.
+                  </>
+                }
+              />
             </h2>
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
               per product
@@ -265,8 +324,20 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
       {overview && (
         <section className="mt-6">
           <div className="flex items-baseline justify-between mb-2">
-            <h2 className="text-sm font-bold text-slate-900">
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               Needs attention <span className="text-slate-400 font-normal">(today's test results)</span>
+              <HelpPopover
+                size={13}
+                content={
+                  <>
+                    Test results from today that still need your action. Each sampling group shows up as <strong>one row</strong> — even if you re-tested it a few times, only the latest result appears here.
+                    <br /><br />
+                    A green <strong>PASS</strong> row means the whole group is ready to release to packaging. A red <strong>FAIL</strong> row means the whole group needs a disposition (re-test, re-dry, room-temp dry, or scrap).
+                    <br /><br />
+                    Inside a row, the cart highlighted in <strong>green</strong> is the one that was physically sampled — the others share its result because they&apos;re in the same sampling group.
+                  </>
+                }
+              />
             </h2>
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
               {overview.needs_attention.length} entries
@@ -369,12 +440,37 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
 
 // ── Subcomponents ─────────────────────────────────────────────────────────
 
+/** Small group header above each row of stat cards. */
+function SectionHeader({
+  title,
+  help,
+}: {
+  title: string;
+  help?: { title?: string; content: React.ReactNode };
+}) {
+  return (
+    <div className="flex items-center gap-1.5 mb-2">
+      <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-500">{title}</h3>
+      {help && (
+        <HelpPopover
+          title={help.title ?? title}
+          content={help.content}
+          size={11}
+          triggerClass="text-slate-400"
+          align="left"
+        />
+      )}
+    </div>
+  );
+}
+
 function StatCard({
-  label, value, icon: Icon, accent, onClick,
+  label, value, icon: Icon, accent, onClick, help,
 }: {
   label: string; value: number | string; icon: React.ElementType;
   accent: 'amber' | 'orange' | 'slate' | 'blue' | 'emerald' | 'red';
   onClick?: () => void;
+  help?: { title?: string; content: React.ReactNode };
 }) {
   const colors: Record<string, string> = {
     amber:   'bg-amber-50 border-amber-200 text-amber-900',
@@ -384,22 +480,43 @@ function StatCard({
     emerald: 'bg-emerald-50 border-emerald-200 text-emerald-900',
     red:     'bg-red-50 border-red-200 text-red-900',
   };
+  const triggerHints: Record<string, string> = {
+    amber:   'text-amber-700',
+    orange:  'text-orange-700',
+    slate:   'text-slate-500',
+    blue:    'text-blue-700',
+    emerald: 'text-emerald-700',
+    red:     'text-red-700',
+  };
   const ButtonEl: React.ElementType = onClick ? 'button' : 'div';
   return (
-    <ButtonEl
-      onClick={onClick}
-      className={cn(
-        'rounded-xl border-2 p-3 text-left transition-all',
-        colors[accent],
-        onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02]' : '',
+    // Outer wrapper provides the positioning context for the help popover
+    // so the popover button is NOT a descendant of the card button (HTML
+    // forbids nested <button>s and React warns about it).
+    <div className="relative">
+      <ButtonEl
+        onClick={onClick}
+        className={cn(
+          'block w-full rounded-xl border-2 p-3 text-left transition-all',
+          colors[accent],
+          onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02]' : '',
+        )}
+      >
+        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-bold opacity-80 pr-5">
+          <Icon size={12} />
+          <span className="leading-none">{label}</span>
+        </div>
+        <p className="text-2xl font-bold tabular-nums mt-1.5">{value}</p>
+      </ButtonEl>
+      {help && (
+        <HelpPopover
+          title={help.title ?? label}
+          content={help.content}
+          className="absolute top-2 right-2 z-10"
+          triggerClass={triggerHints[accent]}
+        />
       )}
-    >
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-bold opacity-80">
-        <Icon size={12} />
-        <span className="leading-none">{label}</span>
-      </div>
-      <p className="text-2xl font-bold tabular-nums mt-1.5">{value}</p>
-    </ButtonEl>
+    </div>
   );
 }
 
