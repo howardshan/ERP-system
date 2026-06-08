@@ -1935,6 +1935,28 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-118 `20260527000015_qc_check_out_bulk_sampling_method.sql`
+**用途**: 批量出烘干时支持**操作员选择抽样方式**(Method 1 / Method 2),建组改为**确定性**(降序切片 + 确定性 champion),并把方式写进 `group_assigned` 事件 payload 供审计。落地用户反馈:从最高编号车开始切、不再 random champion、特定场景下把余数并入末组。详细算法与示例见 [`docs/QC-取样分组方式-修改计划.md`](../QC-取样分组方式-修改计划.md)。
+
+**签名**: `qc_check_out_sub_lots_bulk(p_sub_lot_ids uuid[], p_out_time timestamptz DEFAULT NULL, p_sampling_method text DEFAULT 'method_1')`。校验 `p_sampling_method IN ('method_1','method_2')`。
+
+**变更**:
+- Step 2a (fresh) / Step 2b (redry) 的 `array_agg(... ORDER BY sub_lot_code)` 改为 **`DESC`**。
+- 切片改成方法感知:Method 2 在 `R = T mod N > 0 && T > N` 时,前 `⌊T/N⌋ - 1` 组取 N 辆(champion = 降序首位 = 最大),末段 `N + R` 辆为一组,champion = 降序倒数第 `⌊K/2⌋ + 1` 位(即升序中偏大);其他情况和 Method 1 一致(每 N 辆一组、余数自成一组、champion = 组内最大)。
+- 每次 `INSERT qc_quality_event 'group_assigned'` 和返回的 `groups[*]` 都带上 `'sampling_method'`。
+
+**前端配套**:
+- 新建 [`src/lib/qcSampling.ts`](../../src/lib/qcSampling.ts) — `planSamplingGroups()` / `championOf()`,与 SQL 一一对照(改算法时必须两边同步)。
+- [`src/services/qcApi.ts`](../../src/services/qcApi.ts) — `checkOutSubLotsBulk` 加 `sampling_method?` 参数;`BulkCheckOutGroup` 加 `sampling_method` / `redry` / `original_group_id` 可选字段;新增 `SamplingMethod` 类型导出。
+- [`src/pages/qc/components/BulkCheckOutDialog.tsx`](../../src/pages/qc/components/BulkCheckOutDialog.tsx) — 弹窗加 Method 1 / 2 radio 二选一(默认 Method 1,套 DisposeDialog radio-card 模式);删除旧的「按 lot 汇总」预览,改为按 SQL 同样的 bucket 划分(fresh/redry × production_lot/原 group)+ 每个 bucket 内列出每组成员 chip 与 champion 高亮,切方式实时重算。
+
+**业务规则**:
+- **BR-Q68** 批量出烘干时,操作员必须选择抽样方式(默认 Method 1)。建组按 `sub_lot_code` 降序进行;**Method 1** = 每 N 辆切一组、余数自成一组、champion = 组内最大编号;**Method 2** = 若有余数则少做 1 组常规组、把余数并入最后一组、最后大组的 champion = 升序排列中的第 `⌊K/2⌋+1` 位(中偏大),常规组仍取最大。同一次 bulk 调用的 Step 2b(redry)沿用同一方法参数;**redry 二次出烘干**操作员重新选,不自动沿用上一次。
+
+**依赖**: M-048 (sampling groups), M-075 (20260523000019 bulk fresh/redry 分类)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)、[`docs/QC-取样分组方式-修改计划.md`](../QC-取样分组方式-修改计划.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2025,6 +2047,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-108 | 20260527000005_qc_sub_lot_produced_at.sql |
 | M-109 | 20260527000006_qc_manual_judgment_and_remark.sql |
 | M-110 | 20260527000007_wh_lot_lifecycle.sql |
+| M-111~M-117 | _(Warehouse S4 + QC v2 / hold hooks — 见 docs/modules/11_warehouse-inventory.md & 09_qc.md)_ |
+| M-118 | 20260527000015_qc_check_out_bulk_sampling_method.sql |
 | M-111 | 20260527000008_wh_balance_status_aware_available.sql |
 | M-112 | 20260527000009_wh_qc_lot_link_schema.sql |
 | M-113 | 20260527000010_wh_recompute_lot_status.sql |
@@ -2032,7 +2056,7 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-115 | 20260527000012_qc_create_production_lot_with_sub_lots_v2.sql |
 | M-116 | 20260527000013_qc_release_passed_sub_lot_v2.sql |
 | M-117 | 20260527000014_qc_hold_event_hooks.sql |
-| **M-112** | _(下一个)_ |
+| **M-119** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

@@ -702,6 +702,9 @@ export async function checkOutSubLotsLegacy(subLotIds: string[], outTime?: strin
 }
 
 // M-048: Bulk check-out that also forms sampling groups + picks champions.
+// M-118: deterministic chunking + operator-chosen sampling method.
+export type SamplingMethod = 'method_1' | 'method_2';
+
 export interface BulkCheckOutGroup {
   test_group_id: string;
   group_sequence: number;
@@ -709,6 +712,9 @@ export interface BulkCheckOutGroup {
   member_count: number;
   champion_id: string;
   member_ids: string[];
+  redry?: boolean;
+  original_group_id?: string | null;
+  sampling_method?: SamplingMethod;
 }
 export interface BulkCheckOutResult {
   requested: number;
@@ -725,10 +731,12 @@ export interface BulkCheckOutResult {
 export async function checkOutSubLotsBulk(input: {
   sub_lot_ids: string[];
   out_time?: string | null;
+  sampling_method?: SamplingMethod;
 }): Promise<BulkCheckOutResult> {
   return rpc<BulkCheckOutResult>('qc_check_out_sub_lots_bulk', {
     p_sub_lot_ids: input.sub_lot_ids,
     p_out_time: input.out_time ?? null,
+    p_sampling_method: input.sampling_method ?? 'method_1',
   });
 }
 
