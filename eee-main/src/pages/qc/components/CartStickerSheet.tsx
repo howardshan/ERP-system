@@ -4,7 +4,6 @@ import { Printer, X } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { SubLot } from '../../../services/qcApi';
 import { getSavedPrinter } from '../../../lib/printerConfig';
-import { isWebUsbSupported, openUsbPrinter, printCanvasUsb, testPrintUsb } from '../../../lib/usbPrint';
 
 interface Props {
   carts: SubLot[];
@@ -15,17 +14,13 @@ interface Props {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Physical label: 4 × 6 inch (w4h6).  The GP-1324D feeds labels portrait
-// (short side across the print head).  Our sticker design is LANDSCAPE.
+// Physical label: 2 × 3 inch.  Print path:
+//   Browser → POST /print (PNG base64) → print bridge → lp -o ppi=203 → CUPS
 //
-// Print path:
-//   renderPrintPng rotates the landscape 1218×812 canvas 90° CCW to produce
-//   a portrait 812×1218 PNG, then submits it with `lp -o media=w4h6`.
-//   CUPS fills the full 4×6 label.  Peel and apply the label, then rotate it
-//   90° CW — the design reads normally (barcode on left, fields on right).
-//
-// Prerequisite (run once per machine):
-//   lpoptions -p <printer_name> -o PageSize=w4h6
+// The design canvas is LANDSCAPE 6"×4" (3:2 ratio).  At PRINT_DPI=101 this
+// produces a 606×404 PNG.  The bridge tells CUPS `ppi=203`, so CUPS computes
+// natural size = 3"×2" — matching the 2"×3" label in landscape orientation.
+// No rotation is applied; the landscape canvas is sent as-is.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DESIGN_W_IN = 6;   // design canvas width  in inches (landscape)
@@ -233,47 +228,27 @@ async function checkPrintBridge(): Promise<boolean> {
   return ok;
 }
 
-async function hasAuthorizedUsbPrinter(): Promise<boolean> {
-  if (!isWebUsbSupported()) return false;
-  const devices = await navigator.usb.getDevices();
-  return devices.some(d =>
-    d.configurations.some(c =>
-      c.interfaces.some(i => i.alternates.some(a => a.interfaceClass === 7)),
-    ),
-  );
-}
 
 /**
- * Portrait 812×1218 canvas (landscape design rotated 90° CCW).
- * Used by CUPS bridge, Tauri lp, and WebUSB TSPL paths.
+ * Landscape 606×404 canvas ready to send to the print bridge.
+ * No rotation — the bridge prints at ppi=203 so CUPS sees 3"×2" natural size.
+ * Colors are pre-inverted because the GP-1324D CUPS driver negates the image.
  */
 async function renderPrintCanvas(
   c: SubLot, workOrderBarcode: string, skuCode: string | null, skuName: string,
 ): Promise<HTMLCanvasElement> {
-  const landscape = await drawStickerCanvas(c, workOrderBarcode, skuCode, skuName, PRINT_DPI);
-  const W = landscape.width;   // 1218
-  const H = landscape.height;  // 812
-  const rot = document.createElement('canvas');
-  rot.width  = H;  // 812
-  rot.height = W;  // 1218
-  const rctx = rot.getContext('2d')!;
-  rctx.translate(H, 0);
-  rctx.rotate(Math.PI / 2);   // +90° CW (fixes upside-down output)
-  rctx.imageSmoothingEnabled = false;
-  rctx.drawImage(landscape, 0, 0);
-
-  // Pre-invert colors: the GP-1324D CUPS driver on macOS outputs a negative
-  // of the input image, so we invert here to cancel it out.
-  const imgData = rctx.getImageData(0, 0, rot.width, rot.height);
+  const canvas = await drawStickerCanvas(c, workOrderBarcode, skuCode, skuName, PRINT_DPI);
+  // Pre-invert: GP-1324D CUPS driver on macOS outputs a negative of the input
+  const ctx = canvas.getContext('2d')!;
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const d = imgData.data;
   for (let i = 0; i < d.length; i += 4) {
     d[i]   = 255 - d[i];
     d[i+1] = 255 - d[i+1];
     d[i+2] = 255 - d[i+2];
   }
-  rctx.putImageData(imgData, 0, 0);
-
-  return rot;
+  ctx.putImageData(imgData, 0, 0);
+  return canvas;
 }
 
 /** Base64 PNG for CUPS / print bridge. */
@@ -288,13 +263,55 @@ async function postPrintToBridge(pngBase64: string, printer: string): Promise<vo
   const r = await fetchWithTimeout(`${PRINT_BRIDGE}/print`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ png: pngBase64, printer: printer || undefined, media: 'w4h6' }),
+    body: JSON.stringify({ png: pngBase64, printer: printer || undefined }),
     timeoutMs: 30_000,
   });
   if (!r.ok) {
     const err = await r.json().catch(() => ({ error: r.statusText })) as { error?: string };
     throw new Error(err.error ?? r.statusText);
   }
+}
+
+/**
+ * Zero-install web print path.
+ * Opens a hidden window containing all labels at 3"×2" landscape, then
+ * calls window.print() once for the whole batch (one dialog, N pages).
+ * Colors are NOT pre-inverted — the browser sends pixels as-is to the driver.
+ */
+async function printAllViaWindow(
+  carts: SubLot[],
+  workOrderBarcode: string,
+  skuCode: string | null,
+  skuName: string,
+  onProgress: (i: number) => void,
+): Promise<void> {
+  const dataUrls: string[] = [];
+  for (let i = 0; i < carts.length; i++) {
+    onProgress(i);
+    const canvas = await drawStickerCanvas(carts[i], workOrderBarcode, skuCode, skuName, PRINT_DPI);
+    dataUrls.push(canvas.toDataURL('image/png'));
+  }
+
+  const win = window.open('', '_blank', 'width=1,height=1,left=-9999,top=-9999');
+  if (!win) throw new Error('浏览器拦截了弹窗，请在地址栏右侧允许弹窗后重试');
+
+  const imgs = dataUrls.map(url => `<img src="${url}">`).join('');
+  win.document.write(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  @page { size: 3in 2in landscape; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #fff; }
+  img { display: block; width: 3in; height: 2in; page-break-after: always; }
+  img:last-child { page-break-after: avoid; }
+</style></head><body>${imgs}</body></html>`);
+  win.document.close();
+
+  await new Promise<void>(resolve => setTimeout(() => {
+    win.focus();
+    win.print();
+    win.close();
+    resolve();
+  }, 250));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -364,8 +381,6 @@ export function CartStickerSheet({
 }: Props) {
   const [printing, setPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState('');
-  // Browser: inferred from USB auth only (no network probe — avoids console noise when bridge is off).
-  const [usbReady, setUsbReady] = useState(false);
   const [previewsReady, setPreviewsReady] = useState(false);
   const [loadedCount, setLoadedCount] = useState(0);
   const loadedPreviewIds = useRef(new Set<string>());
@@ -386,142 +401,46 @@ export function CartStickerSheet({
     if (n >= carts.length) setPreviewsReady(true);
   }, [carts.length]);
 
-  const handleBrowserPrint = () => {
-    if (!previewsReady) {
-      setPrintStatus('⚠ 标签图片仍在生成，请稍候再打印');
-      return;
-    }
-    window.print();
-  };
-
-  useEffect(() => {
-    if (isTauri) return;
-    let cancelled = false;
-    hasAuthorizedUsbPrinter().then(ok => {
-      if (!cancelled) setUsbReady(ok);
-    });
-    return () => { cancelled = true; };
-  }, [isTauri]);
-
   const doPrint = async () => {
     if (printing) return;
     setPrinting(true);
     setPrintStatus('');
-
-    const t0 = performance.now();
-    const log = (msg: string) => {
-      console.log(`[Print +${(performance.now()-t0).toFixed(0)}ms] ${msg}`);
-    };
-
-    log(`START isTauri=${isTauri} carts=${carts.length}`);
-
     try {
-      let printer = getSavedPrinter() ?? '';
-      log(`savedPrinter="${printer || '(none)'}"`);
+      const printer = getSavedPrinter() || 'Gprinter_GP_1324D';
 
-      // ── Path 1: Tauri desktop app ──────────────────────────────────────────
+      // ── Tauri desktop app (silent, pre-inverted) ─────────────────────────
       if (isTauri) {
         const { invoke } = await import('@tauri-apps/api/core');
-        if (!printer) {
-          try {
-            const dp = await invoke<string>('get_default_printer');
-            if (dp?.trim()) printer = dp.trim();
-            log(`get_default_printer → "${printer}"`);
-          } catch (e) { log(`get_default_printer error: ${e}`); }
-        }
-        printer = printer || 'Gprinter_GP_1324D';
-        log(`using printer (Tauri): "${printer}"`);
         for (let i = 0; i < carts.length; i++) {
-          const c = carts[i];
-          setPrintStatus(`正在打印 ${i + 1} / ${carts.length}：${c.sub_lot_code}…`);
-          const pngBase64 = await renderPrintPng(c, workOrderBarcode, skuCode, skuName);
-          const result = await invoke<string>('print_png', { pngBase64, printer });
-          log(`print_png → ${result}`);
+          setPrintStatus(`正在打印 ${i + 1} / ${carts.length}…`);
+          const pngBase64 = await renderPrintPng(carts[i], workOrderBarcode, skuCode, skuName);
+          await invoke<string>('print_png', { pngBase64, printer });
         }
-        setPrintStatus(`✓ 已打印 ${carts.length} 张标签`);
-        log('ALL DONE ✓ (Tauri)');
+        setPrintStatus(`✓ 已打印 ${carts.length} 张`);
         return;
       }
 
-      // ── Path 2: WebUSB (skip bridge probe when USB already authorised) ───────
-      const tryWebUsbPrint = async (forcePicker = false): Promise<boolean> => {
-        if (!isWebUsbSupported()) return false;
-        if (!forcePicker) {
-          const hasUsb = usbReady || await hasAuthorizedUsbPrinter();
-          if (!hasUsb) return false;
-        }
-
-        log(forcePicker ? 'WebUSB (device picker)' : 'WebUSB');
-        setPrintStatus('正在连接 USB 打印机…');
-        const device = await openUsbPrinter();
+      // ── Web: try silent bridge first, fall back to window.print() ────────
+      if (await checkPrintBridge()) {
         for (let i = 0; i < carts.length; i++) {
-          const c = carts[i];
-          setPrintStatus(`正在打印 ${i + 1} / ${carts.length}：${c.sub_lot_code}…`);
-          const canvas = await renderPrintCanvas(c, workOrderBarcode, skuCode, skuName);
-          await printCanvasUsb(canvas, device);
-          log(`✓ USB ${c.sub_lot_code}`);
+          setPrintStatus(`正在打印 ${i + 1} / ${carts.length}…`);
+          const pngBase64 = await renderPrintPng(carts[i], workOrderBarcode, skuCode, skuName);
+          await postPrintToBridge(pngBase64, printer);
         }
-        setPrintStatus(`✓ 已打印 ${carts.length} 张标签 (USB)`);
-        setUsbReady(true);
-        log('ALL DONE ✓ (WebUSB)');
-        return true;
-      };
-
-      // ── Path 2: CUPS via print bridge (preferred when queue name saved) ────
-      const tryBridgePrint = async (): Promise<boolean> => {
-        const bridgeOk = await checkPrintBridge();
-        if (!bridgeOk) return false;
-        const queue = printer || 'Gprinter_GP_1324D';
-        log(`bridge → lp -d "${queue}"`);
-        for (let i = 0; i < carts.length; i++) {
-          const c = carts[i];
-          setPrintStatus(`正在打印 ${i + 1} / ${carts.length}：${c.sub_lot_code}…`);
-          const pngBase64 = await renderPrintPng(c, workOrderBarcode, skuCode, skuName);
-          try {
-            await postPrintToBridge(pngBase64, queue);
-          } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            if (msg.includes('abort') || msg.includes('AbortError')) {
-              throw new Error('打印服务无响应，请确认 print bridge 已启动');
-            }
-            throw e;
-          }
-          log(`✓ ${c.sub_lot_code}`);
-        }
-        setPrintStatus(`✓ 已打印 ${carts.length} 张标签 (CUPS: ${queue})`);
-        log('ALL DONE ✓ (bridge)');
-        return true;
-      };
-
-      // Saved CUPS queue → always try bridge before WebUSB
-      if (printer && (await tryBridgePrint())) return;
-
-      // ── Path 3: WebUSB ─────────────────────────────────────────────────────
-      if (await tryWebUsbPrint()) return;
-
-      if (await tryBridgePrint()) return;
-
-      if (isWebUsbSupported()) {
-        log('bridge unavailable → prompting WebUSB');
-        setPrintStatus('正在连接 USB 打印机…');
-        if (await tryWebUsbPrint(true)) return;
+        setPrintStatus(`✓ 已打印 ${carts.length} 张`);
+        return;
       }
 
-      setPrintStatus(
-        '❌ 无法打印：请启动 print bridge（python3 print_server.py），或在页面右上角连接 USB 打印机，或使用「浏览器打印」',
+      // ── Web fallback: browser print dialog (zero install) ────────────────
+      setPrintStatus('正在准备打印…');
+      await printAllViaWindow(
+        carts, workOrderBarcode, skuCode, skuName,
+        i => setPrintStatus(`正在渲染 ${i + 1} / ${carts.length}…`),
       );
-      log('no bridge, no WebUSB');
+      setPrintStatus(`✓ 打印对话框已打开（共 ${carts.length} 张）`);
 
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      log(`ERROR: ${msg}`);
-      if (msg.includes('abort') || msg.includes('AbortError')) {
-        setPrintStatus('❌ 打印服务无响应，请确认 print bridge 已启动');
-      } else if (msg.includes('No device selected') || msg.includes('cancelled')) {
-        setPrintStatus('❌ 未选择 USB 打印机。请在页面右上角「标签打印机」中连接设备');
-      } else {
-        setPrintStatus(`❌ 打印失败: ${msg}`);
-      }
+      setPrintStatus(`❌ 打印失败: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setPrinting(false);
     }
@@ -531,13 +450,6 @@ export function CartStickerSheet({
     <div className="cart-print-root fixed inset-0 z-50 flex flex-col bg-slate-900/70">
       {/* ── Toolbar ── */}
       <div className="no-print sticky top-0 z-10 bg-white border-b border-slate-200 shrink-0">
-        {!isTauri && !usbReady && (
-          <div className="px-5 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-800">
-            打印前请任选其一：① 本机运行{' '}
-            <code className="font-mono text-[11px]">python3 print_server.py</code>
-            {' '}后点 Print（CUPS）；② 在右上角「标签打印机」连接 USB 后点 Print；③ 使用「浏览器打印…」。
-          </div>
-        )}
         <div className="px-5 py-3 flex items-center gap-3 flex-wrap">
           <h2 className="text-sm font-bold text-slate-900">
             Print stickers · {carts.length} cart{carts.length === 1 ? '' : 's'}
@@ -549,7 +461,7 @@ export function CartStickerSheet({
           ) : (
             <span className="text-xs text-slate-500">
               {previewsReady
-                ? '浏览器/PDF：6×4 in 横版，每车一页'
+                ? `${carts.length} 张标签，点击打印`
                 : `生成预览中… (${loadedCount}/${carts.length})`}
             </span>
           )}
@@ -568,41 +480,8 @@ export function CartStickerSheet({
             ) : (
               <Printer size={12} />
             )}
-            {printing ? '打印中…' : 'Print'}
+            {printing ? '打印中…' : '打印标签'}
           </button>
-          <button
-            type="button"
-            disabled={printing || !previewsReady}
-            onClick={handleBrowserPrint}
-            title={previewsReady ? '在打印对话框中选 6×4 英寸横版' : '等待预览生成完成'}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-600 hover:bg-slate-500 text-white disabled:opacity-50"
-          >
-            浏览器打印…
-          </button>
-          {isWebUsbSupported() && (
-            <button
-              type="button"
-              disabled={printing}
-              onClick={async () => {
-                setPrinting(true);
-                setPrintStatus('正在连接…');
-                try {
-                  const dev = await openUsbPrinter();
-                  setPrintStatus('发送测试指令…');
-                  await testPrintUsb(dev);
-                  setPrintStatus('✓ 测试指令已发送（查看打印机是否出纸）');
-                  setUsbReady(true);
-                } catch (e) {
-                  setPrintStatus(`❌ 测试失败: ${e instanceof Error ? e.message : String(e)}`);
-                } finally {
-                  setPrinting(false);
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-amber-500 hover:bg-amber-400 text-white disabled:opacity-50"
-            >
-              Test USB
-            </button>
-          )}
           <button
             type="button"
             onClick={onClose}
