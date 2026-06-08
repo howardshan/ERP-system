@@ -1957,6 +1957,25 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-119 `20260527000016_qc_submit_inspection_restore_no_supervisor.sql`
+**用途**: 移除**未追踪的** `qc.testing.supervisor_judge` 主管权限校验,恢复 M-117 版本的 `qc_submit_inspection`。
+
+**现象**: 操作员在 Testing 页录数后点 Fail 覆盖系统建议 → RPC 返回 400 `Supervisor permission (qc.testing.supervisor_judge) required to override the auto-judgment`。
+
+**根因**: 该校验**仓库里不存在**(全部 migration、`src/`、`permissionStructure.ts` 都搜不到 `supervisor_judge`)。线上 DB 上的 `qc_submit_inspection` 被有人通过 Supabase SQL Editor 直接 `CREATE OR REPLACE` 加了这条 gate,但没写成 migration。与 M-109 / M-117 / BR-Q67 的设计**冲突**——按设计,任何有 `qc.testing.submit_inspection` 权限的操作员都可以覆盖系统建议、写 Remark,无需主管审批。
+
+**变更**: 把 `qc_submit_inspection` 字节级恢复成 M-117 ([20260527000014](../../supabase/migrations/20260527000014_qc_hold_event_hooks.sql)) 的版本。保留 M-117 的 S4 hold-sync hook(`qc_hold_synced_to_wh` 事件)。幂等。
+
+**如果将来确实要做主管审批 gate**,正确做法:
+1. 把 `supervisor_judge` 加进 [`src/lib/permissionStructure.ts`](../../src/lib/permissionStructure.ts) 的 `qc.testing` 下。
+2. 写 permission seed migration 给指定账户授权。
+3. 在 `qc_submit_inspection` 里加 tracked migration 形式的 gate(校验 `auth.uid()` 是否持有该权限)。
+4. 前端 Testing 页面当用户没该权限时**禁用** Pass/Fail 覆盖按钮(避免提交后才 400 弹错)。
+
+**依赖**: M-117 (20260527000014)。**无 schema 变更,无前端配套**。**关联文档**: 无新增 BR。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2056,7 +2075,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-115 | 20260527000012_qc_create_production_lot_with_sub_lots_v2.sql |
 | M-116 | 20260527000013_qc_release_passed_sub_lot_v2.sql |
 | M-117 | 20260527000014_qc_hold_event_hooks.sql |
-| **M-119** | _(下一个)_ |
+| M-119 | 20260527000016_qc_submit_inspection_restore_no_supervisor.sql |
+| **M-120** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

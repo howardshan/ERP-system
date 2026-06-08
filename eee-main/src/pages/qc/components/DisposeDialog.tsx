@@ -16,6 +16,13 @@ interface Props {
   subLotIds?: string[];
   /** Human-readable codes shown in the dialog. If omitted, falls back to [subLot.sub_lot_code]. */
   subLotCodes?: string[];
+  /**
+   * The cart that drove the group's current result (the existing champion).
+   * When provided, "Retest" is dispatched on this cart so M-106's normalisation
+   * keeps the original champion in place — otherwise it would shift to the
+   * lowest-numbered cart in the group. Omitted for solo carts.
+   */
+  championSubLotId?: string;
   permissions: {
     redry: boolean;
     room_temp: boolean;
@@ -70,7 +77,7 @@ const OPTIONS: OptionDef[] = [
   },
 ];
 
-export function DisposeDialog({ open, subLot, subLotIds, subLotCodes, permissions, onClose, onDisposed }: Props) {
+export function DisposeDialog({ open, subLot, subLotIds, subLotCodes, championSubLotId, permissions, onClose, onDisposed }: Props) {
   const effectiveIds   = subLotIds   ?? (subLot ? [subLot.id] : []);
   const effectiveCodes = subLotCodes ?? (subLot ? [subLot.sub_lot_code] : []);
   const [type, setType] = useState<DispositionType>('redry_dryer');
@@ -111,6 +118,7 @@ export function DisposeDialog({ open, subLot, subLotIds, subLotCodes, permission
       const minutes = hours != null ? Math.round(hours * 60) : null;
       await createDispositionGroup({
         sub_lot_ids: effectiveIds,
+        champion_sub_lot_id: championSubLotId,
         type,
         remark: remark || null,
         redry_expected_dry_minutes: minutes,

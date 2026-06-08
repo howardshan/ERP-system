@@ -1273,6 +1273,13 @@ export async function releasePassedSubLotsGroup(subLotIds: string[], yieldQuanti
 /** Apply the same disposition to every cart in a sampling group. */
 export async function createDispositionGroup(input: {
   sub_lot_ids: string[];
+  /**
+   * The cart whose result the group inherited (the existing champion). When
+   * provided AND `type === 'retest'`, the single retest call is dispatched on
+   * this cart so M-106's normalisation keeps the original champion in place.
+   * Falls back to `sub_lot_ids[0]` if omitted. See bug note in QcHome.
+   */
+  champion_sub_lot_id?: string;
   type: DispositionType;
   remark: string | null;
   redry_expected_dry_minutes: number | null;
@@ -1283,7 +1290,7 @@ export async function createDispositionGroup(input: {
   // disposition type (scrap / redry / room-temp) is genuinely per-cart.
   if (input.type === 'retest') {
     await createDisposition({
-      drying_sub_lot_id: input.sub_lot_ids[0],
+      drying_sub_lot_id: input.champion_sub_lot_id ?? input.sub_lot_ids[0],
       type: input.type,
       remark: input.remark,
       redry_expected_dry_minutes: input.redry_expected_dry_minutes,
