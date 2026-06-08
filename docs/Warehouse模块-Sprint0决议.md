@@ -569,6 +569,39 @@ END IF;
 
 **S4 落点**：`qc_create_production_lot_with_sub_lots` 已接受 `p_packaging_item_id`（M-095）。S4 在其成功后，用 `packaging_item_id` 调 `wh_create_lot` 并回填 `lot_id`（决议 §4.5），其余（§5.1 聚合、§5.2 双条件、§4.5 sub_lot.lot_id 冗余）不变。
 
+### 5.7 历史 `packaging_item_id IS NULL` 车的放行兼容（S4 前置）— 2026-05-27 决议
+
+#### 问题
+
+`qc_production_lot.packaging_item_id` 在 M-092 才加入；M-095 RPC 层**不强制**该参数（注释"trust-the-caller"）。所以：
+- M-092 **之前**建的车 → NULL
+- M-092 之后**通过 Studio 手动**建的车 → 可能 NULL
+- §5.6 的"建车校验 IS NOT NULL"只能拦**新建**车
+
+历史 NULL 车走 QC 放行时，`wh_sync_release_from_qc` 不知道目标 ERP item，建不出 lot，会失败。
+
+#### 决议（用户 2026-05-27）：方案 C 混合（按歧义度分流）
+
+`wh_sync_release_from_qc` 检测到 production_lot.packaging_item_id IS NULL 时，按 `qc_sku_item` 关联数分流：
+
+| 该 SKU 关联 item 数 | 处理 |
+|--------------------|------|
+| **1 个**（无歧义） | **自动回填** packaging_item_id，继续放行；写一条 `qc_quality_event` 记录"系统自动选择" |
+| **≥2 个**（有歧义） | RPC 抛特殊错误码 → 前端 catch → 弹"为这批选最终产品"模态框 → 操作员选完调辅助 RPC `qc_set_lot_packaging_item(production_lot_id, item_id)` 回填 → 重试放行 |
+| **0 个**（未关联） | RPC 报错"先去 ProductManagement 配置 final products"；放行失败 |
+
+**关键约束：**
+- **不做一次性 backfill migration**——避免猜错。历史 NULL 车按需 lazy-fill。
+- 新建车**仍走 §5.6 强制校验**（建车时必填 packaging_item_id）；本节只是历史兼容路径。
+- 辅助 RPC `qc_set_lot_packaging_item` **仅允许 packaging_item_id IS NULL 时 SET**（防覆盖已有选择）；写 `qc_quality_event` 留痕。
+- 操作员补选的事件类型建议 `payload.source = 'late_fill_on_release'` 与建车时的选择区分开。
+
+#### S4 实施落点（追加到 §Sprint 4 任务清单）
+
+- 增加 RPC `qc_set_lot_packaging_item(p_production_lot_id, p_item_id)` —— SECURITY DEFINER；仅 NULL→SET；校验 item 在 `qc_sku_item` 关联表里。
+- `wh_sync_release_from_qc` 入参做上述 1/2/3 分流；"多关联未选"路径用 `RAISE EXCEPTION` 加可识别前缀（如 message 以 `PACKAGING_REQUIRED:` 起头）让前端 catch。
+- 前端：QC 放行（Production 页面）catch 该错误 → 弹模态框；选项 = `listProductItemLinks(sku_id)` 的关联 items；OK 后调 `qc_set_lot_packaging_item` + 重试放行。
+
 ---
 
 ## 决议依赖关系总览
@@ -611,5 +644,6 @@ END IF;
 | 2026-05-24 | （项目组评审）   | 4 项决议全部选择方案 A；选 A 后发现决议 2↔3 在"部分合格"场景下有内部矛盾                                          |
 | 2026-05-24 | （AI 协助修订）  | 修订 §3.2 方案 A 表格；追加 §3.5（部分合格场景细则）、§4.5（lot_id 冗余方案）、§5（跨决议实施细则：聚合规则、双条件校验、BR-W1/W4 措辞修订） |
 | 2026-05-26 | （现状同步）   | QC↔ERP 桥接从 item_id 一对一列演进为 `qc_sku_item` 联结表 + `qc_production_lot.packaging_item_id`（M-087/M-092/M-095）。追加 §1.5、§2.3 注、§5.6；决议 1 与 §5.5 的 S4 实施细则随之更新 |
+| 2026-05-27 | （S4 前置审计）  | 追加 §5.7：历史 `packaging_item_id IS NULL` 车放行采用「混合策略」（SKU 单关联自动回填 / 多关联弹窗 / 0 关联报错）。明确"不做一次性 backfill migration"，新增辅助 RPC `qc_set_lot_packaging_item` 作为弹窗回填路径 |
 
 

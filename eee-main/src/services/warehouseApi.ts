@@ -379,3 +379,143 @@ export async function getLot(lotId: number): Promise<LotHeader> {
     created_at: row.created_at as string,
   };
 }
+
+// ── Lot lifecycle (Sprint 3) ────────────────────────────────────────────────
+
+export type CoaResult = 'pass' | 'fail' | 'conditional' | 'pending';
+
+export interface Coa {
+  id: number;
+  coa_number: string;
+  lot_id: number;
+  test_date: string;
+  result: CoaResult;
+  tested_by: string | null;
+  document_ref: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ReleaseLotResult {
+  lot_id: number;
+  lot_number: string;
+  new_status: LotStatus;
+  coa_id: number;
+  coa_number: string;
+}
+
+export interface ExpiringLot {
+  lot_id: number;
+  lot_number: string;
+  item_id: number;
+  item_sku: string;
+  item_name: string;
+  base_uom: string;
+  lot_status: LotStatus;
+  expiry_date: string;
+  days_until_expiry: number;   // negative = already expired
+  total_on_hand: number;
+}
+
+export async function releaseLot(input: {
+  lotId: number;
+  testDate?: string | null;
+  testedBy?: string | null;
+  documentRef?: string | null;
+  notes?: string | null;
+}): Promise<ReleaseLotResult> {
+  return rpc<ReleaseLotResult>('wh_release_lot', {
+    p_lot_id: input.lotId,
+    p_test_date: input.testDate ?? null,
+    p_tested_by: input.testedBy ?? null,
+    p_document_ref: input.documentRef ?? null,
+    p_notes: input.notes ?? null,
+  });
+}
+
+export async function rejectLot(input: {
+  lotId: number;
+  reason: string;
+  testDate?: string | null;
+  testedBy?: string | null;
+  documentRef?: string | null;
+}): Promise<ReleaseLotResult> {
+  if (!input.reason || !input.reason.trim()) throw new Error('拒收原因必填');
+  return rpc<ReleaseLotResult>('wh_reject_lot', {
+    p_lot_id: input.lotId,
+    p_reason: input.reason.trim(),
+    p_test_date: input.testDate ?? null,
+    p_tested_by: input.testedBy ?? null,
+    p_document_ref: input.documentRef ?? null,
+  });
+}
+
+export async function expireLots(): Promise<{ expired_count: number; lot_ids: number[] }> {
+  return rpc('wh_expire_lots', {});
+}
+
+export async function listExpiring(daysAhead: number = 30): Promise<ExpiringLot[]> {
+  return rpc<ExpiringLot[]>('wh_list_expiring', { p_days_ahead: daysAhead });
+}
+
+// List COA history for a single lot (read; direct query is allowed).
+export async function listLotCoa(lotId: number): Promise<Coa[]> {
+  const { data, error } = await supabase
+    .from('coa')
+    .select('id, coa_number, lot_id, test_date, result, tested_by, document_ref, notes, created_at')
+    .eq('lot_id', lotId)
+    .order('id', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Coa[];
+}
+
+// ── QC ↔ ERP sync (Sprint 4) ────────────────────────────────────────────────
+//
+// These two RPCs are normally invoked indirectly by qcApi.releasePassedSubLot
+// (the release path calls wh_sync_release_from_qc inside the same transaction
+// via M-116). They're exposed here for two cases:
+//   1. setLotPackagingItem — front-end calls this when it catches a
+//      PACKAGING_REQUIRED:<id> error from release, asks the operator to pick
+//      from qc_sku_item links, then retries release.
+//   2. syncReleaseFromQc — manual reconciliation tool (e.g. an admin retrying
+//      a sync after a previous failure was investigated). Not used by the
+//      happy path.
+
+export interface LotReleaseSyncResult {
+  sub_lot_id: string;
+  production_lot_id: string;
+  lot_id: number;
+  item_id: number;
+  yield_quantity: number;
+  transaction_id: number;
+  recompute: {
+    lot_id: number;
+    old_status: LotStatus;
+    new_status: LotStatus;
+    action: string;
+    total: number;
+    pass_terminal?: number;
+    hold_terminal?: number;
+    terminal?: number;
+  };
+}
+
+export async function setLotPackagingItem(input: {
+  productionLotId: string;
+  itemId: number;
+}): Promise<{ production_lot_id: string; packaging_item_id: number }> {
+  return rpc('qc_set_lot_packaging_item', {
+    p_production_lot_id: input.productionLotId,
+    p_item_id: input.itemId,
+  });
+}
+
+export async function syncReleaseFromQc(input: {
+  subLotId: string;
+  yieldQuantity: number;
+}): Promise<LotReleaseSyncResult> {
+  return rpc<LotReleaseSyncResult>('wh_sync_release_from_qc', {
+    p_sub_lot_id: input.subLotId,
+    p_yield_quantity: input.yieldQuantity,
+  });
+}

@@ -1796,6 +1796,145 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-110 `20260527000007_wh_lot_lifecycle.sql`
+**用途**: Warehouse S3 批次生命周期 — 放行 / 拒收 / 一键标定过期 / 临期查询。BR-6a 状态机 + BR-11 COA 门控；不改 S1 内核（BR-W4 已含 `expired`/`rejected` 拦截）。
+
+**变更**:
+
+| 对象 | 说明 |
+|------|------|
+| `wh_next_coa_number()` | `COA-NNNNNN`，max+1 正则（仿 `wh_next_grn_number`） |
+| `wh_release_lot(p_lot_id, p_test_date?, p_tested_by?, p_document_ref?, p_notes?)` | 仅 `quarantine` → `available`；写 `coa(result='pass')`；返回 `{lot_id, new_status, coa_id, coa_number}` |
+| `wh_reject_lot(p_lot_id, p_reason, p_test_date?, p_tested_by?, p_document_ref?)` | `quarantine` 或 `available` → `rejected`；`reason` 必填→`coa.notes`；result='fail' |
+| `wh_expire_lots()` | 管理函数：把 `expiry_date < today AND status NOT IN ('consumed','rejected','expired')` 的批次 status 改为 `expired`；返回 `{expired_count, lot_ids}` |
+| `wh_list_expiring(p_days_ahead int DEFAULT 30)` | `LANGUAGE sql STABLE`：返回 (已过期未标定 OR 未来 N 天到期) 的 lots；join `item` + 跨库位 SUM 在库；含 `days_until_expiry`（负=已过期） |
+
+**特性**: 幂等（`CREATE OR REPLACE`）。无 schema 变更，`coa` 表来自 M-001。
+
+**前端配套**:
+- `src/services/warehouseApi.ts` — `releaseLot` / `rejectLot` / `expireLots` / `listExpiring` / `listLotCoa`；`Coa` / `ExpiringLot` 类型
+- `src/pages/warehouse/LotDetailPage.tsx` — 加「放行」（仅 quarantine + canRelease）/「拒收」（quarantine 或 available + canReject）按钮 + 内联表单 + 底部「质检记录（COA）」表
+- `src/pages/warehouse/ExpiringPage.tsx` — 新页：天数阈值（7/30/60/90）+ 一键标定过期按钮 + 表格
+
+**依赖**: M-001（lot/coa 表）、M-102（`_wh_apply_transaction` BR-W4 已含 expired/rejected 检查）。**关联文档**: `docs/modules/11_warehouse-inventory.md`。
+
+---
+
+### M-111 `20260527000008_wh_balance_status_aware_available.sql`
+**用途**: Warehouse 微调 — `wh_list_balance` 的 `quantity_available` 改为**状态感知**。S3 验证时发现：rejected/expired 批次的"可用"列仍按 `on_hand - allocated` 算,与 BR-W4 拦截语义不符（实际不能动用）。
+
+**变更**: `CREATE OR REPLACE FUNCTION wh_list_balance(...)` 同签名替换;`quantity_available = CASE WHEN lot.status='available' THEN on_hand - allocated ELSE 0 END`。`quantity_on_hand` 保持物理数量不变。
+
+**前端配套**: `BalancePage.tsx` 物料汇总行:`totalAvailable < totalOnHand` 时"可用"列变琥珀色 + 旁注"· 冻结 N"。
+
+**特性**: 幂等（同签名 CREATE OR REPLACE）。**依赖**: M-104（原 `wh_list_balance`）。
+
+---
+
+### M-112 `20260527000009_wh_qc_lot_link_schema.sql`
+**用途**: Warehouse S4 起点 — 给 QC 模块加 ERP `lot` 的反向 FK,并用触发器把 `qc_drying_sub_lot.lot_id` 自动同步到父 `qc_production_lot.lot_id`(决议 §4.5)。后续 wh_sync 写流水时直接读 sub_lot.lot_id 即可,无需多 join。
+
+**变更**:
+
+| 对象 | 说明 |
+|------|------|
+| `qc_production_lot.lot_id bigint REFERENCES lot(id)` + idx | QC 卡片 ↔ ERP 批次 1:1 链 |
+| `qc_drying_sub_lot.lot_id bigint REFERENCES lot(id)` + idx | 冗余列,触发器维护 |
+| `qc_sync_sub_lot_lot_id()` + `trg_qc_sub_lot_sync_lot_id` BEFORE INSERT OR UPDATE OF production_lot_id ON qc_drying_sub_lot | 写时从父 qc_production_lot 同步 lot_id |
+| 一次性 backfill | `UPDATE qc_drying_sub_lot SET lot_id = pl.lot_id ... WHERE sl.lot_id IS NULL AND pl.lot_id IS NOT NULL` |
+
+**为何用触发器不用生成列**: `qc_drying_sub_lot.production_lot_id` 是可变列（M-063 在 bulk checkout 时会跨 production_lot 重新分组卡片）,而 PostgreSQL 生成列要求源列 IMMUTABLE。
+
+**特性**: 幂等（`ADD COLUMN IF NOT EXISTS` + `CREATE OR REPLACE` + `DROP TRIGGER IF EXISTS`）。**依赖**: M-001（lot 表）、M-001/M-063（qc_drying_sub_lot 已有 production_lot_id 列）。**关联文档**: `docs/modules/11_warehouse-inventory.md`、`docs/modules/09_qc.md`。
+
+---
+
+### M-113 `20260527000010_wh_recompute_lot_status.sql`
+**用途**: Warehouse S4 — `wh_recompute_lot_status(p_lot_id)` 按决议 §5.1 把 ERP `lot.status` 从该批关联 sub_lots 的当前状态聚合出来。在每次释放结束被 `wh_sync_release_from_qc` 调用,也可单独跑做对账。
+
+**聚合规则**:
+- 任一 sub_lot 仍非终态(`created`/`drying`/`pending`/`inspecting`/`passed`/`awaiting_*`)→ 不动 lot.status,保留 `quarantine`
+- 全部 sub_lots 终态 + 至少一个 `closed`/`dispatched` → `available`(混合:held 没有 ERP 余额,所以"混合=available"是诚实的)
+- 全部 sub_lots 终态 + 全部 `hold`/`disposing` → `on_hold`(信息化,无 ERP 余额可动)
+
+**特性**: `SECURITY DEFINER` + `SET search_path = public, pg_temp`;幂等。**依赖**: M-112(`qc_drying_sub_lot.lot_id`)。
+
+---
+
+### M-114 `20260527000011_wh_qc_sync_helpers.sql`
+**用途**: Warehouse S4 — 把 QC 释放路径接入 ERP 库存账本的两个辅助 RPC。
+
+**变更**:
+
+| 对象 | 说明 |
+|------|------|
+| `qc_set_lot_packaging_item(p_production_lot_id uuid, p_item_id bigint)` SECURITY DEFINER | 历史卡片 packaging_item_id 为 NULL 时的补登入口(决议 §5.7)。仅当当前 NULL 才允许 SET(不可覆盖);校验 item ∈ `qc_sku_item` 关联表;写 `qc_quality_event(packaging_item_set, payload.source='late_fill_on_release')`。 |
+| `wh_sync_release_from_qc(p_sub_lot_id uuid, p_yield_quantity numeric)` SECURITY DEFINER | BR-W3 同步主体。由 M-116 在释放事务内调。流程:① §5.7 三分流(0 关联 → `NO_PACKAGING_LINKED:<sku_id>`;≥2 关联 → `PACKAGING_REQUIRED:<production_lot_id>`;单关联 → 自动 setLotPackagingItem)。② 历史 NULL `lot_id` 懒创建 ERP lot(同 M-115 参数:`source_type='produced'`,`status='quarantine'`,`source_doc_type='qc_production_lot'`),并 UPDATE 同 production_lot 下所有 sub_lots 的 lot_id。③ 调内核 `_wh_apply_transaction(transaction_type='production_output', +yield)` 落 LOC-PACK-STAGE;`reference_id=NULL`(uuid/bigint 不兼容),追溯信息进 `reference_type='qc_release'` + `notes`。④ 调 `wh_recompute_lot_status` 聚合 lot.status。 |
+
+**错误码契约**(前端 catch 用):
+- `PACKAGING_REQUIRED:<production_lot_id>` — 多关联,弹窗让操作员选包装,选完调 `setLotPackagingItem` + 重试
+- `NO_PACKAGING_LINKED:<sku_id>` — SKU 无包装,硬阻断,提示去 ProductManagement 配置
+- `YIELD_REQUIRED: ...` — 产出 ≤ 0
+
+**特性**: `SECURITY DEFINER` + `SET search_path = public, pg_temp`;幂等。**依赖**: M-001(`qc_quality_event`/`qc_sku_item`)、M-079(`LOC-PACK-STAGE` seed)、M-102(`_wh_apply_transaction` + BR-W4)、M-103(`wh_create_lot`)、M-112(`qc_production_lot.lot_id` + 触发器)、M-113(`wh_recompute_lot_status`)。
+
+---
+
+### M-115 `20260527000012_qc_create_production_lot_with_sub_lots_v2.sql`
+**用途**: Warehouse S4 — `qc_create_production_lot_with_sub_lots` CREATE OR REPLACE M-095,把"建车 → 建 ERP lot"打通,完成决议 §5.6 新建路径硬约束。
+
+**变更**:
+1. **强校验** `p_packaging_item_id IS NOT NULL`,否则 `RAISE EXCEPTION 'PACKAGING_REQUIRED_AT_CREATION: ...'`(前端已要求填,这层把后端 Studio 直插路径也堵住)
+2. **建 ERP lot 在 sub_lot 循环之前**:`wh_create_lot(p_item_id=p_packaging_item_id, p_source_type='produced', p_lot_number=p_lot_number, p_status='quarantine', p_source_doc_type='qc_production_lot')` → 返回 `new_erp_lot_id`
+3. `UPDATE qc_production_lot SET lot_id = new_erp_lot_id WHERE id = new_lot_id` — 在 sub_lot 插入前完成,让 M-112 触发器看到父 lot_id
+4. `sub_lot_created` qc_quality_event payload 加 `wh_lot_id`
+5. 返回 jsonb 加 `wh_lot_id`
+
+**为何 `source_doc_id` 不传**: `qc_production_lot.id` 是 uuid,`lot.source_doc_id` 是 bigint,不兼容。反向链通过 `qc_production_lot.lot_id`(此函数 step ③)实现。
+
+**特性**: 幂等(同签名 CREATE OR REPLACE);**历史车辆不补建**(由 M-114 在首次放行时懒创建)。**依赖**: M-095(原函数)、M-103(`wh_create_lot`)、M-112(`qc_production_lot.lot_id`)。
+
+---
+
+### M-116 `20260527000013_qc_release_passed_sub_lot_v2.sql`
+**用途**: Warehouse S4 — `qc_release_passed_sub_lot` CREATE OR REPLACE M-068,加 yield 入参 + 内嵌 ERP 同步。BR-W3 终于在代码层闭环:同步失败 → sub_lot 不进 closed。
+
+**签名变更**: 加 `p_yield_quantity numeric DEFAULT NULL`(向后兼容老 callers 的类型,但运行时会抛 `YIELD_REQUIRED`)。
+
+**流程**:
+1. 锁 sub_lot,**M-068 幂等短路保留**:status IN ('closed','dispatched') 直接返回 `qc_sub_lot_to_json`,**不**调 wh_sync(再调一次就会重复 +yield)
+2. status 必须是 'passed',否则报错
+3. yield > 0 校验,否则 `RAISE 'YIELD_REQUIRED: ...'`
+4. UPDATE status → 'closed'
+5. `wh_sync_release_from_qc(p_sub_lot_id, p_yield_quantity)` — 任何错误整体回滚 → sub_lot 恢复 'passed'(BR-W3)
+6. 写 `released` qc_quality_event,payload 嵌入 wh_sync 返回 jsonb
+
+**特性**: 幂等(同签名 CREATE OR REPLACE)。**依赖**: M-068(原函数)、M-114(`wh_sync_release_from_qc`)。
+
+---
+
+### M-117 `20260527000014_qc_hold_event_hooks.sql`
+**用途**: Warehouse S4 — `qc_submit_inspection`(原 M-109)+ `qc_create_disposition`(原 M-106)CREATE OR REPLACE,在 hold / disposition 路径追加 ERP 链接审计事件。**不改 ERP 余额/状态**(决议:hold 从未发过 yield;rework/grind/scrap/concession/retest 也都不发 yield,yield 只在释放路径流)。
+
+**变更**:
+
+| 函数 | 追加内容 |
+|------|---------|
+| `qc_submit_inspection` | 在 inspection_failed_hold 路径末尾,对**所有当前 status='hold'** 的 sub_lots(冠军本身 + 组传染的 siblings)写 `qc_quality_event(qc_hold_synced_to_wh)`,payload 含 `wh_lot_id`(来自 `qc_production_lot.lot_id`)/`source`(`inspection_fail` 或 `group_propagation`)/`champion_id`/`test_group_id`/`inspection_record_id`。返回 jsonb 加 `wh_lot_id`。 |
+| `qc_create_disposition` | 在最末尾对当前 sub_lot 写 `qc_quality_event(qc_disposition_synced_to_wh)`,payload 含 `wh_lot_id` / `disposition_id` / `disposition_type` / `new_status`。返回 jsonb 加 `wh_lot_id`。 |
+
+**为何不调内核**: hold 的 sub_lot 从未走过释放(yield=0 = 余额从未 +N),所以不存在"回滚"语义可写;disposition 后续要么不出货(scrap/grind/concession 都是终态),要么走 retest/redry 重回测试链,余额变动只在最终释放发生。
+
+**特性**: 幂等(同签名 CREATE OR REPLACE);M-109 的手动判定 + 组传染 / M-106 的 retest 重组逻辑**完整保留**。**依赖**: M-106(原 qc_create_disposition)、M-109(原 qc_submit_inspection)、M-112(`qc_production_lot.lot_id`)。
+
+**前端配套(S4 整体)**:
+- `src/services/warehouseApi.ts` — `setLotPackagingItem` / `syncReleaseFromQc` 函数 + `LotReleaseSyncResult` 类型
+- `src/services/qcApi.ts` — `releasePassedSubLot(subLotId, yieldQuantity)` 加 yield 必填 + catch `PACKAGING_REQUIRED:` / `NO_PACKAGING_LINKED:` / `YIELD_REQUIRED:` 并抛 `PackagingRequiredError` / `NoPackagingLinkedError` / `YieldRequiredError` 类;新增 `getProductionLotSku(productionLotId)` 辅助
+- `src/pages/qc/components/ReleaseDialog.tsx`(新)— 三态模态框:yield 输入 → 捕获 PackagingRequiredError 弹包装选择 → setLotPackagingItem + 重试;NoPackagingLinkedError 显示"先去产品管理配置"
+- `src/pages/qc/QcHome.tsx` — Needs Attention 区的"放行"按钮改为打开 ReleaseDialog,而不是直接调 RPC
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -1885,7 +2024,15 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-107 | 20260527000004_qc_needs_attention_dedup_by_group.sql |
 | M-108 | 20260527000005_qc_sub_lot_produced_at.sql |
 | M-109 | 20260527000006_qc_manual_judgment_and_remark.sql |
-| **M-110** | _(下一个)_ |
+| M-110 | 20260527000007_wh_lot_lifecycle.sql |
+| M-111 | 20260527000008_wh_balance_status_aware_available.sql |
+| M-112 | 20260527000009_wh_qc_lot_link_schema.sql |
+| M-113 | 20260527000010_wh_recompute_lot_status.sql |
+| M-114 | 20260527000011_wh_qc_sync_helpers.sql |
+| M-115 | 20260527000012_qc_create_production_lot_with_sub_lots_v2.sql |
+| M-116 | 20260527000013_qc_release_passed_sub_lot_v2.sql |
+| M-117 | 20260527000014_qc_hold_event_hooks.sql |
+| **M-112** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
