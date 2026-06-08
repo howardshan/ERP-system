@@ -702,6 +702,9 @@ export async function checkOutSubLotsLegacy(subLotIds: string[], outTime?: strin
 }
 
 // M-048: Bulk check-out that also forms sampling groups + picks champions.
+// M-118: deterministic chunking + operator-chosen sampling method.
+export type SamplingMethod = 'method_1' | 'method_2';
+
 export interface BulkCheckOutGroup {
   test_group_id: string;
   group_sequence: number;
@@ -709,6 +712,9 @@ export interface BulkCheckOutGroup {
   member_count: number;
   champion_id: string;
   member_ids: string[];
+  redry?: boolean;
+  original_group_id?: string | null;
+  sampling_method?: SamplingMethod;
 }
 export interface BulkCheckOutResult {
   requested: number;
@@ -725,10 +731,12 @@ export interface BulkCheckOutResult {
 export async function checkOutSubLotsBulk(input: {
   sub_lot_ids: string[];
   out_time?: string | null;
+  sampling_method?: SamplingMethod;
 }): Promise<BulkCheckOutResult> {
   return rpc<BulkCheckOutResult>('qc_check_out_sub_lots_bulk', {
     p_sub_lot_ids: input.sub_lot_ids,
     p_out_time: input.out_time ?? null,
+    p_sampling_method: input.sampling_method ?? 'method_1',
   });
 }
 
@@ -1265,6 +1273,13 @@ export async function releasePassedSubLotsGroup(subLotIds: string[], yieldQuanti
 /** Apply the same disposition to every cart in a sampling group. */
 export async function createDispositionGroup(input: {
   sub_lot_ids: string[];
+  /**
+   * The cart whose result the group inherited (the existing champion). When
+   * provided AND `type === 'retest'`, the single retest call is dispatched on
+   * this cart so M-106's normalisation keeps the original champion in place.
+   * Falls back to `sub_lot_ids[0]` if omitted. See bug note in QcHome.
+   */
+  champion_sub_lot_id?: string;
   type: DispositionType;
   remark: string | null;
   redry_expected_dry_minutes: number | null;
@@ -1275,7 +1290,7 @@ export async function createDispositionGroup(input: {
   // disposition type (scrap / redry / room-temp) is genuinely per-cart.
   if (input.type === 'retest') {
     await createDisposition({
-      drying_sub_lot_id: input.sub_lot_ids[0],
+      drying_sub_lot_id: input.champion_sub_lot_id ?? input.sub_lot_ids[0],
       type: input.type,
       remark: input.remark,
       redry_expected_dry_minutes: input.redry_expected_dry_minutes,

@@ -348,6 +348,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
         } : null}
         subLotIds={disposeTarget?.group_sub_lot_ids}
         subLotCodes={disposeTarget?.group_sub_lot_codes}
+        championSubLotId={disposeTarget?.drying_sub_lot_id}
         permissions={dispositionPerms}
         onClose={() => setDisposeTarget(null)}
         onDisposed={onDisposed}
