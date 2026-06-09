@@ -1976,6 +1976,29 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-120 `20260609000001_qc_failed_outcome_split.sql`
+**用途**: 把「Failed today」从单数字拆成「总数 / 还未消化数」,并给最近 fail 的每一条标 outcome。**操作员反馈**:大数字混了"已经 retest 通过"和"还没处理"两种情况,看不出还有多少坑等填。
+
+**变更**:
+- `qc_overview.stats` 加 `failed_today_open` —— 今天的 fail 里**没有后续 pass、也没有后续终态处置**(`scrap` / `grind` / `concession` / `rework`)的数量。同卡或同抽样组的后续都算。其它 stats 与 needs_attention 块与 M-107 完全一致(verbatim 复制)。
+- `qc_recent_failed_inspections` 每行加 `outcome` 字段:
+  - `retest_passed` — 同卡或同组后续有 pass
+  - `disposed` — 同卡或同组后续有终态处置
+  - `open` — 都没有,失败还挂着
+  - 优先级:`retest_passed` > `disposed` > `open`。
+
+**前端配套**:
+- [`src/services/qcApi.ts`](../../src/services/qcApi.ts) — `QcOverviewStats.failed_today_open?: number`、新类型 `FailOutcome`、`RecentFailItem.outcome?: FailOutcome`。
+- [`src/pages/qc/QcHome.tsx`](../../src/pages/qc/QcHome.tsx) — Failed today 卡片大数字下方新增小字行 `<n> still open · <m> resolved`(从 `failed_today` − `failed_today_open` 推导 resolved);Fail 明细面板每行加 outcome 小 chip(emerald / slate / orange);卡片 `?` 帮助文案更新解释口径。
+- `StatCard` 加可选 `subline?: React.ReactNode` 通用 prop;新增 `FailOutcomeBadge` 组件。
+
+**业务规则**:
+- **BR-Q69** Dashboard「Failed today」=今天的失败次数累计,不因 retest 通过而下降;小字 `still open` =截至当下还没消化的子集。明细面板按 outcome 标 chip,操作员一眼能识别每条失败的下落。
+
+**依赖**: M-058 (qc_recent_failed_inspections), M-107 (qc_overview)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2076,7 +2099,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-116 | 20260527000013_qc_release_passed_sub_lot_v2.sql |
 | M-117 | 20260527000014_qc_hold_event_hooks.sql |
 | M-119 | 20260527000016_qc_submit_inspection_restore_no_supervisor.sql |
-| **M-120** | _(下一个)_ |
+| M-120 | 20260609000001_qc_failed_outcome_split.sql |
+| **M-121** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

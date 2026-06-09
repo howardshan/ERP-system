@@ -13,6 +13,7 @@ import {
   NeedsAttentionItem,
   PassRateForecastItem,
   RecentFailItem,
+  FailOutcome,
 } from '../../services/qcApi';
 import { getInventorySummary, getAvailableCarts, PkgInventorySku, PkgCart } from '../../services/pkgApi';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -240,8 +241,19 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                       .finally(() => setFailsLoading(false));
                   }
                 }}
+                subline={(() => {
+                  const total = overview.stats.failed_today;
+                  const open = overview.stats.failed_today_open;
+                  if (total === 0 || open == null) return null;
+                  const resolved = Math.max(0, total - open);
+                  return (
+                    <>
+                      <span className="font-bold">{open}</span> still open · {resolved} resolved
+                    </>
+                  );
+                })()}
                 help={{
-                  content: 'How many carts have failed inspection since this morning. Click the card to see what failed in the last two days (cart code + reading).',
+                  content: 'How many carts have failed inspection since this morning — the big number is the running total today (it does NOT shrink when a retest passes). The smaller "X still open · Y resolved" line breaks that down: "open" = no retest pass yet AND not scrapped/discarded yet; "resolved" = already retested to pass or sent to scrap / grind / concession / rework. Click the card to see what failed in the last two days, with each row tagged by outcome.',
                 }}
               />
             </div>
@@ -465,12 +477,14 @@ function SectionHeader({
 }
 
 function StatCard({
-  label, value, icon: Icon, accent, onClick, help,
+  label, value, icon: Icon, accent, onClick, help, subline,
 }: {
   label: string; value: number | string; icon: React.ElementType;
   accent: 'amber' | 'orange' | 'slate' | 'blue' | 'emerald' | 'red';
   onClick?: () => void;
   help?: { title?: string; content: React.ReactNode };
+  /** Optional small text shown directly below the big number. */
+  subline?: React.ReactNode;
 }) {
   const colors: Record<string, string> = {
     amber:   'bg-amber-50 border-amber-200 text-amber-900',
@@ -507,6 +521,9 @@ function StatCard({
           <span className="leading-none">{label}</span>
         </div>
         <p className="text-2xl font-bold tabular-nums mt-1.5">{value}</p>
+        {subline && (
+          <p className="text-[11px] font-medium opacity-80 mt-0.5 leading-snug">{subline}</p>
+        )}
       </ButtonEl>
       {help && (
         <HelpPopover
@@ -725,6 +742,29 @@ function dayLabel(isoStr: string): string {
   return label || `${mon}/${day}`;
 }
 
+/**
+ * Tiny chip showing what happened to a failed inspection after the fact.
+ * Renders nothing for legacy rows that don't carry an outcome (in case the
+ * frontend ships before the M-120 migration is applied).
+ */
+function FailOutcomeBadge({ outcome }: { outcome: FailOutcome | undefined }) {
+  if (!outcome) return null;
+  const styles: Record<FailOutcome, { cls: string; label: string }> = {
+    retest_passed: { cls: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Retested → passed' },
+    disposed:      { cls: 'bg-slate-100  text-slate-600  border-slate-200',    label: 'Disposed' },
+    open:          { cls: 'bg-orange-100 text-orange-700 border-orange-200',   label: 'Still open' },
+  };
+  const s = styles[outcome];
+  return (
+    <span className={cn(
+      'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border',
+      s.cls,
+    )}>
+      {s.label}
+    </span>
+  );
+}
+
 function FailDetailPanel({ items, loading, onClose, onOpenHistory }: {
   items: RecentFailItem[];
   loading: boolean;
@@ -767,7 +807,7 @@ function FailDetailPanel({ items, loading, onClose, onOpenHistory }: {
           <ul className="divide-y divide-slate-100">
             {dayItems.map(item => (
               <li key={item.inspection_id} className="px-4 py-3">
-                {/* Row header: sample ID + Aw + time */}
+                {/* Row header: sample ID + Aw + outcome badge + time */}
                 <div className="flex items-baseline gap-2 mb-2 flex-wrap">
                   <span className="font-mono font-bold text-sm text-red-700">
                     {item.sample_id ?? item.champion_code}
@@ -777,6 +817,7 @@ function FailDetailPanel({ items, loading, onClose, onOpenHistory }: {
                       Aw <span className="font-mono font-bold text-slate-800">{item.aw}</span>
                     </span>
                   )}
+                  <FailOutcomeBadge outcome={item.outcome} />
                   <span className="text-[11px] text-slate-400 ml-auto">
                     {formatQcDateTime(item.submitted_at)}
                   </span>
