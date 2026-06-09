@@ -1529,6 +1529,31 @@ export async function getRecentFailedInspections(days = 2): Promise<RecentFailIt
   return rpc<RecentFailItem[]>('qc_recent_failed_inspections', { p_days: days });
 }
 
+/**
+ * M-121: mirror of RecentFailItem for passed inspections.
+ *   `released`         — every group member has moved past `passed`
+ *   `awaiting_release` — at least one member is still `passed`
+ */
+export type PassOutcome = 'released' | 'awaiting_release';
+
+export interface RecentPassItem {
+  inspection_id: string;
+  sample_id: string | null;
+  aw: number | null;
+  submitted_at: string;
+  sku_name: string | null;
+  lot_number: string | null;
+  work_order_barcode: string | null;
+  champion_code: string;
+  test_group_id: string | null;
+  outcome?: PassOutcome;
+  group_members: FailGroupMember[];
+}
+
+export async function getRecentPassedInspections(days = 2): Promise<RecentPassItem[]> {
+  return rpc<RecentPassItem[]>('qc_recent_passed_inspections', { p_days: days });
+}
+
 /** Fetch all sub-lots that belong to the same test group (by test_group_id). */
 export async function getGroupMembers(testGroupId: string): Promise<Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>> {
   const { data, error } = await supabase

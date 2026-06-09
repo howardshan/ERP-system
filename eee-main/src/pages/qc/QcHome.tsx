@@ -8,12 +8,15 @@ import {
   getQcOverview,
   dashboardPassRateForecast,
   getRecentFailedInspections,
+  getRecentPassedInspections,
   formatQcDateTime,
   QcOverview,
   NeedsAttentionItem,
   PassRateForecastItem,
   RecentFailItem,
   FailOutcome,
+  RecentPassItem,
+  PassOutcome,
 } from '../../services/qcApi';
 import { getInventorySummary, getAvailableCarts, PkgInventorySku, PkgCart } from '../../services/pkgApi';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -53,6 +56,9 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
   const [showFailPanel, setShowFailPanel] = useState(false);
   const [recentFails, setRecentFails] = useState<RecentFailItem[]>([]);
   const [failsLoading, setFailsLoading] = useState(false);
+  const [showPassPanel, setShowPassPanel] = useState(false);
+  const [recentPasses, setRecentPasses] = useState<RecentPassItem[]>([]);
+  const [passesLoading, setPassesLoading] = useState(false);
   const [inventory, setInventory] = useState<PkgInventorySku[]>([]);
   const [expandedSkus, setExpandedSkus] = useState<Set<string>>(new Set());
   const [bucketDetail, setBucketDetail] = useState<{
@@ -222,9 +228,19 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                 label={`Passed today (${overview.stats.pass_rate_pct ?? '—'}%)`}
                 value={overview.stats.passed_today}
                 icon={CheckCircle2} accent="emerald"
+                onClick={() => {
+                  setShowPassPanel(v => !v);
+                  if (!showPassPanel) {
+                    setPassesLoading(true);
+                    getRecentPassedInspections(2)
+                      .then(setRecentPasses)
+                      .catch(() => {})
+                      .finally(() => setPassesLoading(false));
+                  }
+                }}
                 help={{
                   title: 'Passed today',
-                  content: 'How many carts have passed inspection since this morning. The percentage in parentheses is today\'s overall pass rate — passes divided by total tests done today.',
+                  content: 'How many carts have passed inspection since this morning. The percentage in parentheses is today\'s overall pass rate — passes divided by total tests done today. Click the card to see what passed in the last two days, with each row tagged "Released" or "Awaiting release".',
                 }}
               />
               <StatCard
@@ -267,6 +283,16 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
           items={recentFails}
           loading={failsLoading}
           onClose={() => setShowFailPanel(false)}
+          onOpenHistory={onOpenHistory}
+        />
+      )}
+
+      {/* ── Pass detail panel ────────────────────────────────────────── */}
+      {showPassPanel && (
+        <PassDetailPanel
+          items={recentPasses}
+          loading={passesLoading}
+          onClose={() => setShowPassPanel(false)}
           onOpenHistory={onOpenHistory}
         />
       )}
@@ -857,6 +883,132 @@ function FailDetailPanel({ items, loading, onClose, onOpenHistory }: {
                         {/* Status badge */}
                         {statusBadge(m.status)}
                         {/* Chevron */}
+                        {onOpenHistory && (
+                          <ChevronRight size={12} className="text-slate-400 shrink-0" />
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * M-121: tiny chip for a passed inspection's downstream state.
+ * Renders nothing for legacy rows that don't carry an outcome (frontend can
+ * ship before the M-121 migration is applied).
+ */
+function PassOutcomeBadge({ outcome }: { outcome: PassOutcome | undefined }) {
+  if (!outcome) return null;
+  const styles: Record<PassOutcome, { cls: string; label: string }> = {
+    released:         { cls: 'bg-slate-100  text-slate-600  border-slate-200',     label: 'Released' },
+    awaiting_release: { cls: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Awaiting release' },
+  };
+  const s = styles[outcome];
+  return (
+    <span className={cn(
+      'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border',
+      s.cls,
+    )}>
+      {s.label}
+    </span>
+  );
+}
+
+/**
+ * Mirror of FailDetailPanel for passed inspections — same shape, emerald
+ * accent, "Released" / "Awaiting release" badges instead of fail outcomes.
+ */
+function PassDetailPanel({ items, loading, onClose, onOpenHistory }: {
+  items: RecentPassItem[];
+  loading: boolean;
+  onClose: () => void;
+  onOpenHistory?: (subLotId: string) => void;
+}) {
+  const groups = React.useMemo(() => {
+    const map = new Map<string, RecentPassItem[]>();
+    for (const item of items) {
+      const key = dayLabel(item.submitted_at);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(item);
+    }
+    return Array.from(map.entries());
+  }, [items]);
+
+  return (
+    <div className="mt-3 bg-white border-2 border-emerald-200 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-emerald-50 border-b border-emerald-200">
+        <h3 className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
+          <CheckCircle2 size={14} className="text-emerald-600" /> Passed inspections (last 2 days)
+        </h3>
+        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-emerald-100">
+          <X size={14} className="text-emerald-700" />
+        </button>
+      </div>
+
+      {loading && (
+        <p className="text-xs text-slate-400 p-4 animate-pulse">Loading…</p>
+      )}
+      {!loading && items.length === 0 && (
+        <p className="text-xs text-slate-500 p-4">No passed inspections in the last 2 days.</p>
+      )}
+      {!loading && groups.map(([day, dayItems]) => (
+        <div key={day}>
+          <div className="px-4 py-1.5 bg-slate-50 border-b border-slate-100">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{day}</span>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {dayItems.map(item => (
+              <li key={item.inspection_id} className="px-4 py-3">
+                <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+                  <span className="font-mono font-bold text-sm text-emerald-700">
+                    {item.sample_id ?? item.champion_code}
+                  </span>
+                  {item.aw != null && (
+                    <span className="text-xs text-slate-500">
+                      Aw <span className="font-mono font-bold text-slate-800">{item.aw}</span>
+                    </span>
+                  )}
+                  <PassOutcomeBadge outcome={item.outcome} />
+                  <span className="text-[11px] text-slate-400 ml-auto">
+                    {formatQcDateTime(item.submitted_at)}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  {item.sku_name ?? '—'}
+                  {item.work_order_barcode ? ` · ${item.work_order_barcode}` : item.lot_number ? ` · ${item.lot_number}` : ''}
+                </p>
+                <ul className="mt-1 divide-y divide-slate-100 rounded-lg border border-slate-200 overflow-hidden">
+                  {item.group_members.map(m => (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenHistory?.(m.id)}
+                        disabled={!onOpenHistory}
+                        className={cn(
+                          'w-full flex items-center gap-2 px-3 py-2 text-left transition-colors',
+                          onOpenHistory ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default',
+                          m.is_champion ? 'bg-emerald-50' : 'bg-white',
+                        )}
+                      >
+                        {m.is_champion && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 shrink-0">
+                            Sample
+                          </span>
+                        )}
+                        <span className={cn(
+                          'font-mono text-xs font-semibold flex-1 text-left',
+                          m.is_champion ? 'text-emerald-800' : 'text-slate-700',
+                        )}>
+                          {m.sub_lot_code}
+                        </span>
+                        {statusBadge(m.status)}
                         {onOpenHistory && (
                           <ChevronRight size={12} className="text-slate-400 shrink-0" />
                         )}
