@@ -1999,6 +1999,28 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-121 `20260609000002_qc_recent_passed_inspections.sql`
+**用途**: 给 QC Home「Passed today」卡片加点击展开的明细面板,镜像 Failed today 的体验。操作员要求可以审计今天的通过项 + 一眼看出哪些已 release、哪些还挂着等放行。
+
+**新增 RPC**: `qc_recent_passed_inspections(p_days int DEFAULT 2)` —— 形状与 [M-058 qc_recent_failed_inspections](../../supabase/migrations/20260522000016_qc_recent_failed_inspections.sql) 对称,只是 `ir.result = 'pass'`。每行带 `outcome`:
+- `released` — 同组所有成员都已脱离 `passed`(已 closed / dispatched 等)。
+- `awaiting_release` — 同组至少有一辆还在 `passed`。
+- solo 车按自己的 `status` 判定。
+
+**前端配套**:
+- [`src/services/qcApi.ts`](../../src/services/qcApi.ts) — `PassOutcome` 类型、`RecentPassItem` 接口、`getRecentPassedInspections()`。
+- [`src/pages/qc/QcHome.tsx`](../../src/pages/qc/QcHome.tsx):
+  - `Passed today` StatCard 加 `onClick` → 切换面板(同 Failed today 模式)。
+  - 新组件 `PassDetailPanel`(emerald 主题)+ `PassOutcomeBadge`(grey "Released" / emerald "Awaiting release")。
+  - Passed today 卡片 `?` 文案补充"点击查看明细"。
+
+**业务规则**:
+- **BR-Q70** Dashboard「Passed today」卡片点击展开最近 2 天的 pass 明细;每行右上角 chip 标 `Released` / `Awaiting release`,基于同卡或同组成员当前是否还在 `passed` 状态判定。
+
+**依赖**: M-058 (qc_recent_failed_inspections — 形状参考)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2100,7 +2122,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-117 | 20260527000014_qc_hold_event_hooks.sql |
 | M-119 | 20260527000016_qc_submit_inspection_restore_no_supervisor.sql |
 | M-120 | 20260609000001_qc_failed_outcome_split.sql |
-| **M-121** | _(下一个)_ |
+| M-121 | 20260609000002_qc_recent_passed_inspections.sql |
+| **M-122** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
