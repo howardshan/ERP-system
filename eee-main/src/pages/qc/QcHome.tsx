@@ -823,6 +823,9 @@ function FailDetailPanel({ items, loading, onClose, onOpenHistory }: {
         </button>
       </div>
 
+      {/* Body scrolls inside the panel when it would otherwise grow past 60vh. */}
+      <div className="max-h-[60vh] overflow-y-auto">
+
       {loading && (
         <p className="text-xs text-slate-400 p-4 animate-pulse">Loading…</p>
       )}
@@ -899,6 +902,8 @@ function FailDetailPanel({ items, loading, onClose, onOpenHistory }: {
           </ul>
         </div>
       ))}
+
+      </div>
     </div>
   );
 }
@@ -955,6 +960,9 @@ function PassDetailPanel({ items, loading, onClose, onOpenHistory }: {
           <X size={14} className="text-emerald-700" />
         </button>
       </div>
+
+      {/* Body scrolls inside the panel when it would otherwise grow past 60vh. */}
+      <div className="max-h-[60vh] overflow-y-auto">
 
       {loading && (
         <p className="text-xs text-slate-400 p-4 animate-pulse">Loading…</p>
@@ -1025,6 +1033,8 @@ function PassDetailPanel({ items, loading, onClose, onOpenHistory }: {
           </ul>
         </div>
       ))}
+
+      </div>
     </div>
   );
 }
