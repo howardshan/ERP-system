@@ -1162,6 +1162,13 @@ export interface QcOverviewStats {
   awaiting_wa_result: number;
   passed_today: number;
   failed_today: number;
+  /**
+   * M-120: subset of `failed_today` whose fails have NOT been resolved yet
+   * — no later passing inspection and no later terminal disposition
+   * (scrap / grind / concession / rework) on the same cart or anywhere in
+   * the same sampling group.
+   */
+  failed_today_open?: number;
   longest_wait_minutes: number | null;
   pass_rate_pct: number | null;
 }
@@ -1495,6 +1502,16 @@ export interface FailGroupMember {
   status: string;
   is_champion: boolean;
 }
+/**
+ * M-120: outcome resolved against later events (same cart or same group).
+ *   - `retest_passed` — a later passing inspection exists
+ *   - `disposed`     — a later terminal disposition exists
+ *                       (scrap / grind / concession / rework)
+ *   - `open`         — neither; the failure is still in the open queue
+ * Precedence (highest wins): retest_passed > disposed > open.
+ */
+export type FailOutcome = 'retest_passed' | 'disposed' | 'open';
+
 export interface RecentFailItem {
   inspection_id: string;
   sample_id: string | null;
@@ -1505,6 +1522,7 @@ export interface RecentFailItem {
   work_order_barcode: string | null;
   champion_code: string;
   test_group_id: string | null;
+  outcome?: FailOutcome;
   group_members: FailGroupMember[];
 }
 export async function getRecentFailedInspections(days = 2): Promise<RecentFailItem[]> {
