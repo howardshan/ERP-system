@@ -231,6 +231,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                 onClick={() => {
                   setShowPassPanel(v => !v);
                   if (!showPassPanel) {
+                    setShowFailPanel(false);  // mutually exclusive with Fail panel
                     setPassesLoading(true);
                     getRecentPassedInspections(2)
                       .then(setRecentPasses)
@@ -250,6 +251,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                 onClick={() => {
                   setShowFailPanel(v => !v);
                   if (!showFailPanel) {
+                    setShowPassPanel(false);  // mutually exclusive with Pass panel
                     setFailsLoading(true);
                     getRecentFailedInspections(2)
                       .then(setRecentFails)
