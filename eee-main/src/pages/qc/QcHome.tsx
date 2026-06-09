@@ -534,12 +534,14 @@ function StatCard({
   return (
     // Outer wrapper provides the positioning context for the help popover
     // so the popover button is NOT a descendant of the card button (HTML
-    // forbids nested <button>s and React warns about it).
-    <div className="relative">
+    // forbids nested <button>s and React warns about it). `h-full` on both
+    // wrapper and inner button keeps every card in a grid row the same
+    // height as the tallest one (e.g. when one card has a `subline`).
+    <div className="relative h-full">
       <ButtonEl
         onClick={onClick}
         className={cn(
-          'block w-full rounded-xl border-2 p-3 text-left transition-all',
+          'block w-full h-full rounded-xl border-2 p-3 text-left transition-all',
           colors[accent],
           onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.02]' : '',
         )}
