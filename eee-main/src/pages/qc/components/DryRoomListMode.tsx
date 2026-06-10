@@ -63,6 +63,10 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
   const [selectedOut, setSelectedOut] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
+  // Bumped when the error popup is dismissed → re-focuses the open scan dialog
+  // so the operator can keep scanning right away.
+  const [scanFocusTick, setScanFocusTick] = useState(0);
+  const dismissError = () => { setError(''); setScanFocusTick(t => t + 1); };
   const [scanOpen, setScanOpen] = useState(false);
   const [scanOutOpen, setScanOutOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -308,11 +312,11 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
       {/* Errors render as a center popup with a close button — clearer than
           an inline banner that the operator might miss while scanning. */}
       {error && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
           <button
             type="button"
             className="absolute inset-0 bg-black/40"
-            onClick={() => setError('')}
+            onClick={dismissError}
             aria-label="Dismiss"
           />
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border-2 border-red-200">
@@ -325,7 +329,7 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
                 <h2 className="text-base font-bold text-slate-900 mt-0.5">Scan / action failed</h2>
               </div>
               <button
-                onClick={() => setError('')}
+                onClick={dismissError}
                 className="p-1 rounded hover:bg-slate-100 text-slate-500"
                 aria-label="Close"
               >
@@ -338,7 +342,8 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
             <footer className="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50 rounded-b-2xl">
               <button
                 type="button"
-                onClick={() => setError('')}
+                onClick={dismissError}
+                autoFocus
                 className="px-4 py-2 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-700 text-white"
               >
                 OK
@@ -637,6 +642,7 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
         dryerNumber={dryerNumber}
         keepOpen
         runningSummary={`${selected.size} cart${selected.size === 1 ? '' : 's'} queued for check-in`}
+        focusSignal={scanFocusTick}
         onClose={() => setScanOpen(false)}
         onFound={handleScanned}
       />
@@ -654,6 +660,7 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
         dryerNumber={dryerNumber}
         keepOpen
         runningSummary={`${selectedOut.size} cart${selectedOut.size === 1 ? '' : 's'} queued for check-out`}
+        focusSignal={scanFocusTick}
         onClose={() => setScanOutOpen(false)}
         onFound={handleScannedForOut}
       />

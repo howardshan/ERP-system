@@ -29,6 +29,10 @@ export default function TestingPage({ onOpenHistory }: Props) {
   const canViewDashboard = can('qc', 'testing', 'view_dashboard');
   const canSample = can('qc', 'testing', 'take_sample');
   const canSubmit = can('qc', 'testing', 'submit_inspection');
+  // M-118: supervisor-only override of the auto-suggested verdict. Required
+  // for any decision when the reading sits inside the soft band but outside
+  // the hard band, and for flipping the verdict inside the hard band.
+  const canSupervise = can('qc', 'testing', 'supervisor_judge');
 
   const [activeTab, setActiveTab] = useState<'queue' | 'dashboard'>('queue');
   const [pending, setPending] = useState<SubLot[]>([]);
@@ -179,6 +183,7 @@ export default function TestingPage({ onOpenHistory }: Props) {
               subLot={selected}
               canSample={canSample}
               canSubmit={canSubmit}
+              canSupervise={canSupervise}
               onOpenHistory={() => onOpenHistory(selected.id)}
               onSampleTaken={load}
               onDone={() => { setMsg('Test completed'); setSelectedId(null); load(); }}
@@ -195,25 +200,35 @@ export default function TestingPage({ onOpenHistory }: Props) {
 // ─── Per-sub-lot workflow ──────────────────────────────────────────────────
 
 function TestWorkflow({
-  subLot, canSample, canSubmit, onOpenHistory, onSampleTaken, onDone, onError,
+  subLot, canSample, canSubmit, canSupervise, onOpenHistory, onSampleTaken, onDone, onError,
 }: {
   subLot: SubLot;
   canSample: boolean;
   canSubmit: boolean;
+  canSupervise: boolean;
   onOpenHistory: () => void;
   onSampleTaken: () => void;
   onDone: () => void;
   onError: (m: string) => void;
 }) {
   const [phase, setPhase] = useState<Phase>('idle');
-  const [sampleIdInput, setSampleIdInput] = useState('');
   const [activeSample, setActiveSample] = useState<Sample | null>(null);
   const [allSamples, setAllSamples] = useState<Sample[]>([]);
-  const [limits, setLimits] = useState<{ item_name: string; lower_limit: number; upper_limit: number } | null>(null);
+  const [limits, setLimits] = useState<{
+    item_name: string;
+    lower_limit: number;
+    upper_limit: number;
+    soft_lower_limit: number;
+    soft_upper_limit: number;
+  } | null>(null);
   const [aw, setAw] = useState('');
   const [busy, setBusy] = useState(false);
   const [judged, setJudged] = useState<'pass' | 'fail' | null>(null);      // system suggestion (reference)
   const [decision, setDecision] = useState<'pass' | 'fail' | null>(null);  // operator's final call
+  // M-118: which band the current reading sits in. 'hard' = auto pass,
+  // 'soft' = supervisor decides, 'out' = forced FAIL. null = no reading or
+  // no template loaded yet.
+  const [band, setBand] = useState<'hard' | 'soft' | 'out' | null>(null);
   const [remark, setRemark] = useState('');
   const [finalResult, setFinalResult] = useState<'pass' | 'fail' | null>(null);
   const [groupMembers, setGroupMembers] = useState<Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>>([]);
@@ -238,7 +253,6 @@ function TestWorkflow({
         const stillPending = rows.find(r => r.status === 'pending');
         if (stillPending) {
           setActiveSample(stillPending);
-          setSampleIdInput(stillPending.sample_id);
           setPhase('measure');
         } else {
           setPhase('sample');
@@ -248,23 +262,33 @@ function TestWorkflow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subLot.id]);
 
-  // System suggestion live as aw changes; default the operator's decision to it
-  // (the operator can still override below).
+  // M-118: live three-band classification.
+  // - Reading in hard range → auto PASS (operator default; supervisor may flip)
+  // - Reading in soft band  → supervisor must explicitly pick PASS or FAIL
+  // - Reading outside soft  → forced FAIL (Pass button is disabled for everyone)
   useEffect(() => {
     if (phase !== 'measure') return;
-    if (!aw) { setJudged(null); setDecision(null); return; }
+    if (!aw) { setJudged(null); setDecision(null); setBand(null); return; }
     const v = parseFloat(aw);
-    if (!Number.isFinite(v) || !limits) { setJudged(null); return; }
-    const sug = v >= limits.lower_limit && v <= limits.upper_limit ? 'pass' : 'fail';
+    if (!Number.isFinite(v) || !limits) { setJudged(null); setBand(null); return; }
+    const inHard = v >= limits.lower_limit      && v <= limits.upper_limit;
+    const inSoft = v >= limits.soft_lower_limit && v <= limits.soft_upper_limit;
+    const sug: 'pass' | 'fail' = inHard ? 'pass' : 'fail';
     setJudged(sug);
-    setDecision(sug);
+    setBand(inHard ? 'hard' : inSoft ? 'soft' : 'out');
+    // Default decision: hard → pass, out → fail (forced), soft → unset so
+    // supervisor consciously picks one (no silent default in the discretion zone).
+    if (inHard) setDecision('pass');
+    else if (!inSoft) setDecision('fail');
+    else setDecision(null);
   }, [aw, limits, phase]);
 
   const handleTakeSample = async () => {
-    if (!sampleIdInput.trim()) { onError('Enter a sample ID first'); return; }
     setBusy(true);
     try {
-      const s = await takeSample({ sub_lot_id: subLot.id, sample_id: sampleIdInput.trim() });
+      // M-119: omit sample_id → server auto-generates from sub_lot_code
+      // (+ "R" / "R2" / ... for retests).
+      const s = await takeSample({ sub_lot_id: subLot.id });
       setActiveSample(s);
       setPhase('measure');
       const rows = await listSamplesForSubLot(subLot.id);
@@ -362,31 +386,44 @@ function TestWorkflow({
         </div>
       )}
 
-      {/* Step 1: take sample */}
-      {phase === 'sample' && (
-        <Step number={1} title="Take sample">
-          <p className="text-xs text-slate-500 mb-3">
-            Enter a sample ID (your numbering), then click Take sample. This locks the sample to this sub-lot.
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={sampleIdInput}
-              onChange={(e) => setSampleIdInput(e.target.value)}
-              placeholder="e.g. S-2026-0521-001"
-              className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono"
-            />
-            <button
-              type="button"
-              onClick={handleTakeSample}
-              disabled={busy || !canSample || !sampleIdInput.trim()}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
-            >
-              <FlaskConical size={13} /> Take sample
-            </button>
-          </div>
-        </Step>
-      )}
+      {/* Step 1: take sample — M-119: sample ID auto-derived from cart code.
+          Initial test reuses the cart code verbatim; subsequent samples (i.e.
+          retests after a fail+retest disposition) get "R", "R2", "R3", ... */}
+      {phase === 'sample' && (() => {
+        const priorCount = allSamples.length;
+        const isRetest = priorCount > 0;
+        const previewId = priorCount === 0
+          ? subLot.sub_lot_code
+          : priorCount === 1
+            ? `${subLot.sub_lot_code}R`
+            : `${subLot.sub_lot_code}R${priorCount}`;
+        return (
+          <Step number={1} title={isRetest ? `Take retest sample #${priorCount}` : 'Take sample'}>
+            <p className="text-xs text-slate-500 mb-3">
+              Sample ID is auto-generated from the cart code{isRetest ? ' (with R suffix for retests)' : ''}.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex-1 min-w-[200px] rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-3 py-2.5">
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Sample ID</p>
+                <code className="text-base font-mono font-bold text-slate-900">{previewId}</code>
+                {isRetest && (
+                  <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
+                    retest #{priorCount}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleTakeSample}
+                disabled={busy || !canSample}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
+              >
+                <FlaskConical size={13} /> Take sample
+              </button>
+            </div>
+          </Step>
+        );
+      })()}
 
       {/* Step 2: enter reading → system suggests → operator decides + remark */}
       {phase === 'measure' && activeSample && (
@@ -398,8 +435,25 @@ function TestWorkflow({
               <>
                 <span className="text-[11px] text-slate-400">·</span>
                 <span className="text-[11px] text-slate-500">
-                  Spec range: <code className="font-mono text-slate-700">[{limits.lower_limit}, {limits.upper_limit}]</code>
+                  Hard <code className="font-mono text-emerald-700">[{limits.lower_limit}, {limits.upper_limit}]</code>
                 </span>
+                {(limits.soft_lower_limit < limits.lower_limit || limits.soft_upper_limit > limits.upper_limit) && (
+                  <span className="text-[11px] text-slate-500">
+                    Soft <code className="font-mono text-amber-700">[{limits.soft_lower_limit}, {limits.soft_upper_limit}]</code>
+                  </span>
+                )}
+                {band && (
+                  <span className={cn(
+                    'text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded',
+                    band === 'hard' ? 'bg-emerald-100 text-emerald-700'
+                      : band === 'soft' ? 'bg-amber-100 text-amber-800'
+                      : 'bg-red-100 text-red-700',
+                  )}>
+                    {band === 'hard' ? 'in hard range'
+                      : band === 'soft' ? 'soft — supervisor'
+                      : 'outside tolerance'}
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -430,34 +484,68 @@ function TestWorkflow({
           </div>
           <NumericKeypad value={aw} onChange={setAw} />
 
-          {/* Operator's final judgment (defaults to the suggestion, overridable) */}
-          <div className="mt-4">
-            <p className="text-xs font-bold text-slate-700 mb-1.5">Final judgment</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDecision('pass')}
-                disabled={!aw}
-                className={cn(
-                  'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40',
-                  decision === 'pass' ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 text-slate-700 hover:border-emerald-400',
+          {/* Operator's final judgment.
+              M-118 disable matrix:
+                            hard               soft               out
+              Pass button:  on / supervisor‑   supervisor‑only    DISABLED
+              Fail button:  supervisor‑only    supervisor‑only    on
+              Without a template, both buttons stay on (legacy fallback).
+              "supervisor-" prefix above means: enabled, but RPC also rejects
+              non-supervisors who try to override — the disabled state here is
+              purely a UX hint so non-supervisors don't get backend errors. */}
+          {(() => {
+            const hasTmpl = !!limits;
+            const passDisabled = !aw || (hasTmpl && (
+              band === 'out' || (band === 'soft' && !canSupervise)
+            ));
+            // Fail is the override direction inside hard, and the discretion
+            // call inside soft — both require supervisor. Outside soft, FAIL
+            // is the only allowed verdict so we leave the button enabled.
+            const failDisabled = !aw || (hasTmpl && !canSupervise && band !== 'out');
+            return (
+              <div className="mt-4">
+                <p className="text-xs font-bold text-slate-700 mb-1.5">Final judgment</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDecision('pass')}
+                    disabled={passDisabled}
+                    title={hasTmpl && band === 'out' ? 'Reading outside soft tolerance — must FAIL'
+                      : hasTmpl && band === 'soft' && !canSupervise ? 'Supervisor permission required'
+                      : undefined}
+                    className={cn(
+                      'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                      decision === 'pass' ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 text-slate-700 hover:border-emerald-400',
+                    )}
+                  >
+                    Pass
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDecision('fail')}
+                    disabled={failDisabled}
+                    title={hasTmpl && band !== 'out' && !canSupervise ? 'Supervisor permission required to override to FAIL' : undefined}
+                    className={cn(
+                      'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                      decision === 'fail' ? 'border-red-500 bg-red-600 text-white' : 'border-slate-200 text-slate-700 hover:border-red-400',
+                    )}
+                  >
+                    Fail
+                  </button>
+                </div>
+                {hasTmpl && band === 'soft' && !canSupervise && (
+                  <p className="mt-1.5 text-[11px] text-amber-700">
+                    Reading is in the supervisor-discretion band. Please ask a supervisor to submit.
+                  </p>
                 )}
-              >
-                Pass
-              </button>
-              <button
-                type="button"
-                onClick={() => setDecision('fail')}
-                disabled={!aw}
-                className={cn(
-                  'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40',
-                  decision === 'fail' ? 'border-red-500 bg-red-600 text-white' : 'border-slate-200 text-slate-700 hover:border-red-400',
+                {hasTmpl && band === 'out' && (
+                  <p className="mt-1.5 text-[11px] text-red-700">
+                    Reading is outside soft tolerance — must FAIL (no one can override).
+                  </p>
                 )}
-              >
-                Fail
-              </button>
-            </div>
-          </div>
+              </div>
+            );
+          })()}
 
           {/* Remark (optional) */}
           <div className="mt-3">

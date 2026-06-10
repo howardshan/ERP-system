@@ -16,6 +16,10 @@ interface Props {
   /** Optional label rendered in the dialog footer to give live feedback,
    *  e.g. "Selected 3 carts so far".  Only shown when `keepOpen` is true. */
   runningSummary?: string;
+  /** Bump this value (e.g. increment a counter) to re-focus the scan input —
+   *  used after the parent dismisses a blocking error popup so the operator can
+   *  keep scanning without clicking back into the field. */
+  focusSignal?: number;
   onClose: () => void;
   onFound: (subLot: SubLot) => void;
 }
@@ -28,7 +32,7 @@ interface Props {
  * required. The dialog ALSO accepts manual typing for fallback.
  */
 export function ScanQrDialog({
-  open, dryerNumber, keepOpen = false, runningSummary, onClose, onFound,
+  open, dryerNumber, keepOpen = false, runningSummary, focusSignal, onClose, onFound,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
@@ -47,6 +51,14 @@ export function ScanQrDialog({
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
+
+  // Re-focus the input when the parent asks (e.g. after dismissing an error
+  // popup), so the operator can keep scanning without clicking back in.
+  useEffect(() => {
+    if (open && focusSignal != null) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [focusSignal, open]);
 
   if (!open) return null;
 

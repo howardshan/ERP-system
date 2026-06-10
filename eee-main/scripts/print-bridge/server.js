@@ -17,7 +17,7 @@ const cors     = require('cors');
 const { execFile } = require('child_process');
 const { writeFile, unlink } = require('fs/promises');
 const { tmpdir, platform } = require('os');
-const { join }    = require('path');
+const { join, dirname } = require('path');
 
 const IS_WINDOWS = platform() === 'win32';
 
@@ -55,48 +55,105 @@ app.get('/printers', (_req, res) => {
   }
 });
 
-// ── Print PNG ─────────────────────────────────────────────────────────────────
-// Body: { png: "<base64>", printer?: "<cups-queue>" }
+// ── Print PNG(s) ────────────────────────────────────────────────────────────
+// Body: { pngs: ["<base64>", ...], printer?: "<queue>" }   (preferred)
+//   or: { png: "<base64>", printer?: "<queue>" }            (single, legacy)
 //
-// The app sends a landscape 606×404 PNG (PRINT_DPI=101).
-// lp option `ppi=203` tells CUPS the true resolution → natural size = 3"×2",
-// which fills a 2"×3" label in landscape orientation.  No media override —
-// the printer queue is configured for the right paper size.
+// The app renders each label as a LANDSCAPE 4:3 PNG at the printer's native
+// 203 dpi (812×609). The WHOLE batch is printed as ONE job (one `lp` with N
+// files / one Windows PrintDocument with N pages) so the data streams to the
+// printer continuously — it calibrates the label gap once instead of re-sensing
+// every few labels (the cause of ~15 s pauses).
 app.post('/print', async (req, res) => {
-  const { png, printer } = req.body || {};
+  const body = req.body || {};
+  const { printer } = body;
+  const printerName = (printer || DEFAULT_PRINTER).trim();
 
-  if (!png) {
-    return res.status(400).json({ error: 'missing png' });
+  // ── Vector PDF path (preferred for web) ───────────────────────────────────
+  // The whole batch is one multi-page 4"×3" PDF. Vector text/lines are
+  // rasterised by the printer driver at its native dpi → crisp on any model.
+  // It's a single job (one PDF), so the label gap is calibrated only once.
+  if (body.pdf) {
+    const pdfFile = join(tmpdir(), `label_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+    try {
+      await writeFile(pdfFile, Buffer.from(body.pdf, 'base64'));
+      if (IS_WINDOWS) {
+        // SumatraPDF.exe ships next to this binary; prints PDF silently at 1:1.
+        const sumatra = join(dirname(process.execPath), 'SumatraPDF.exe');
+        const args = ['-silent', '-exit-when-done', '-print-settings', 'noscale'];
+        args.push(printerName ? '-print-to' : '-print-to-default');
+        if (printerName) args.push(printerName);
+        args.push(pdfFile);
+        await new Promise((resolve, reject) => {
+          execFile(sumatra, args, (err, _o, stderr) => {
+            if (err) reject(new Error('SumatraPDF: ' + (stderr?.trim() || err.message)));
+            else resolve();
+          });
+        });
+      } else {
+        // macOS / Linux: CUPS prints the PDF natively at the page's true size
+        // (4"×3"). Queue default media should be 4×3 → 1:1, no scaling.
+        const args = [];
+        if (printerName) args.push('-d', printerName);
+        args.push(pdfFile);
+        await new Promise((resolve, reject) => {
+          execFile('lp', args, (err, _o, stderr) => {
+            if (err) reject(new Error(stderr?.trim() || err.message));
+            else resolve();
+          });
+        });
+      }
+      return res.json({ ok: true, printer: printerName || '(default)', pdf: true });
+    } catch (e) {
+      console.error('[print-bridge] pdf error:', e.message);
+      return res.status(500).json({ error: e.message });
+    } finally {
+      unlink(pdfFile).catch(() => {});
+    }
   }
 
-  const tmpFile = join(tmpdir(), `label_${Date.now()}_${Math.random().toString(36).slice(2)}.png`);
+  // ── Legacy PNG path (Tauri / fallback) ────────────────────────────────────
+  const list = Array.isArray(body.pngs) ? body.pngs : (body.png ? [body.png] : []);
+  // Per-machine printer resolution (the app renders the PNG at this dpi).
+  const dpi = [203, 300, 600].includes(Number(body.dpi)) ? Number(body.dpi) : 203;
+
+  if (list.length === 0) {
+    return res.status(400).json({ error: 'missing png(s) or pdf' });
+  }
+
+  const stamp = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const tmpFiles = list.map((_, i) => join(tmpdir(), `label_${stamp}_${i}.png`));
 
   try {
-    await writeFile(tmpFile, Buffer.from(png, 'base64'));
-
-    const printerName = (printer || DEFAULT_PRINTER).trim();
+    await Promise.all(tmpFiles.map((f, i) => writeFile(f, Buffer.from(list[i], 'base64'))));
 
     if (IS_WINDOWS) {
-      // ── Windows: PowerShell + System.Drawing ──────────────────────────────
-      // 606px ÷ 203dpi = 2.985" ≈ 3"  |  404px ÷ 203dpi = 1.990" ≈ 2"
-      // PrintDocument Graphics unit = 1/100 inch → multiply by 100
-      const escapedPath = tmpFile.replace(/\\/g, '\\\\').replace(/'/g, "''");
+      // ── Windows: one PrintDocument, N pages (single job) ──────────────────
+      // PrintDocument units are 1/100 inch → 4"×3" page = 400×300.
       const escapedPrinter = printerName.replace(/'/g, "''");
+      const psArray = tmpFiles
+        .map(f => `'${f.replace(/\\/g, '\\\\').replace(/'/g, "''")}'`)
+        .join(',');
       const ps = [
         `Add-Type -AssemblyName System.Drawing`,
-        `$img = [System.Drawing.Bitmap]::FromFile('${escapedPath}')`,
-        `$pd  = New-Object System.Drawing.Printing.PrintDocument`,
+        `$paths = @(${psArray})`,
+        `$script:imgs = @(); foreach ($p in $paths) { $script:imgs += [System.Drawing.Bitmap]::FromFile($p) }`,
+        `$script:idx = 0`,
+        `$pd = New-Object System.Drawing.Printing.PrintDocument`,
         escapedPrinter ? `$pd.PrinterSettings.PrinterName = '${escapedPrinter}'` : '',
-        `$pd.DefaultPageSettings.Landscape = $true`,
-        `$script:bmp = $img`,
+        `$pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize('ERPLabel4x3', 400, 300)`,
+        `$pd.DefaultPageSettings.Margins  = New-Object System.Drawing.Printing.Margins(0,0,0,0)`,
+        `$pd.OriginAtMargins = $false`,
         `$pd.add_PrintPage({`,
         `  param($s, $e)`,
-        `  $w = [int][Math]::Round(606.0 / 203.0 * 100)`,   // ≈ 299  (1/100 inch)
-        `  $h = [int][Math]::Round(404.0 / 203.0 * 100)`,   // ≈ 199  (1/100 inch)
-        `  $e.Graphics.DrawImage($script:bmp, 0, 0, $w, $h)`,
+        `  $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor`,
+        `  $e.Graphics.PixelOffsetMode  = [System.Drawing.Drawing2D.PixelOffsetMode]::Half`,
+        `  $e.Graphics.DrawImage($script:imgs[$script:idx], 0, 0, $e.PageBounds.Width, $e.PageBounds.Height)`,
+        `  $script:idx++`,
+        `  $e.HasMorePages = ($script:idx -lt $script:imgs.Count)`,
         `})`,
         `$pd.Print()`,
-        `$img.Dispose()`,
+        `foreach ($img in $script:imgs) { $img.Dispose() }`,
       ].filter(Boolean).join('; ');
 
       await new Promise((resolve, reject) => {
@@ -107,11 +164,16 @@ app.post('/print', async (req, res) => {
       });
 
     } else {
-      // ── macOS / Linux: lp (CUPS) ──────────────────────────────────────────
+      // ── macOS / Linux: one `lp` with all files = a single job, N pages ────
+      // `ppi=<dpi>`: the image is rendered at the printer's native dpi, so its
+      // natural size = 4"×3" (1 px → 1 dot, no rescaling, crisp edges).
+      // Page size comes from the QUEUE DEFAULT (set the printer default to 4×3).
+      // No per-job `-o media=...`: forcing custom media makes many thermal
+      // printers re-run gap calibration every few labels.
       const args = [];
       if (printerName) args.push('-d', printerName);
-      args.push('-o', 'ppi=203');  // 606÷203 = 3" × 404÷203 = 2" landscape
-      args.push(tmpFile);
+      args.push('-o', `ppi=${dpi}`);
+      args.push(...tmpFiles);   // multiple files → ONE job
 
       await new Promise((resolve, reject) => {
         execFile('lp', args, (err, _stdout, stderr) => {
@@ -121,12 +183,12 @@ app.post('/print', async (req, res) => {
       });
     }
 
-    res.json({ ok: true, printer: printerName || '(default)' });
+    res.json({ ok: true, printer: printerName || '(default)', count: list.length });
   } catch (e) {
     console.error('[print-bridge] error:', e.message);
     res.status(500).json({ error: e.message });
   } finally {
-    unlink(tmpFile).catch(() => {});
+    await Promise.all(tmpFiles.map(f => unlink(f).catch(() => {})));
   }
 });
 

@@ -1935,89 +1935,85 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
-### M-118 `20260527000015_qc_check_out_bulk_sampling_method.sql`
-**用途**: 批量出烘干时支持**操作员选择抽样方式**(Method 1 / Method 2),建组改为**确定性**(降序切片 + 确定性 champion),并把方式写进 `group_assigned` 事件 payload 供审计。落地用户反馈:从最高编号车开始切、不再 random champion、特定场景下把余数并入末组。详细算法与示例见 [`docs/QC-取样分组方式-修改计划.md`](../QC-取样分组方式-修改计划.md)。
+### M-118 `20260527000015_qc_soft_limits.sql`
+**用途**: QC 检验加 **三区分级判定**(hard / soft / out),并把手动 override 收紧到新加的 supervisor 权限 `qc.testing.supervisor_judge`。
 
-**签名**: `qc_check_out_sub_lots_bulk(p_sub_lot_ids uuid[], p_out_time timestamptz DEFAULT NULL, p_sampling_method text DEFAULT 'method_1')`。校验 `p_sampling_method IN ('method_1','method_2')`。
+**问题**: M-109 让 `qc_submit_inspection` 接受 `p_result` 直接 override 自动判定,但**没有任何约束** —— 任何持 `qc.testing.submit_inspection` 的人都能把超出 hard PASS 范围的读数硬过 PASS。运营反馈这放过了不合格品,需要把 override 限制到 (a) 受控范围内 (b) 受控人群手中。
+
+**新规则**:
+
+| 读数位置 | 判定 |
+|---|---|
+| Hard 内 `[lower_limit, upper_limit]` | 自动 PASS;**supervisor** 可改 FAIL |
+| Soft 边带 `[soft_lower, lower) ∪ (upper, soft_upper]` | **仅 supervisor** 可决定 PASS/FAIL |
+| Soft 外 | **强制 FAIL,任何人都不能 override** |
+
+**Schema 变更**:
+- `qc_inspection_template` 加 `soft_lower_limit / soft_upper_limit numeric(10,4) NOT NULL`
+- 回填:**所有现有 7 个 template 都设 soft = hard**(立刻关掉 override 通道,运营按需重配)
+- CHECK 约束 `qc_inspection_template_soft_wraps_hard`(soft 必须包住 hard)+ `qc_inspection_template_soft_order`(soft_lower ≤ soft_upper)
+
+**RPC 变更**:
+- `qc_submit_inspection`:加载 tmpl 后计算 `in_hard / in_soft`,如果 `p_result <> suggested`:
+  - 不在 soft 内 → `RAISE EXCEPTION 'Reading … outside soft tolerance — manual override not allowed'`
+  - 在 soft 内但无 `qc.testing.supervisor_judge` 权限 → `RAISE EXCEPTION 'Supervisor permission … required'`
+  - 写库的 `values_json` 多记 `in_hard / in_soft`;quality_event payload 多记 `in_hard / in_soft / manual_override_by_supervisor / soft_limits`,审计可追溯
+  - **群组传染逻辑完全不动**(冠军 PASS → siblings 全 passed,FAIL → siblings hold,这套 M-106 / M-109 引入的语义保留)
+- `qc_list_products`:templates 输出多 `soft_lower_limit / soft_upper_limit`,ProductManagement 直接读
+
+**新权限**:
+- `qc.testing.supervisor_judge`(prereq `submit_inspection`)— 持有此权限才能在 soft 边带做决定,以及在 hard 内反向 override 成 FAIL
+- 命名空间放在 `qc.testing.*` 跟其他 inspection 权限一致(M-094 没动 testing 子树)
+- Seed: `ysha@smu.edu` / `shayiqing16@gmail.com` 两个 dev 账号开箱即有,延续 M-064 / M-083 习惯
+
+**前端配套**:
+- `src/services/qcApi.ts` — `TemplateInput` / `InspectionTemplate` 加 `soft_lower_limit / soft_upper_limit`;`createProduct` / `updateProduct` 的 insert/update rows 同步;`inspectionTemplateForSubLot` 的 select + 返回类型扩展
+- `src/pages/qc/ProductManagement.tsx` — 每个 test template block 拆成两个 grouped fieldset:绿色 "Hard PASS range" + 琥珀色 "Soft tolerance"(各 2 列 Lower/Upper);`addTemplate` 初始化 4 个 NaN;submit 校验加 wrap check;SKU 卡片预览里 soft ≠ hard 时多打一段琥珀色 `· soft [...]`
+- `src/pages/qc/TestingPage.tsx` — `canSupervise` hook;`band: 'hard' | 'soft' | 'out' | null` state 跟着读数变;`limits` 类型加 soft 两列;Pass/Fail 按钮按下表 disabled:
+
+| band | Pass | Fail |
+|---|---|---|
+| hard | enabled | supervisor only |
+| soft | supervisor only | supervisor only |
+| out | **disabled** | enabled |
+
+  显示区从原来的 `Spec range: [a, b]` 改成 `Hard [a, b]` + 必要时 `Soft [c, d]` + `band` 角标(emerald/amber/red),soft band 内但非 supervisor 时显示 "请叫 supervisor",out 时显示 "outside soft tolerance — must FAIL"
+- `src/lib/permissionStructure.ts` — `qc.testing` 资源下加 `supervisor_judge` 条目,prereq `submit_inspection`
+
+**业务规则**:
+- **BR-Q70** 每个检验模板必须配 hard `[lower, upper]` + soft `[soft_lower, soft_upper]`,soft 必须**包住** hard(`soft_lower ≤ lower` AND `soft_upper ≥ upper`);DB CHECK 强制,前端 submit 同步校验。
+- **BR-Q71** Manual override 受 `qc.testing.supervisor_judge` 守门:读数在 hard 内反向选 FAIL,或在 soft 边带选任意 verdict,都需此权限;无此权限的提交跟着自动判定走。
+- **BR-Q72** 读数超出 soft 范围时,**任何人**(包括 supervisor)都不能 override,RPC 强制返回 FAIL。
+- **BR-Q73** Migration 默认所有现有 SKU `soft = hard`,等于关闭 override 通道;运营按需为单个 SKU 加宽 soft 才开放 supervisor discretion。
+
+**审计**: 走过 supervisor override 路径的 inspection,`qc_quality_event(inspection_passed | inspection_failed_hold)` 的 payload 含 `manual_override_by_supervisor: true / in_hard / in_soft / soft_limits`,Audit Log 可直接过滤。
+
+---
+
+### M-119 `20260527000016_qc_sample_id_from_cart.sql`
+**用途**: 取消运营手动维护 sample 号码;sample ID 一律服务端从车号(`sub_lot_code`)派生。
+
+**问题**: TestingPage Take Sample 之前必须手动输 `S-2026-0521-001` 这种自编号,运营反馈跟车号是两套独立编号体系,既麻烦又容易记错(尤其同一车多次 retest 时)。车号 `<work_order>-NNN` 本来就唯一,直接复用最干净。
+
+**规则**(服务端在 `qc_take_sample` 自动算):
+- n = 该 sub_lot 已有 qc_sample 行数
+- n = 0(初次测) → `sample_id = <sub_lot_code>`,例如 `W12345-001`
+- n = 1(第一次 retest) → `<sub_lot_code>R`,例如 `W12345-001R`
+- n ≥ 2(第二/三/... 次 retest) → `<sub_lot_code>R<n>`,例如 `W12345-001R2`、`W12345-001R3`
 
 **变更**:
-- Step 2a (fresh) / Step 2b (redry) 的 `array_agg(... ORDER BY sub_lot_code)` 改为 **`DESC`**。
-- 切片改成方法感知:Method 2 在 `R = T mod N > 0 && T > N` 时,前 `⌊T/N⌋ - 1` 组取 N 辆(champion = 降序首位 = 最大),末段 `N + R` 辆为一组,champion = 降序倒数第 `⌊K/2⌋ + 1` 位(即升序中偏大);其他情况和 Method 1 一致(每 N 辆一组、余数自成一组、champion = 组内最大)。
-- 每次 `INSERT qc_quality_event 'group_assigned'` 和返回的 `groups[*]` 都带上 `'sampling_method'`。
+- `qc_take_sample` 的 `p_sample_id` 参数变为可选(`DEFAULT NULL`);传 `NULL` 或空字符串 → 走自动派生;传非空 → 沿用旧的"使用调用方传入值"语义(保留 backward compat)
+- `qc_quality_event(sample_taken).payload` 加 `auto_generated: boolean`,审计可追溯
 
 **前端配套**:
-- 新建 [`src/lib/qcSampling.ts`](../../src/lib/qcSampling.ts) — `planSamplingGroups()` / `championOf()`,与 SQL 一一对照(改算法时必须两边同步)。
-- [`src/services/qcApi.ts`](../../src/services/qcApi.ts) — `checkOutSubLotsBulk` 加 `sampling_method?` 参数;`BulkCheckOutGroup` 加 `sampling_method` / `redry` / `original_group_id` 可选字段;新增 `SamplingMethod` 类型导出。
-- [`src/pages/qc/components/BulkCheckOutDialog.tsx`](../../src/pages/qc/components/BulkCheckOutDialog.tsx) — 弹窗加 Method 1 / 2 radio 二选一(默认 Method 1,套 DisposeDialog radio-card 模式);删除旧的「按 lot 汇总」预览,改为按 SQL 同样的 bucket 划分(fresh/redry × production_lot/原 group)+ 每个 bucket 内列出每组成员 chip 与 champion 高亮,切方式实时重算。
+- `src/services/qcApi.ts` — `takeSample` 的 `sample_id` 改 optional,默认不传 → 服务端派生
+- `src/pages/qc/TestingPage.tsx` — Step 1 的手动输入框换成只读预览块,显示 server 会派出的 ID(`<code>` / `<code>R` / `<code>RN`),retest 时步骤标题改成 "Take retest sample #N" + 角标 "retest #N"
 
 **业务规则**:
-- **BR-Q68** 批量出烘干时,操作员必须选择抽样方式(默认 Method 1)。建组按 `sub_lot_code` 降序进行;**Method 1** = 每 N 辆切一组、余数自成一组、champion = 组内最大编号;**Method 2** = 若有余数则少做 1 组常规组、把余数并入最后一组、最后大组的 champion = 升序排列中的第 `⌊K/2⌋+1` 位(中偏大),常规组仍取最大。同一次 bulk 调用的 Step 2b(redry)沿用同一方法参数;**redry 二次出烘干**操作员重新选,不自动沿用上一次。
+- **BR-Q74** Sample ID 默认服务端派生:初次 = 车号(`sub_lot_code`),retest 加 `R` / `R2` / `R3` ... 后缀。前端不再要求操作员手输 ID。
+- **BR-Q75** 旧的手动输入路径**保留**(调用方传 `p_sample_id` 时跳过自动派生),便于脚本/补录场景按需提供显式 ID。
 
-**依赖**: M-048 (sampling groups), M-075 (20260523000019 bulk fresh/redry 分类)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)、[`docs/QC-取样分组方式-修改计划.md`](../QC-取样分组方式-修改计划.md)。
-
----
-
-### M-119 `20260527000016_qc_submit_inspection_restore_no_supervisor.sql`
-**用途**: 移除**未追踪的** `qc.testing.supervisor_judge` 主管权限校验,恢复 M-117 版本的 `qc_submit_inspection`。
-
-**现象**: 操作员在 Testing 页录数后点 Fail 覆盖系统建议 → RPC 返回 400 `Supervisor permission (qc.testing.supervisor_judge) required to override the auto-judgment`。
-
-**根因**: 该校验**仓库里不存在**(全部 migration、`src/`、`permissionStructure.ts` 都搜不到 `supervisor_judge`)。线上 DB 上的 `qc_submit_inspection` 被有人通过 Supabase SQL Editor 直接 `CREATE OR REPLACE` 加了这条 gate,但没写成 migration。与 M-109 / M-117 / BR-Q67 的设计**冲突**——按设计,任何有 `qc.testing.submit_inspection` 权限的操作员都可以覆盖系统建议、写 Remark,无需主管审批。
-
-**变更**: 把 `qc_submit_inspection` 字节级恢复成 M-117 ([20260527000014](../../supabase/migrations/20260527000014_qc_hold_event_hooks.sql)) 的版本。保留 M-117 的 S4 hold-sync hook(`qc_hold_synced_to_wh` 事件)。幂等。
-
-**如果将来确实要做主管审批 gate**,正确做法:
-1. 把 `supervisor_judge` 加进 [`src/lib/permissionStructure.ts`](../../src/lib/permissionStructure.ts) 的 `qc.testing` 下。
-2. 写 permission seed migration 给指定账户授权。
-3. 在 `qc_submit_inspection` 里加 tracked migration 形式的 gate(校验 `auth.uid()` 是否持有该权限)。
-4. 前端 Testing 页面当用户没该权限时**禁用** Pass/Fail 覆盖按钮(避免提交后才 400 弹错)。
-
-**依赖**: M-117 (20260527000014)。**无 schema 变更,无前端配套**。**关联文档**: 无新增 BR。
-
----
-
-### M-120 `20260609000001_qc_failed_outcome_split.sql`
-**用途**: 把「Failed today」从单数字拆成「总数 / 还未消化数」,并给最近 fail 的每一条标 outcome。**操作员反馈**:大数字混了"已经 retest 通过"和"还没处理"两种情况,看不出还有多少坑等填。
-
-**变更**:
-- `qc_overview.stats` 加 `failed_today_open` —— 今天的 fail 里**没有后续 pass、也没有后续终态处置**(`scrap` / `grind` / `concession` / `rework`)的数量。同卡或同抽样组的后续都算。其它 stats 与 needs_attention 块与 M-107 完全一致(verbatim 复制)。
-- `qc_recent_failed_inspections` 每行加 `outcome` 字段:
-  - `retest_passed` — 同卡或同组后续有 pass
-  - `disposed` — 同卡或同组后续有终态处置
-  - `open` — 都没有,失败还挂着
-  - 优先级:`retest_passed` > `disposed` > `open`。
-
-**前端配套**:
-- [`src/services/qcApi.ts`](../../src/services/qcApi.ts) — `QcOverviewStats.failed_today_open?: number`、新类型 `FailOutcome`、`RecentFailItem.outcome?: FailOutcome`。
-- [`src/pages/qc/QcHome.tsx`](../../src/pages/qc/QcHome.tsx) — Failed today 卡片大数字下方新增小字行 `<n> still open · <m> resolved`(从 `failed_today` − `failed_today_open` 推导 resolved);Fail 明细面板每行加 outcome 小 chip(emerald / slate / orange);卡片 `?` 帮助文案更新解释口径。
-- `StatCard` 加可选 `subline?: React.ReactNode` 通用 prop;新增 `FailOutcomeBadge` 组件。
-
-**业务规则**:
-- **BR-Q69** Dashboard「Failed today」=今天的失败次数累计,不因 retest 通过而下降;小字 `still open` =截至当下还没消化的子集。明细面板按 outcome 标 chip,操作员一眼能识别每条失败的下落。
-
-**依赖**: M-058 (qc_recent_failed_inspections), M-107 (qc_overview)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
-
----
-
-### M-121 `20260609000002_qc_recent_passed_inspections.sql`
-**用途**: 给 QC Home「Passed today」卡片加点击展开的明细面板,镜像 Failed today 的体验。操作员要求可以审计今天的通过项 + 一眼看出哪些已 release、哪些还挂着等放行。
-
-**新增 RPC**: `qc_recent_passed_inspections(p_days int DEFAULT 2)` —— 形状与 [M-058 qc_recent_failed_inspections](../../supabase/migrations/20260522000016_qc_recent_failed_inspections.sql) 对称,只是 `ir.result = 'pass'`。每行带 `outcome`:
-- `released` — 同组所有成员都已脱离 `passed`(已 closed / dispatched 等)。
-- `awaiting_release` — 同组至少有一辆还在 `passed`。
-- solo 车按自己的 `status` 判定。
-
-**前端配套**:
-- [`src/services/qcApi.ts`](../../src/services/qcApi.ts) — `PassOutcome` 类型、`RecentPassItem` 接口、`getRecentPassedInspections()`。
-- [`src/pages/qc/QcHome.tsx`](../../src/pages/qc/QcHome.tsx):
-  - `Passed today` StatCard 加 `onClick` → 切换面板(同 Failed today 模式)。
-  - 新组件 `PassDetailPanel`(emerald 主题)+ `PassOutcomeBadge`(grey "Released" / emerald "Awaiting release")。
-  - Passed today 卡片 `?` 文案补充"点击查看明细"。
-
-**业务规则**:
-- **BR-Q70** Dashboard「Passed today」卡片点击展开最近 2 天的 pass 明细;每行右上角 chip 标 `Released` / `Awaiting release`,基于同卡或同组成员当前是否还在 `passed` 状态判定。
-
-**依赖**: M-058 (qc_recent_failed_inspections — 形状参考)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
+**未做**: `qc_sample.sample_id` 没有加 UNIQUE 约束(历史上手动输入允许重复 / 跨 sub_lot 同名);如未来要彻底归一,需要单独再做一个唯一性约束 migration。
 
 ---
 
@@ -2120,10 +2116,9 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-115 | 20260527000012_qc_create_production_lot_with_sub_lots_v2.sql |
 | M-116 | 20260527000013_qc_release_passed_sub_lot_v2.sql |
 | M-117 | 20260527000014_qc_hold_event_hooks.sql |
-| M-119 | 20260527000016_qc_submit_inspection_restore_no_supervisor.sql |
-| M-120 | 20260609000001_qc_failed_outcome_split.sql |
-| M-121 | 20260609000002_qc_recent_passed_inspections.sql |
-| **M-122** | _(下一个)_ |
+| M-118 | 20260527000015_qc_soft_limits.sql |
+| M-119 | 20260527000016_qc_sample_id_from_cart.sql |
+| **M-120** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

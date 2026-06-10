@@ -5,13 +5,13 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "install-service": "bash install-service.sh",
-    "uninstall-service": "bash uninstall-service.sh",
-    "install-service-win": "powershell -ExecutionPolicy Bypass -File install-service-windows.ps1",
-    "uninstall-service-win": "powershell -ExecutionPolicy Bypass -File uninstall-service-windows.ps1"
+    "build": "node build.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.3.0"
   }
 }
