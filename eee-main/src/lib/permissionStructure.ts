@@ -183,6 +183,17 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'delete', label: 'Delete', prereq: 'edit' },
         ],
       },
+      // M-122 — Daily Report data-entry (digitised Forming Production Excel).
+      // Frontend call site: pages/production/DailyReportPage.tsx.
+      daily_report: {
+        label: 'Daily Report (Forming Production)',
+        permissions: [
+          { id: 'view',   label: 'View Daily Reports', prereq: null },
+          { id: 'create', label: 'Create Report Row',  prereq: 'view' },
+          { id: 'edit',   label: 'Edit Report Row',    prereq: 'view' },
+          { id: 'delete', label: 'Delete Report Row',  prereq: 'edit' },
+        ],
+      },
     },
   },
   hr: {
