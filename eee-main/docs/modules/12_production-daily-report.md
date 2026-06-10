@@ -38,8 +38,9 @@
 
 `src/pages/production/DailyReportPage.tsx`:
 - 顶部 **日期选择器 + 班次切换(1st/2nd/3rd)**,贴合"一次录一个班"的习惯。
-- 主体表格:当前 日期+班次 的记录;单行内联编辑(同一时刻仅一行可编辑),底部"+ 新增行"。机台/料号/工号/停机原因走下拉(查主数据),其余手填。
-- 10 个计算列在编辑行**实时预览**(前端按 BR-P1 同口径算),保存后以视图返回值为准。
+- **紧凑列表**:当前 日期+班次 的记录只显示关键列(机台 / 料号 / 描述 / 操作员 / 产出 / 工时 / 总车数 / Pcs·Hr / Credit + 操作),宽度适配屏幕,不再横向溢出。Credit 以色块徽章呈现效率(≥1 绿 / ≥0.8 琥珀 / <0.8 红)。
+- **右侧滑出抽屉**做新增/编辑:字段按「标识 / 车号 / 产量 / 停机 / 备注」分组;底部「自动计算」区按 BR-P1 同口径**实时预览** 10 个公式列,保存后以视图返回值为准。
+  - 设计原因:Excel 原表 22 列一行,若整屏平铺会超出屏幕且录入困难;故列表只留关键列、完整录入收进抽屉。
 - 权限门:无 `view` 显示 `PermissionDenied`;增/改/删按钮按 `create/edit/delete` 控制。
 
 服务层 `src/services/productionDailyApi.ts`:`listDailyReports(date,shift)` 读视图;`create/update/deleteDailyReport` 写流水表;`listProducts/Machines/Operators/DowntimeReasons` 取下拉。

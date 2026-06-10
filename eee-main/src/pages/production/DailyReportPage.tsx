@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import { getISOWeek } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
@@ -13,23 +13,12 @@ import {
 } from '../../services/productionDailyApi';
 
 const SHIFTS: Shift[] = ['1st', '2nd', '3rd'];
-const NEW = '__new__';
 
-/** Draft form — numeric fields are kept as strings so empty / partial entry
- *  ("", "0.") works without flipping to 0. Parsed on save. */
+/** Draft form — numeric fields kept as strings so empty / partial entry works. */
 interface Draft {
-  machine_id: string;
-  product_id: string;
-  operator_id: string;
-  work_order: string;
-  cart_from: string;
-  cart_to: string;
-  output_qty: string;
-  work_hours: string;
-  defect_waste_lbs: string;
-  down_hours: string;
-  downtime_reason_id: string;
-  note: string;
+  machine_id: string; product_id: string; operator_id: string; work_order: string;
+  cart_from: string; cart_to: string; output_qty: string; work_hours: string;
+  defect_waste_lbs: string; down_hours: string; downtime_reason_id: string; note: string;
 }
 
 const emptyDraft = (): Draft => ({
@@ -63,7 +52,6 @@ const intOrNull = (s: string): number | null => {
   const n = numOrNull(s);
   return n == null ? null : Math.trunc(n);
 };
-
 const fmt = (n: number | null | undefined, dp = 2): string =>
   n == null || !Number.isFinite(n) ? '—'
     : n.toLocaleString(undefined, { maximumFractionDigits: dp });
@@ -95,8 +83,8 @@ export default function DailyReportPage() {
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // editingId: an existing row id, or NEW for the draft "add row", or null.
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // Drawer: null = closed; 'new' = create; otherwise the row id being edited.
+  const [drawer, setDrawer] = useState<'new' | string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
 
   const productById = useMemo(() => {
@@ -105,7 +93,6 @@ export default function DailyReportPage() {
     return m;
   }, [products]);
 
-  // ── data loading ──
   useEffect(() => {
     listProducts().then(setProducts).catch((e) => setError(e.message));
     listMachines().then(setMachines).catch((e) => setError(e.message));
@@ -124,7 +111,7 @@ export default function DailyReportPage() {
 
   useEffect(() => {
     load();
-    setEditingId(null);
+    setDrawer(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, shift, canView]);
 
@@ -132,7 +119,7 @@ export default function DailyReportPage() {
     return <PermissionDenied permission="production.daily_report.view" feature={t('dailyReport.feature')} />;
   }
 
-  // ── live preview of the 10 computed columns for the draft (mirrors BR-P1) ──
+  // live preview of the 10 computed columns (mirrors the view / BR-P1)
   const preview = useMemo(() => {
     const p = draft.product_id ? productById.get(draft.product_id) : undefined;
     const output = numOrNull(draft.output_qty) ?? 0;
@@ -142,7 +129,6 @@ export default function DailyReportPage() {
     const pcsHr = hours && hours > 0 ? output / hours : null;
     return {
       item_description: p?.description ?? null,
-      // mirror the view: blank lookup → 0 when product present, else NULL
       standard_lbs_hr: p ? (p.pcs_lbs_per_hour ?? 0) : null,
       lbs_good_produced: (p?.bone_avg ?? 0) * output,
       runner_weight_pct: p ? (p.runner_avg ?? 0) : null,
@@ -154,25 +140,15 @@ export default function DailyReportPage() {
     };
   }, [draft, productById, date]);
 
-  // ── editing actions ──
-  const startAdd = () => {
-    setError(''); setMsg('');
-    setDraft(emptyDraft());
-    setEditingId(NEW);
-  };
-  const startEdit = (r: DailyReportRow) => {
-    setError(''); setMsg('');
-    setDraft(rowToDraft(r));
-    setEditingId(r.id);
-  };
-  const cancel = () => { setEditingId(null); setDraft(emptyDraft()); };
+  const openNew = () => { setError(''); setMsg(''); setDraft(emptyDraft()); setDrawer('new'); };
+  const openEdit = (r: DailyReportRow) => { setError(''); setMsg(''); setDraft(rowToDraft(r)); setDrawer(r.id); };
+  const closeDrawer = () => { setDrawer(null); setDraft(emptyDraft()); setError(''); };
 
   const buildInput = (): DailyReportInput | null => {
     if (!draft.machine_id) { setError(t('dailyReport.errMachine')); return null; }
     if (!draft.operator_id) { setError(t('dailyReport.errOperator')); return null; }
     return {
-      report_date: date,
-      shift,
+      report_date: date, shift,
       machine_id: draft.machine_id,
       product_id: draft.product_id || null,
       operator_id: draft.operator_id,
@@ -193,11 +169,10 @@ export default function DailyReportPage() {
     if (!input) return;
     setBusy(true); setError('');
     try {
-      if (editingId && editingId !== NEW) await updateDailyReport(editingId, input);
+      if (drawer && drawer !== 'new') await updateDailyReport(drawer, input);
       else await createDailyReport(input);
       setMsg(t('dailyReport.saved'));
-      setEditingId(null);
-      setDraft(emptyDraft());
+      closeDrawer();
       load();
     } catch (e) {
       setError((e as Error).message);
@@ -220,121 +195,84 @@ export default function DailyReportPage() {
     }
   };
 
-  // ── render helpers ──
-  const th = 'px-2 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap';
-  const thCalc = cn(th, 'bg-slate-50 text-indigo-500');
-  const td = 'px-2 py-1.5 text-xs text-slate-700 whitespace-nowrap';
-  const tdCalc = cn(td, 'bg-slate-50/70 text-slate-600 tabular-nums');
-  const input = 'w-full border border-slate-300 rounded px-1.5 h-8 text-xs';
-  const colCount = 24;
+  // ── compact list ──
+  const th = 'px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap';
+  const td = 'px-3 py-2.5 text-sm text-slate-700';
 
-  const selectCell = (
-    value: string, onChange: (v: string) => void,
-    opts: { value: string; label: string }[], placeholder = true,
-  ) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={input}>
-      {placeholder && <option value="">{t('dailyReport.selectPlaceholder')}</option>}
-      {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
-  );
-
-  const renderEditRow = (key: string) => (
-    <tr key={key} className="bg-amber-50/60 border-y border-amber-200">
-      <td className={td}>{selectCell(draft.machine_id, (v) => setDraft({ ...draft, machine_id: v }),
-        machines.map((m) => ({ value: m.id, label: m.code })))}</td>
-      <td className={td}>{selectCell(draft.product_id, (v) => setDraft({ ...draft, product_id: v }),
-        products.map((p) => ({ value: p.id, label: p.item_number })))}</td>
-      <td className={tdCalc}>{preview.item_description ?? '—'}</td>
-      <td className={td}><input className={input} value={draft.work_order}
-        onChange={(e) => setDraft({ ...draft, work_order: e.target.value })} /></td>
-      <td className={td}><input className={input} inputMode="numeric" value={draft.cart_from}
-        onChange={(e) => setDraft({ ...draft, cart_from: e.target.value })} /></td>
-      <td className={td}><input className={input} inputMode="numeric" value={draft.cart_to}
-        onChange={(e) => setDraft({ ...draft, cart_to: e.target.value })} /></td>
-      <td className={tdCalc}>{fmt(preview.total_carts, 0)}</td>
-      <td className={td}><input className={input} inputMode="decimal" value={draft.output_qty}
-        onChange={(e) => setDraft({ ...draft, output_qty: e.target.value })} /></td>
-      <td className={td}>{selectCell(draft.operator_id, (v) => setDraft({ ...draft, operator_id: v }),
-        operators.map((o) => ({ value: o.id, label: `${o.badge_no} · ${o.name}` })))}</td>
-      <td className={td}><input className={input} inputMode="decimal" value={draft.work_hours}
-        onChange={(e) => setDraft({ ...draft, work_hours: e.target.value })} /></td>
-      <td className={td}><input className={input} inputMode="decimal" value={draft.defect_waste_lbs}
-        onChange={(e) => setDraft({ ...draft, defect_waste_lbs: e.target.value })} /></td>
-      <td className={td}><input className={input} inputMode="decimal" value={draft.down_hours}
-        onChange={(e) => setDraft({ ...draft, down_hours: e.target.value })} /></td>
-      <td className={td}>{selectCell(draft.downtime_reason_id, (v) => setDraft({ ...draft, downtime_reason_id: v }),
-        reasons.map((r) => ({ value: r.id, label: r.label })))}</td>
-      <td className={td}><input className={cn(input, 'min-w-[140px]')} value={draft.note}
-        onChange={(e) => setDraft({ ...draft, note: e.target.value })} /></td>
-      {/* computed */}
-      <td className={tdCalc}>{fmt(preview.standard_lbs_hr)}</td>
-      <td className={tdCalc}>{fmt(preview.lbs_good_produced)}</td>
-      <td className={tdCalc}>{fmt(preview.runner_weight_pct, 4)}</td>
-      <td className={tdCalc}>{fmt(preview.runner_regrind_lbs)}</td>
-      <td className={tdCalc}>{fmt(preview.pcs_lbs_per_hr)}</td>
-      <td className={tdCalc}>{fmt(preview.credit, 3)}</td>
-      <td className={tdCalc}>{fmt(preview.week_num, 0)}</td>
-      <td className={cn(td, 'sticky right-0 bg-amber-50')}>
-        <div className="flex items-center gap-1">
-          <button onClick={save} disabled={busy}
-            className="p-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50" title={t('dailyReport.save')}>
-            <Check size={13} />
-          </button>
-          <button onClick={cancel} disabled={busy}
-            className="p-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700" title={t('dailyReport.cancel')}>
-            <X size={13} />
-          </button>
-        </div>
-      </td>
-    </tr>
-  );
-
-  const renderReadRow = (r: DailyReportRow) => (
-    <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
-      <td className={cn(td, 'font-medium')}>{r.machine_code}</td>
-      <td className={cn(td, 'font-mono')}>{r.item_number ?? '—'}</td>
-      <td className={td}>{r.item_description ?? '—'}</td>
-      <td className={cn(td, 'font-mono')}>{r.work_order ?? '—'}</td>
-      <td className={td}>{r.cart_from ?? '—'}</td>
-      <td className={td}>{r.cart_to ?? '—'}</td>
-      <td className={tdCalc}>{fmt(r.total_carts, 0)}</td>
-      <td className={cn(td, 'tabular-nums')}>{fmt(r.output_qty, 0)}</td>
-      <td className={td}>{r.badge_no} · {r.operator_name}</td>
-      <td className={cn(td, 'tabular-nums')}>{fmt(r.work_hours)}</td>
-      <td className={cn(td, 'tabular-nums')}>{fmt(r.defect_waste_lbs)}</td>
-      <td className={cn(td, 'tabular-nums')}>{fmt(r.down_hours)}</td>
-      <td className={td}>{r.downtime_reason ?? '—'}</td>
-      <td className={cn(td, 'max-w-[200px] truncate')} title={r.note ?? ''}>{r.note ?? '—'}</td>
-      {/* computed */}
-      <td className={tdCalc}>{fmt(r.standard_lbs_hr)}</td>
-      <td className={tdCalc}>{fmt(r.lbs_good_produced)}</td>
-      <td className={tdCalc}>{fmt(r.runner_weight_pct, 4)}</td>
-      <td className={tdCalc}>{fmt(r.runner_regrind_lbs)}</td>
-      <td className={tdCalc}>{fmt(r.pcs_lbs_per_hr)}</td>
-      <td className={tdCalc}>{fmt(r.credit, 3)}</td>
-      <td className={tdCalc}>{fmt(r.week_num, 0)}</td>
-      <td className={cn(td, 'sticky right-0 bg-white')}>
-        <div className="flex items-center gap-1">
-          {canEdit && (
-            <button onClick={() => startEdit(r)} disabled={editingId !== null || busy}
-              className="p-1 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-40" title={t('dailyReport.edit')}>
-              <Pencil size={13} />
-            </button>
-          )}
-          {canDelete && (
-            <button onClick={() => remove(r.id)} disabled={editingId !== null || busy}
-              className="p-1 rounded hover:bg-red-100 text-red-500 disabled:opacity-40" title={t('dailyReport.delete')}>
-              <Trash2 size={13} />
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
+  const renderList = () => (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className={cn(th, 'text-left')}>{t('dailyReport.colMachine')}</th>
+              <th className={cn(th, 'text-left')}>{t('dailyReport.colItem')}</th>
+              <th className={cn(th, 'text-left')}>{t('dailyReport.colDescription')}</th>
+              <th className={cn(th, 'text-left')}>{t('dailyReport.colOperator')}</th>
+              <th className={cn(th, 'text-right')}>{t('dailyReport.colOutput')}</th>
+              <th className={cn(th, 'text-right')}>{t('dailyReport.colWorkHours')}</th>
+              <th className={cn(th, 'text-right')}>{t('dailyReport.colTotalCarts')}</th>
+              <th className={cn(th, 'text-right')}>{t('dailyReport.colPcsHr')}</th>
+              <th className={cn(th, 'text-right')}>{t('dailyReport.colCredit')}</th>
+              <th className={cn(th, 'text-right w-24')}>{t('dailyReport.actions')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((r) => (
+              <tr key={r.id} className="hover:bg-slate-50 cursor-pointer"
+                  onClick={() => (canEdit ? openEdit(r) : undefined)}>
+                <td className={cn(td, 'font-medium whitespace-nowrap')}>{r.machine_code}</td>
+                <td className={cn(td, 'font-mono text-xs whitespace-nowrap')}>{r.item_number ?? '—'}</td>
+                <td className={cn(td, 'max-w-[240px] truncate')} title={r.item_description ?? ''}>
+                  {r.item_description ?? '—'}
+                </td>
+                <td className={cn(td, 'whitespace-nowrap')}>
+                  <span className="text-slate-400 text-xs mr-1">{r.badge_no}</span>{r.operator_name}
+                </td>
+                <td className={cn(td, 'text-right tabular-nums')}>{fmt(r.output_qty, 0)}</td>
+                <td className={cn(td, 'text-right tabular-nums')}>{fmt(r.work_hours)}</td>
+                <td className={cn(td, 'text-right tabular-nums')}>{fmt(r.total_carts, 0)}</td>
+                <td className={cn(td, 'text-right tabular-nums')}>{fmt(r.pcs_lbs_per_hr)}</td>
+                <td className={cn(td, 'text-right tabular-nums')}>
+                  <CreditBadge value={r.credit} />
+                </td>
+                <td className={cn(td, 'text-right whitespace-nowrap')} onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center justify-end gap-1">
+                    {canEdit && (
+                      <button onClick={() => openEdit(r)} disabled={busy}
+                        className="p-1.5 rounded hover:bg-slate-200 text-slate-500 disabled:opacity-40" title={t('dailyReport.edit')}>
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button onClick={() => remove(r.id)} disabled={busy}
+                        className="p-1.5 rounded hover:bg-red-100 text-red-500 disabled:opacity-40" title={t('dailyReport.delete')}>
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {!loading && rows.length === 0 && (
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-sm text-slate-400">
+                {t('dailyReport.empty')}
+              </td></tr>
+            )}
+            {loading && (
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-sm text-slate-400">
+                {t('dailyReport.loading')}
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 
   return (
-    <div className="p-6">
-      <div className="mb-4">
+    <div className="p-6 max-w-6xl">
+      <div className="mb-5">
         <h1 className="text-2xl font-bold text-slate-900">{t('dailyReport.title')}</h1>
         <p className="text-slate-600 text-sm mt-0.5">{t('dailyReport.subtitle')}</p>
       </div>
@@ -361,8 +299,8 @@ export default function DailyReportPage() {
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-slate-500">{t('dailyReport.rowCount', { count: rows.length })}</span>
           {canCreate && (
-            <button onClick={startAdd} disabled={editingId !== null}
-              className="flex items-center gap-1.5 px-4 h-9 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold disabled:opacity-50">
+            <button onClick={openNew}
+              className="flex items-center gap-1.5 px-4 h-9 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold">
               <Plus size={14} /> {t('dailyReport.addRow')}
             </button>
           )}
@@ -370,54 +308,212 @@ export default function DailyReportPage() {
       </div>
 
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
-      {error && <p className="text-red-600 bg-red-50 p-2 rounded-lg mb-3 text-sm">{error}</p>}
+      {error && !drawer && <p className="text-red-600 bg-red-50 p-2 rounded-lg mb-3 text-sm">{error}</p>}
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className={th}>{t('dailyReport.colMachine')}</th>
-                <th className={th}>{t('dailyReport.colItem')}</th>
-                <th className={th}>{t('dailyReport.colDescription')}</th>
-                <th className={th}>{t('dailyReport.colWorkOrder')}</th>
-                <th className={th}>{t('dailyReport.colCartFrom')}</th>
-                <th className={th}>{t('dailyReport.colCartTo')}</th>
-                <th className={thCalc}>{t('dailyReport.colTotalCarts')}</th>
-                <th className={th}>{t('dailyReport.colOutput')}</th>
-                <th className={th}>{t('dailyReport.colOperator')}</th>
-                <th className={th}>{t('dailyReport.colWorkHours')}</th>
-                <th className={th}>{t('dailyReport.colDefect')}</th>
-                <th className={th}>{t('dailyReport.colDownHours')}</th>
-                <th className={th}>{t('dailyReport.colDowntimeReason')}</th>
-                <th className={th}>{t('dailyReport.colNote')}</th>
-                <th className={thCalc}>{t('dailyReport.colStdLbsHr')}</th>
-                <th className={thCalc}>{t('dailyReport.colLbsGood')}</th>
-                <th className={thCalc}>{t('dailyReport.colRunnerPct')}</th>
-                <th className={thCalc}>{t('dailyReport.colRunnerRegrind')}</th>
-                <th className={thCalc}>{t('dailyReport.colPcsHr')}</th>
-                <th className={thCalc}>{t('dailyReport.colCredit')}</th>
-                <th className={thCalc}>{t('dailyReport.colWeek')}</th>
-                <th className={cn(th, 'sticky right-0 bg-white')}>{t('dailyReport.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (editingId === r.id ? renderEditRow(r.id) : renderReadRow(r)))}
-              {editingId === NEW && renderEditRow(NEW)}
-              {!loading && rows.length === 0 && editingId !== NEW && (
-                <tr><td colSpan={colCount} className="px-4 py-10 text-center text-sm text-slate-400">
-                  {t('dailyReport.empty')}
-                </td></tr>
-              )}
-              {loading && (
-                <tr><td colSpan={colCount} className="px-4 py-10 text-center text-sm text-slate-400">
-                  {t('dailyReport.loading')}
-                </td></tr>
-              )}
-            </tbody>
-          </table>
+      {renderList()}
+
+      {drawer && (
+        <EntryDrawer
+          t={t}
+          titleKey={drawer === 'new' ? 'dailyReport.drawerTitleNew' : 'dailyReport.drawerTitleEdit'}
+          draft={draft} setDraft={setDraft}
+          preview={preview}
+          machines={machines} products={products} operators={operators} reasons={reasons}
+          error={error}
+          busy={busy}
+          onClose={closeDrawer}
+          onSave={save}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Small coloured efficiency badge (Credit = actual rate / standard rate). */
+function CreditBadge({ value }: { value: number | null }) {
+  if (value == null || !Number.isFinite(value)) return <span className="text-slate-400">—</span>;
+  const tone = value >= 1 ? 'bg-emerald-50 text-emerald-700'
+    : value >= 0.8 ? 'bg-amber-50 text-amber-700'
+      : 'bg-red-50 text-red-700';
+  return (
+    <span className={cn('inline-block px-1.5 py-0.5 rounded text-xs font-semibold tabular-nums', tone)}>
+      {value.toLocaleString(undefined, { maximumFractionDigits: 3 })}
+    </span>
+  );
+}
+
+// ── Slide-over entry drawer ─────────────────────────────────────────────────
+
+interface DrawerProps {
+  t: (k: string, o?: Record<string, unknown>) => string;
+  titleKey: string;
+  draft: Draft;
+  setDraft: (d: Draft) => void;
+  preview: {
+    item_description: string | null; standard_lbs_hr: number | null;
+    lbs_good_produced: number; runner_weight_pct: number | null;
+    runner_regrind_lbs: number; pcs_lbs_per_hr: number | null;
+    credit: number | null; total_carts: number; week_num: number | null;
+  };
+  machines: MachineOption[];
+  products: ProductOption[];
+  operators: OperatorOption[];
+  reasons: DowntimeReasonOption[];
+  error: string;
+  busy: boolean;
+  onClose: () => void;
+  onSave: () => void;
+}
+
+function EntryDrawer(p: DrawerProps) {
+  const { t, draft, setDraft } = p;
+  const set = (k: keyof Draft) => (v: string) => setDraft({ ...draft, [k]: v });
+
+  const labelCls = 'block';
+  const spanCls = 'text-xs font-medium text-slate-600';
+  const inputCls = 'w-full border border-slate-300 rounded-lg px-2.5 h-9 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400';
+
+  const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
+    <label className={labelCls}>
+      <span className={spanCls}>{label}{required && <span className="text-red-500"> *</span>}</span>
+      {children}
+    </label>
+  );
+
+  const Calc = ({ label, value }: { label: string; value: string }) => (
+    <div className="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
+      <span className="text-xs text-slate-500">{label}</span>
+      <span className="text-sm font-semibold text-slate-800 tabular-nums">{value}</span>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-slate-900/30" onClick={p.onClose} />
+      <aside className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col">
+        {/* header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
+          <h2 className="text-base font-bold text-slate-900">{t(p.titleKey)}</h2>
+          <button onClick={p.onClose} className="p-1.5 rounded hover:bg-slate-100 text-slate-500" title={t('dailyReport.close')}>
+            <X size={18} />
+          </button>
         </div>
-      </div>
+
+        {/* body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {p.error && <p className="text-red-600 bg-red-50 p-2 rounded-lg text-sm">{p.error}</p>}
+
+          {/* Identification */}
+          <section className="space-y-3">
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t('dailyReport.secId')}</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t('dailyReport.colMachine')} required>
+                <select className={inputCls} value={draft.machine_id} onChange={(e) => set('machine_id')(e.target.value)}>
+                  <option value="">{t('dailyReport.selectPlaceholder')}</option>
+                  {p.machines.map((m) => <option key={m.id} value={m.id}>{m.code}</option>)}
+                </select>
+              </Field>
+              <Field label={t('dailyReport.colOperator')} required>
+                <select className={inputCls} value={draft.operator_id} onChange={(e) => set('operator_id')(e.target.value)}>
+                  <option value="">{t('dailyReport.selectPlaceholder')}</option>
+                  {p.operators.map((o) => <option key={o.id} value={o.id}>{o.badge_no} · {o.name}</option>)}
+                </select>
+              </Field>
+              <Field label={t('dailyReport.colItem')}>
+                <select className={inputCls} value={draft.product_id} onChange={(e) => set('product_id')(e.target.value)}>
+                  <option value="">{t('dailyReport.selectPlaceholder')}</option>
+                  {p.products.map((pr) => <option key={pr.id} value={pr.id}>{pr.item_number}</option>)}
+                </select>
+              </Field>
+              <Field label={t('dailyReport.colWorkOrder')}>
+                <input className={inputCls} value={draft.work_order} onChange={(e) => set('work_order')(e.target.value)} />
+              </Field>
+            </div>
+            {p.preview.item_description && (
+              <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-2.5 py-1.5">{p.preview.item_description}</p>
+            )}
+          </section>
+
+          {/* Carts */}
+          <section className="space-y-3">
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t('dailyReport.secCarts')}</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label={t('dailyReport.colCartFrom')}>
+                <input className={inputCls} inputMode="numeric" value={draft.cart_from} onChange={(e) => set('cart_from')(e.target.value)} />
+              </Field>
+              <Field label={t('dailyReport.colCartTo')}>
+                <input className={inputCls} inputMode="numeric" value={draft.cart_to} onChange={(e) => set('cart_to')(e.target.value)} />
+              </Field>
+              <Field label={t('dailyReport.colTotalCarts')}>
+                <div className={cn(inputCls, 'flex items-center bg-slate-50 text-slate-700 tabular-nums')}>{fmt(p.preview.total_carts, 0)}</div>
+              </Field>
+            </div>
+          </section>
+
+          {/* Production */}
+          <section className="space-y-3">
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t('dailyReport.secProduction')}</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label={t('dailyReport.colOutput')}>
+                <input className={inputCls} inputMode="decimal" value={draft.output_qty} onChange={(e) => set('output_qty')(e.target.value)} />
+              </Field>
+              <Field label={t('dailyReport.colWorkHours')}>
+                <input className={inputCls} inputMode="decimal" value={draft.work_hours} onChange={(e) => set('work_hours')(e.target.value)} />
+              </Field>
+              <Field label={t('dailyReport.colDefect')}>
+                <input className={inputCls} inputMode="decimal" value={draft.defect_waste_lbs} onChange={(e) => set('defect_waste_lbs')(e.target.value)} />
+              </Field>
+            </div>
+          </section>
+
+          {/* Downtime */}
+          <section className="space-y-3">
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t('dailyReport.secDowntime')}</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t('dailyReport.colDownHours')}>
+                <input className={inputCls} inputMode="decimal" value={draft.down_hours} onChange={(e) => set('down_hours')(e.target.value)} />
+              </Field>
+              <Field label={t('dailyReport.colDowntimeReason')}>
+                <select className={inputCls} value={draft.downtime_reason_id} onChange={(e) => set('downtime_reason_id')(e.target.value)}>
+                  <option value="">{t('dailyReport.selectPlaceholder')}</option>
+                  {p.reasons.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                </select>
+              </Field>
+            </div>
+          </section>
+
+          {/* Note */}
+          <section className="space-y-2">
+            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t('dailyReport.secNote')}</h3>
+            <textarea className={cn(inputCls, 'h-auto py-2 resize-none')} rows={2}
+              value={draft.note} onChange={(e) => set('note')(e.target.value)} />
+          </section>
+
+          {/* Calculated */}
+          <section className="bg-indigo-50/50 border border-indigo-100 rounded-xl px-4 py-3">
+            <h3 className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest mb-2">{t('dailyReport.secCalculated')}</h3>
+            <Calc label={t('dailyReport.colStdLbsHr')} value={fmt(p.preview.standard_lbs_hr)} />
+            <Calc label={t('dailyReport.colLbsGood')} value={fmt(p.preview.lbs_good_produced)} />
+            <Calc label={t('dailyReport.colRunnerPct')} value={fmt(p.preview.runner_weight_pct, 4)} />
+            <Calc label={t('dailyReport.colRunnerRegrind')} value={fmt(p.preview.runner_regrind_lbs)} />
+            <Calc label={t('dailyReport.colPcsHr')} value={fmt(p.preview.pcs_lbs_per_hr)} />
+            <Calc label={t('dailyReport.colCredit')} value={fmt(p.preview.credit, 3)} />
+            <Calc label={t('dailyReport.colWeek')} value={fmt(p.preview.week_num, 0)} />
+          </section>
+        </div>
+
+        {/* footer */}
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-200 shrink-0">
+          <button onClick={p.onClose} disabled={p.busy}
+            className="px-4 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold">
+            {t('dailyReport.cancel')}
+          </button>
+          <button onClick={p.onSave} disabled={p.busy}
+            className="px-5 h-9 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold disabled:opacity-50">
+            {p.busy ? t('dailyReport.saving') : t('dailyReport.save')}
+          </button>
+        </div>
+      </aside>
     </div>
   );
 }

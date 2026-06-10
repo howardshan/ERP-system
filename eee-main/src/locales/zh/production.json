@@ -75,6 +75,16 @@
     "colCredit": "Credit 效率",
     "colWeek": "周次",
     "selectPlaceholder": "—",
-    "actions": "操作"
+    "actions": "操作",
+    "drawerTitleNew": "新增日报记录",
+    "drawerTitleEdit": "编辑日报记录",
+    "secId": "标识",
+    "secCarts": "车号",
+    "secProduction": "产量",
+    "secDowntime": "停机",
+    "secNote": "备注",
+    "secCalculated": "自动计算",
+    "close": "关闭",
+    "required": "必填"
   }
 }

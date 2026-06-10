@@ -75,6 +75,16 @@
     "colCredit": "Credit",
     "colWeek": "Week #",
     "selectPlaceholder": "—",
-    "actions": "Actions"
+    "actions": "Actions",
+    "drawerTitleNew": "New Daily Report row",
+    "drawerTitleEdit": "Edit Daily Report row",
+    "secId": "Identification",
+    "secCarts": "Carts",
+    "secProduction": "Production",
+    "secDowntime": "Downtime",
+    "secNote": "Note",
+    "secCalculated": "Calculated (auto)",
+    "close": "Close",
+    "required": "Required"
   }
 }

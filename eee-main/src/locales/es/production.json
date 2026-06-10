@@ -75,6 +75,16 @@
     "colCredit": "Crédito",
     "colWeek": "Semana",
     "selectPlaceholder": "—",
-    "actions": "Acciones"
+    "actions": "Acciones",
+    "drawerTitleNew": "Nueva fila de Reporte Diario",
+    "drawerTitleEdit": "Editar fila de Reporte Diario",
+    "secId": "Identificación",
+    "secCarts": "Carros",
+    "secProduction": "Producción",
+    "secDowntime": "Paro",
+    "secNote": "Nota",
+    "secCalculated": "Calculado (auto)",
+    "close": "Cerrar",
+    "required": "Obligatorio"
   }
 }
