@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, ChevronDown, ChevronRight, Pencil, X, Check } from 'lucide-react';
 import {
   listLocations,
@@ -31,6 +32,7 @@ const emptyCreate = (): CreateForm => ({
 });
 
 export default function LocationManagement() {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'locations', 'view');
   const canManage = can('qc', 'locations', 'manage');
@@ -104,15 +106,15 @@ export default function LocationManagement() {
     const dryer = parseInt(createForm.dryer_number, 10);
     const cell = parseInt(createForm.cell_number, 10);
     if (!Number.isFinite(dryer) || dryer < 1) {
-      setError('Dryer number must be ≥ 1');
+      setError(t('locationManagement.errDryerMin'));
       return;
     }
     if (!Number.isFinite(cell) || cell < 0) {
-      setError('Cell number must be ≥ 0');
+      setError(t('locationManagement.errCellMin'));
       return;
     }
     if (!createForm.display_name.trim()) {
-      setError('Display name is required');
+      setError(t('locationManagement.errDisplayNameRequired'));
       return;
     }
     setBusy(true);
@@ -124,13 +126,13 @@ export default function LocationManagement() {
         display_name: createForm.display_name.trim(),
         code: createForm.code.trim() || null,
       });
-      setMsg(`Added ${created.code}`);
+      setMsg(t('locationManagement.added', { code: created.code }));
       // Make sure the new dryer's group is expanded so the user sees the row
       setCollapsed(prev => { const n = new Set(prev); n.delete(dryer); return n; });
       cancelCreate();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Create failed');
+      setError(err instanceof Error ? err.message : t('locationManagement.createFailed'));
     }
     setBusy(false);
   };
@@ -151,7 +153,7 @@ export default function LocationManagement() {
   const submitEdit = async (id: string) => {
     if (busy) return;
     if (!editForm.display_name.trim()) {
-      setError('Display name is required');
+      setError(t('locationManagement.errDisplayNameRequired'));
       return;
     }
     setBusy(true);
@@ -162,45 +164,43 @@ export default function LocationManagement() {
         display_name: editForm.display_name.trim(),
         code: editForm.code.trim() || null,
       });
-      setMsg('Updated');
+      setMsg(t('locationManagement.updated'));
       cancelEdit();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Update failed');
+      setError(err instanceof Error ? err.message : t('locationManagement.updateFailed'));
     }
     setBusy(false);
   };
 
   const handleDelete = async (l: DryingLocation) => {
     if (busy) return;
-    const ok = window.confirm(`Delete ${l.code} (${l.display_name})? This cannot be undone.`);
+    const ok = window.confirm(t('locationManagement.confirmDelete', { code: l.code, name: l.display_name }));
     if (!ok) return;
     setBusy(true);
     setError('');
     try {
       await deleteLocation(l.id);
-      setMsg(`Deleted ${l.code}`);
+      setMsg(t('locationManagement.deleted', { code: l.code }));
       await load();
     } catch (err) {
       // Occupancy guard surfaces as a thrown Error from the RPC; show it inline
-      setError(err instanceof Error ? err.message : 'Delete failed');
+      setError(err instanceof Error ? err.message : t('locationManagement.deleteFailed'));
     }
     setBusy(false);
   };
 
   if (!canView) {
-    return <PermissionDenied permission="qc.locations.view" feature="Dryer Locations" />;
+    return <PermissionDenied permission="qc.locations.view" feature={t('locationManagement.title')} />;
   }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <div className="flex items-end justify-between mb-1">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dryer Locations</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('locationManagement.title')}</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Master data for the dryer grid. Each row is one cell. Renaming
-            updates display labels everywhere the cell appears; deleting is
-            blocked while a sub-lot is placed in the cell.
+            {t('locationManagement.subtitle')}
           </p>
         </div>
         {canManage && (
@@ -210,7 +210,7 @@ export default function LocationManagement() {
             disabled={creating || busy}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40"
           >
-            <Plus size={12} /> Add Location
+            <Plus size={12} /> {t('locationManagement.addLocation')}
           </button>
         )}
       </div>
@@ -220,7 +220,7 @@ export default function LocationManagement() {
 
       {!canManage && (
         <p className="text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-lg mt-3 text-sm">
-          Read-only view. You need <code className="font-mono">qc.locations.manage</code> to add, edit, or delete cells.
+          {t('locationManagement.readOnlyBefore')} <code className="font-mono">qc.locations.manage</code> {t('locationManagement.readOnlyAfter')}
         </p>
       )}
 
@@ -230,9 +230,9 @@ export default function LocationManagement() {
           onSubmit={submitCreate}
           className="mt-5 bg-white border-2 border-blue-200 rounded-xl p-4 space-y-3"
         >
-          <h2 className="font-bold text-sm text-slate-900">New cell</h2>
+          <h2 className="font-bold text-sm text-slate-900">{t('locationManagement.newCell')}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <Field label="Dryer #">
+            <Field label={t('locationManagement.dryerNum')}>
               <input
                 type="number"
                 min={1}
@@ -242,7 +242,7 @@ export default function LocationManagement() {
                 required
               />
             </Field>
-            <Field label="Cell #">
+            <Field label={t('locationManagement.cellNum')}>
               <input
                 type="number"
                 min={0}
@@ -252,22 +252,22 @@ export default function LocationManagement() {
                 required
               />
             </Field>
-            <Field label="Display name">
+            <Field label={t('locationManagement.displayName')}>
               <input
                 type="text"
                 value={createForm.display_name}
                 onChange={e => setCreateForm({ ...createForm, display_name: e.target.value })}
-                placeholder="Dryer 1 · Cell 00"
+                placeholder={t('locationManagement.displayNamePlaceholder')}
                 className="w-full border border-slate-300 rounded px-2 py-1 text-sm"
                 required
               />
             </Field>
-            <Field label="Code (optional)">
+            <Field label={t('locationManagement.codeOptional')}>
               <input
                 type="text"
                 value={createForm.code}
                 onChange={e => setCreateForm({ ...createForm, code: e.target.value })}
-                placeholder="auto: DR<n>-<NN>"
+                placeholder={t('locationManagement.codePlaceholder')}
                 className="w-full border border-slate-300 rounded px-2 py-1 text-sm font-mono"
               />
             </Field>
@@ -278,14 +278,14 @@ export default function LocationManagement() {
               disabled={busy}
               className="px-3 py-1.5 rounded text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40"
             >
-              {busy ? 'Saving…' : 'Create'}
+              {busy ? t('locationManagement.saving') : t('locationManagement.create')}
             </button>
             <button
               type="button"
               onClick={cancelCreate}
               className="px-3 py-1.5 rounded text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700"
             >
-              Cancel
+              {t('locationManagement.cancel')}
             </button>
           </div>
         </form>
@@ -294,11 +294,11 @@ export default function LocationManagement() {
       {/* Groups */}
       <div className="mt-5 space-y-2">
         {groups.length === 0 && (
-          <p className="text-slate-400 text-sm">No locations configured yet.</p>
+          <p className="text-slate-400 text-sm">{t('locationManagement.empty')}</p>
         )}
         {groups.map(([dryerNumber, rows]) => {
           const isCollapsed = collapsed.has(dryerNumber);
-          const groupLabel = dryerNumber < 0 ? 'Unassigned (no dryer #)' : `Dryer ${dryerNumber}`;
+          const groupLabel = dryerNumber < 0 ? t('locationManagement.unassigned') : t('locationManagement.dryerLabel', { num: dryerNumber });
           return (
             <div key={dryerNumber} className="bg-white border border-slate-200 rounded-xl">
               <button
@@ -311,7 +311,7 @@ export default function LocationManagement() {
                   : <ChevronDown  size={14} className="text-slate-400 shrink-0" />}
                 <span className="font-bold text-sm text-slate-900">{groupLabel}</span>
                 <span className="text-xs text-slate-400 ml-auto">
-                  {rows.length} cell{rows.length === 1 ? '' : 's'}
+                  {t('locationManagement.cellCount', { count: rows.length })}
                 </span>
               </button>
               {!isCollapsed && (
@@ -319,10 +319,10 @@ export default function LocationManagement() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-                        <th className="px-4 py-2 text-left">Cell #</th>
-                        <th className="px-4 py-2 text-left">Code</th>
-                        <th className="px-4 py-2 text-left">Display name</th>
-                        <th className="px-4 py-2 text-right">Actions</th>
+                        <th className="px-4 py-2 text-left">{t('locationManagement.cellNum')}</th>
+                        <th className="px-4 py-2 text-left">{t('locationManagement.code')}</th>
+                        <th className="px-4 py-2 text-left">{t('locationManagement.displayName')}</th>
+                        <th className="px-4 py-2 text-right">{t('locationManagement.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -339,7 +339,7 @@ export default function LocationManagement() {
                                   type="text"
                                   value={editForm.code}
                                   onChange={e => setEditForm({ ...editForm, code: e.target.value })}
-                                  placeholder="(unchanged)"
+                                  placeholder={t('locationManagement.codeUnchangedPlaceholder')}
                                   className="w-full border border-slate-300 rounded px-2 py-1 text-xs font-mono"
                                 />
                               ) : (
@@ -367,15 +367,15 @@ export default function LocationManagement() {
                                     onClick={() => submitEdit(l.id)}
                                     disabled={busy}
                                     className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 mr-1.5"
-                                    title="Save"
+                                    title={t('locationManagement.save')}
                                   >
-                                    <Check size={11} /> Save
+                                    <Check size={11} /> {t('locationManagement.save')}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={cancelEdit}
                                     className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700"
-                                    title="Cancel"
+                                    title={t('locationManagement.cancel')}
                                   >
                                     <X size={11} />
                                   </button>
@@ -388,7 +388,7 @@ export default function LocationManagement() {
                                     disabled={busy || editingId !== null}
                                     className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold border border-slate-200 hover:border-blue-400 text-slate-700 disabled:opacity-40 mr-1.5"
                                   >
-                                    <Pencil size={11} /> Edit
+                                    <Pencil size={11} /> {t('locationManagement.edit')}
                                   </button>
                                   <button
                                     type="button"

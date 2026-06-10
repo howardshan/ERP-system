@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import {
   listTestTypes,
@@ -12,6 +13,7 @@ import { PermissionDenied } from './components/PermissionDenied';
 import { cn } from '../../lib/utils';
 
 export default function TestTypesPage() {
+  const { t: tr } = useTranslation('qc');
   const { can } = usePermissions();
   const canView   = can('production', 'products', 'view');
   const canCreate = can('production', 'products', 'create');
@@ -52,11 +54,11 @@ export default function TestTypesPage() {
     setBusy(true); setError('');
     try {
       await createTestType({ name: newName.trim(), unit: newUnit.trim() || null, description: newDesc.trim() || null });
-      setMsg('Test type created');
+      setMsg(tr('testTypesPage.toastCreated'));
       cancelCreate();
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Create failed');
+      setError(err instanceof Error ? err.message : tr('testTypesPage.toastCreateFailed'));
     }
     setBusy(false);
   };
@@ -74,37 +76,37 @@ export default function TestTypesPage() {
     setBusy(true); setError('');
     try {
       await updateTestType(editId, { name: editName.trim(), unit: editUnit.trim() || null, description: editDesc.trim() || null });
-      setMsg('Updated');
+      setMsg(tr('testTypesPage.toastUpdated'));
       setEditId(null);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Update failed');
+      setError(err instanceof Error ? err.message : tr('testTypesPage.toastUpdateFailed'));
     }
     setBusy(false);
   };
 
   const remove = async (t: TestType) => {
-    if (!confirm(`Delete test type "${t.name}"? This will also remove it from all product templates.`)) return;
+    if (!confirm(tr('testTypesPage.confirmDelete', { name: t.name }))) return;
     setBusy(true); setError('');
     try {
       await deleteTestType(t.id);
-      setMsg('Deleted');
+      setMsg(tr('testTypesPage.toastDeleted'));
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed');
+      setError(err instanceof Error ? err.message : tr('testTypesPage.toastDeleteFailed'));
     }
     setBusy(false);
   };
 
-  if (!canView) return <PermissionDenied permission="production.products.view" feature="Test Types" />;
+  if (!canView) return <PermissionDenied permission="production.products.view" feature={tr('testTypesPage.feature')} />;
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Test Types</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{tr('testTypesPage.title')}</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Global catalog of QC test names. Products can reference these to define required tests and acceptance limits.
+            {tr('testTypesPage.subtitle')}
           </p>
         </div>
         {canCreate && !creating && (
@@ -112,7 +114,7 @@ export default function TestTypesPage() {
             onClick={startCreate}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium"
           >
-            <Plus size={14} /> Add test type
+            <Plus size={14} /> {tr('testTypesPage.addTestType')}
           </button>
         )}
       </div>
@@ -126,34 +128,34 @@ export default function TestTypesPage() {
           onSubmit={submitCreate}
           className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 space-y-3"
         >
-          <p className="text-sm font-semibold text-blue-900">New test type</p>
+          <p className="text-sm font-semibold text-blue-900">{tr('testTypesPage.newTestType')}</p>
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Name <span className="text-red-500">*</span></span>
+              <span className="text-xs font-medium text-slate-700">{tr('testTypesPage.nameLabel')} <span className="text-red-500">*</span></span>
               <input
                 autoFocus
                 className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-                placeholder="e.g. Water Activity (Aw)"
+                placeholder={tr('testTypesPage.namePlaceholder')}
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 required
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Default unit</span>
+              <span className="text-xs font-medium text-slate-700">{tr('testTypesPage.defaultUnitLabel')}</span>
               <input
                 className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-                placeholder="e.g. Aw, %, pH"
+                placeholder={tr('testTypesPage.unitPlaceholder')}
                 value={newUnit}
                 onChange={e => setNewUnit(e.target.value)}
               />
             </label>
           </div>
           <label className="block">
-            <span className="text-xs font-medium text-slate-700">Description</span>
+            <span className="text-xs font-medium text-slate-700">{tr('testTypesPage.descriptionLabel')}</span>
             <input
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-              placeholder="Optional description"
+              placeholder={tr('testTypesPage.descriptionPlaceholder')}
               value={newDesc}
               onChange={e => setNewDesc(e.target.value)}
             />

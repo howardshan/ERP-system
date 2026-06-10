@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Plus, Play, CheckCircle2, Pencil } from 'lucide-react';
 import { getBonusTemplates, createBonusTemplate, updateBonusTemplate, getBonusRuns, createBonusRun, calculateBonusRun, approveBonusRun, getBonusLines, updateBonusLine } from '../../../services/hrApi';
 import { getDepartments } from '../../../services/hrApi';
@@ -16,6 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BonusRules() {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canManage  = can('hr', 'payroll', 'manage');
   const canApprove = can('hr', 'payroll', 'approve');
@@ -91,19 +93,19 @@ export default function BonusRules() {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Payroll</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('bonusRules.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Bonus Rules</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('bonusRules.title')}</h1>
           <div className="flex gap-2">
             {view === 'templates' && canManage && (
               <button onClick={() => { setTmplForm({ name: '', formula_type: 'multiplier', base: 'monthly_salary', multiplier: 1, min_tenure_months: 0, performance_weight: 0, is_active: true }); setTmplModal(true); }}
                 className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg">
-                <Plus size={14} /> New Template
+                <Plus size={14} /> {t('bonusRules.newTemplate')}
               </button>
             )}
             {view === 'runs' && canManage && (
               <button onClick={() => setRunModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg">
-                <Plus size={14} /> New Bonus Run
+                <Plus size={14} /> {t('bonusRules.newRun')}
               </button>
             )}
           </div>
@@ -112,7 +114,7 @@ export default function BonusRules() {
           {['templates','runs'].map(v => (
             <button key={v} onClick={() => { setView(v as any); setSelectedRun(null); }}
               className={`text-sm font-semibold pb-1 border-b-2 transition-colors ${view === v ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
-              {v === 'templates' ? 'Bonus Templates' : 'Bonus Runs'}
+              {v === 'templates' ? t('bonusRules.tabTemplates') : t('bonusRules.tabRuns')}
             </button>
           ))}
         </div>
@@ -125,25 +127,25 @@ export default function BonusRules() {
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <table className="w-full">
               <thead><tr className="bg-slate-50 border-b border-slate-200">
-                {['Name','Dept','Formula','Base','Multiplier/Tiers','Min Tenure','Perf Weight','Status',''].map(h => <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                {[t('bonusRules.colName'),t('bonusRules.colDept'),t('bonusRules.colFormula'),t('bonusRules.colBase'),t('bonusRules.colMultiplierTiers'),t('bonusRules.colMinTenure'),t('bonusRules.colPerfWeight'),t('bonusRules.colStatus'),''].map(h => <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
               </tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {templates.length === 0 ? (
-                  <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-slate-400">No bonus templates yet</td></tr>
-                ) : templates.map(t => (
-                  <tr key={t.id} className="text-sm hover:bg-slate-50">
-                    <td className="px-4 py-3 font-semibold text-slate-900">{t.name}</td>
-                    <td className="px-4 py-3 text-slate-500">{t.department_name ?? 'All'}</td>
-                    <td className="px-4 py-3 text-slate-500 capitalize">{t.formula_type.replace('_',' ')}</td>
-                    <td className="px-4 py-3 text-slate-500">{t.base.replace('_',' ')}</td>
+                  <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-slate-400">{t('bonusRules.noTemplates')}</td></tr>
+                ) : templates.map(tmpl => (
+                  <tr key={tmpl.id} className="text-sm hover:bg-slate-50">
+                    <td className="px-4 py-3 font-semibold text-slate-900">{tmpl.name}</td>
+                    <td className="px-4 py-3 text-slate-500">{tmpl.department_name ?? t('bonusRules.allDepartmentsShort')}</td>
+                    <td className="px-4 py-3 text-slate-500 capitalize">{tmpl.formula_type.replace('_',' ')}</td>
+                    <td className="px-4 py-3 text-slate-500">{tmpl.base.replace('_',' ')}</td>
                     <td className="px-4 py-3 text-slate-500">
-                      {t.formula_type === 'multiplier' ? `${t.multiplier}×` : t.formula_type === 'fixed' ? `Fixed: ${t.fixed_amount}` : t.tiers ? `${(t.tiers as any[]).length} tiers` : '—'}
+                      {tmpl.formula_type === 'multiplier' ? `${tmpl.multiplier}×` : tmpl.formula_type === 'fixed' ? t('bonusRules.fixedLabel', { amount: tmpl.fixed_amount }) : tmpl.tiers ? t('bonusRules.tiersCount', { count: (tmpl.tiers as any[]).length }) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{t.min_tenure_months}m</td>
-                    <td className="px-4 py-3 text-slate-500">{(t.performance_weight * 100).toFixed(0)}%</td>
-                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${t.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{t.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td className="px-4 py-3 text-slate-500">{tmpl.min_tenure_months}m</td>
+                    <td className="px-4 py-3 text-slate-500">{(tmpl.performance_weight * 100).toFixed(0)}%</td>
+                    <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${tmpl.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{tmpl.is_active ? t('bonusRules.active') : t('bonusRules.inactive')}</span></td>
                     <td className="px-4 py-3">
-                      {canManage && <button onClick={() => { setTmplForm({ ...t }); setTmplModal(true); }} className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-teal-600"><Pencil size={13} /></button>}
+                      {canManage && <button onClick={() => { setTmplForm({ ...tmpl }); setTmplModal(true); }} className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-teal-600"><Pencil size={13} /></button>}
                     </td>
                   </tr>
                 ))}
@@ -156,11 +158,11 @@ export default function BonusRules() {
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <table className="w-full">
                   <thead><tr className="bg-slate-50 border-b border-slate-200">
-                    {['Name','Template','Period','Total','Status',''].map(h => <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                    {[t('bonusRules.colName'),t('bonusRules.colTemplate'),t('bonusRules.colPeriod'),t('bonusRules.colTotal'),t('bonusRules.colStatus'),''].map(h => <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
                   </tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {runs.length === 0 ? (
-                      <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No bonus runs yet</td></tr>
+                      <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">{t('bonusRules.noRuns')}</td></tr>
                     ) : runs.map(r => (
                       <tr key={r.id} onClick={() => selectRun(r)} className="text-sm hover:bg-teal-50 cursor-pointer">
                         <td className="px-5 py-3 font-semibold text-slate-900">{r.name}</td>
@@ -169,8 +171,8 @@ export default function BonusRules() {
                         <td className="px-5 py-3 font-semibold text-slate-900">{r.total_amount != null ? r.total_amount.toLocaleString() : '—'}</td>
                         <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[r.status]}`}>{r.status}</span></td>
                         <td className="px-5 py-3 flex gap-1.5">
-                          {canManage && (r.status === 'draft') && <button onClick={e => { e.stopPropagation(); calc(r.id); }} className="p-1.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-600" title="Calculate"><Play size={12} /></button>}
-                          {canApprove && r.status === 'review' && <button onClick={e => { e.stopPropagation(); approve(r.id); }} className="p-1.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-600" title="Approve"><CheckCircle2 size={12} /></button>}
+                          {canManage && (r.status === 'draft') && <button onClick={e => { e.stopPropagation(); calc(r.id); }} className="p-1.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-600" title={t('bonusRules.calculate')}><Play size={12} /></button>}
+                          {canApprove && r.status === 'review' && <button onClick={e => { e.stopPropagation(); approve(r.id); }} className="p-1.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-600" title={t('bonusRules.approve')}><CheckCircle2 size={12} /></button>}
                         </td>
                       </tr>
                     ))}
@@ -183,14 +185,14 @@ export default function BonusRules() {
               <div className="w-96 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col max-h-[600px]">
                 <div className="px-5 py-4 border-b border-slate-200">
                   <h3 className="text-sm font-bold text-slate-900">{selectedRun.name}</h3>
-                  <p className="text-xs text-slate-400">{lines.length} employees · Total: {lines.reduce((s, l) => s + l.final_amount, 0).toLocaleString()}</p>
+                  <p className="text-xs text-slate-400">{t('bonusRules.employeesTotal', { count: lines.length, total: lines.reduce((s, l) => s + l.final_amount, 0).toLocaleString() })}</p>
                 </div>
                 <div className="overflow-y-auto flex-1">
                   {lines.map(l => (
                     <div key={l.id} className="px-5 py-3 border-b border-slate-50 flex items-center gap-3">
                       <div className="flex-1">
                         <p className="text-sm font-semibold text-slate-900">{l.employee_name}</p>
-                        <p className="text-[10px] text-slate-400">{l.department} · Base: {l.base_amount.toLocaleString()}</p>
+                        <p className="text-[10px] text-slate-400">{l.department} · {t('bonusRules.baseLabel', { amount: l.base_amount.toLocaleString() })}</p>
                       </div>
                       <div className="text-right">
                         {canManage && selectedRun.status === 'review' ? (
@@ -199,7 +201,7 @@ export default function BonusRules() {
                         ) : (
                           <span className="text-sm font-bold text-teal-700">{l.final_amount.toLocaleString()}</span>
                         )}
-                        {l.manual_override != null && <span className="text-[9px] text-amber-500 block">overridden</span>}
+                        {l.manual_override != null && <span className="text-[9px] text-amber-500 block">{t('bonusRules.overridden')}</span>}
                       </div>
                     </div>
                   ))}
@@ -214,53 +216,53 @@ export default function BonusRules() {
       {tmplModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold text-slate-900 mb-5">{(tmplForm as any).id ? 'Edit' : 'New'} Bonus Template</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-5">{(tmplForm as any).id ? t('bonusRules.editTemplateTitle') : t('bonusRules.newTemplateTitle')}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Template Name *</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.templateNameLabel')}</label>
                 <input value={tmplForm.name ?? ''} onChange={e => setTmplForm(p => ({ ...p, name: e.target.value }))}
-                  placeholder="e.g. Year-End Bonus"
+                  placeholder={t('bonusRules.templateNamePlaceholder')}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Department (optional)</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.departmentLabel')}</label>
                   <select value={tmplForm.department_id ?? ''} onChange={e => setTmplForm(p => ({ ...p, department_id: e.target.value ? Number(e.target.value) : null }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                    <option value="">All departments</option>
+                    <option value="">{t('bonusRules.allDepartments')}</option>
                     {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Formula Type</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.formulaTypeLabel')}</label>
                   <select value={tmplForm.formula_type ?? 'multiplier'} onChange={e => setTmplForm(p => ({ ...p, formula_type: e.target.value as any }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                    <option value="multiplier">Multiplier (n × salary)</option>
-                    <option value="fixed">Fixed Amount</option>
-                    <option value="tiered">Tiered (salary brackets)</option>
-                    <option value="performance_based">Performance-based</option>
+                    <option value="multiplier">{t('bonusRules.formulaMultiplier')}</option>
+                    <option value="fixed">{t('bonusRules.formulaFixed')}</option>
+                    <option value="tiered">{t('bonusRules.formulaTiered')}</option>
+                    <option value="performance_based">{t('bonusRules.formulaPerformance')}</option>
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Base</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.baseFieldLabel')}</label>
                   <select value={tmplForm.base ?? 'monthly_salary'} onChange={e => setTmplForm(p => ({ ...p, base: e.target.value as any }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                    <option value="monthly_salary">Monthly Salary</option>
-                    <option value="annual_salary">Annual Salary</option>
-                    <option value="fixed_amount">Fixed Amount</option>
+                    <option value="monthly_salary">{t('bonusRules.baseMonthly')}</option>
+                    <option value="annual_salary">{t('bonusRules.baseAnnual')}</option>
+                    <option value="fixed_amount">{t('bonusRules.baseFixed')}</option>
                   </select>
                 </div>
                 {tmplForm.formula_type === 'multiplier' || tmplForm.formula_type === 'performance_based' ? (
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Multiplier</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.multiplierLabel')}</label>
                     <input type="number" min={0} step={0.1} value={tmplForm.multiplier ?? 1} onChange={e => setTmplForm(p => ({ ...p, multiplier: Number(e.target.value) }))}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                   </div>
                 ) : tmplForm.formula_type === 'fixed' ? (
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Fixed Amount (CNY)</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.fixedAmountLabel')}</label>
                     <input type="number" min={0} value={tmplForm.fixed_amount ?? ''} onChange={e => setTmplForm(p => ({ ...p, fixed_amount: Number(e.target.value) }))}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                   </div>
@@ -268,24 +270,24 @@ export default function BonusRules() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Min Tenure (months)</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.minTenureLabel')}</label>
                   <input type="number" min={0} value={tmplForm.min_tenure_months ?? 0} onChange={e => setTmplForm(p => ({ ...p, min_tenure_months: Number(e.target.value) }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Performance Weight (0–1)</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.perfWeightLabel')}</label>
                   <input type="number" min={0} max={1} step={0.1} value={tmplForm.performance_weight ?? 0} onChange={e => setTmplForm(p => ({ ...p, performance_weight: Number(e.target.value) }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={tmplForm.is_active ?? true} onChange={e => setTmplForm(p => ({ ...p, is_active: e.target.checked }))} className="rounded" />
-                <span className="text-sm text-slate-700">Active</span>
+                <span className="text-sm text-slate-700">{t('bonusRules.active')}</span>
               </label>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setTmplModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-              <button onClick={saveTmpl} disabled={saving} className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">{saving ? 'Saving…' : 'Save'}</button>
+              <button onClick={() => setTmplModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('bonusRules.cancel')}</button>
+              <button onClick={saveTmpl} disabled={saving} className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">{saving ? t('bonusRules.saving') : t('bonusRules.save')}</button>
             </div>
           </div>
         </div>
@@ -295,37 +297,37 @@ export default function BonusRules() {
       {runModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-5">New Bonus Run</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-5">{t('bonusRules.newRunTitle')}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Run Name *</label>
-                <input value={runForm.name} onChange={e => setRunForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. 2026 Year-End Bonus"
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.runNameLabel')}</label>
+                <input value={runForm.name} onChange={e => setRunForm(p => ({ ...p, name: e.target.value }))} placeholder={t('bonusRules.runNamePlaceholder')}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Template *</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.templateRequiredLabel')}</label>
                 <select value={runForm.template_id} onChange={e => setRunForm(p => ({ ...p, template_id: Number(e.target.value) }))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                  <option value={0}>Select template</option>
+                  <option value={0}>{t('bonusRules.selectTemplate')}</option>
                   {templates.filter(t => t.is_active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Period Start</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.periodStartLabel')}</label>
                   <input type="date" value={runForm.period_start} onChange={e => setRunForm(p => ({ ...p, period_start: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Period End</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('bonusRules.periodEndLabel')}</label>
                   <input type="date" value={runForm.period_end} onChange={e => setRunForm(p => ({ ...p, period_end: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setRunModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
-              <button onClick={saveRun} disabled={saving} className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">{saving ? 'Creating…' : 'Create'}</button>
+              <button onClick={() => setRunModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('bonusRules.cancel')}</button>
+              <button onClick={saveRun} disabled={saving} className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">{saving ? t('bonusRules.creating') : t('bonusRules.create')}</button>
             </div>
           </div>
         </div>

@@ -1,0 +1,29 @@
+{
+  "financials": "财务",
+  "allModules": "全部模块",
+  "section": {
+    "overview": "概览",
+    "generalLedger": "总账",
+    "payablesReceivables": "应付与应收",
+    "reports": "报表",
+    "administration": "管理"
+  },
+  "item": {
+    "dashboard": "仪表盘",
+    "chartOfAccounts": "会计科目表",
+    "newJournalEntry": "新建凭证",
+    "journalEntries": "凭证列表",
+    "approvals": "审批",
+    "accountsPayable": "应付账款",
+    "accountsReceivable": "应收账款",
+    "trialBalance": "试算平衡表",
+    "profitLoss": "利润表",
+    "balanceSheet": "资产负债表",
+    "accountingPeriods": "会计期间",
+    "auditLog": "审计日志"
+  },
+  "dashboardLayout": {
+    "erpStatus": "ERP 状态：运行中",
+    "server": "服务器：US-WEST-1（生产环境）"
+  }
+}

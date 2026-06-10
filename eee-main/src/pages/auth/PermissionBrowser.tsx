@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, X, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { getPermissionHolders, getUsers, setPermission } from '../../services/authApi';
 import { PERMISSION_STRUCTURE } from '../../lib/permissionStructure';
@@ -6,6 +7,7 @@ import type { UserPermissionGrant, ErpUser } from '../../types/auth';
 import { usePermissions } from '../../contexts/PermissionContext';
 
 export default function PermissionBrowser() {
+  const { t } = useTranslation('auth');
   const { can } = usePermissions();
   const canManageRoles = can('auth', 'roles', 'manage');
   const [selectedModule, setSelectedModule] = useState('');
@@ -84,7 +86,7 @@ export default function PermissionBrowser() {
     <div className="flex-1 flex overflow-hidden">
       {/* Left: module tree */}
       <nav className="w-64 bg-[#faf8f5] border-r border-slate-200 overflow-y-auto py-3">
-        <p className="px-4 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Modules & Permissions</p>
+        <p className="px-4 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('permissionBrowser.modulesAndPermissions')}</p>
         {Object.entries(PERMISSION_STRUCTURE).map(([modId, mod]) => {
           const modCollapsed = collapsedModules.has(modId);
           return (
@@ -134,7 +136,7 @@ export default function PermissionBrowser() {
       <main className="flex-1 overflow-y-auto p-8">
         {!selectedPerm ? (
           <div className="flex flex-col items-center justify-center h-48 gap-2 text-slate-400">
-            <p className="text-sm">Select a permission on the left to see who has it</p>
+            <p className="text-sm">{t('permissionBrowser.selectPermissionHint')}</p>
           </div>
         ) : (
           <div className="max-w-2xl">
@@ -144,10 +146,10 @@ export default function PermissionBrowser() {
                   {PERMISSION_STRUCTURE[selectedModule]?.label} · {PERMISSION_STRUCTURE[selectedModule]?.resources[selectedResource]?.label}
                 </p>
                 <h3 className="text-lg font-bold text-slate-900 mt-0.5">
-                  {permDef?.label} Permission
+                  {t('permissionBrowser.permissionTitle', { label: permDef?.label })}
                 </h3>
                 {permDef?.prereq && (
-                  <p className="text-xs text-slate-400 mt-1">Prerequisite: <span className="font-semibold">{permDef.prereq}</span></p>
+                  <p className="text-xs text-slate-400 mt-1">{t('permissionBrowser.prerequisite')}: <span className="font-semibold">{permDef.prereq}</span></p>
                 )}
               </div>
               {canManageRoles && (
@@ -155,7 +157,7 @@ export default function PermissionBrowser() {
                   onClick={() => setShowAddUser(v => !v)}
                   className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
                 >
-                  <Plus size={13} /> Add User
+                  <Plus size={13} /> {t('permissionBrowser.addUser')}
                 </button>
               )}
             </div>
@@ -164,28 +166,28 @@ export default function PermissionBrowser() {
             {showAddUser && canManageRoles && (
               <div className="mb-5 p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-end gap-3">
                 <div className="flex-1">
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">User</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{t('permissionBrowser.user')}</label>
                   <select
                     value={selectedAddUserId}
                     onChange={e => setSelectedAddUserId(e.target.value)}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="">Select a user…</option>
+                    <option value="">{t('permissionBrowser.selectUserPlaceholder')}</option>
                     {eligibleUsers.map(u => (
-                      <option key={u.id} value={u.id}>{u.full_name} ({u.department ?? 'No dept'})</option>
+                      <option key={u.id} value={u.id}>{u.full_name} ({u.department ?? t('permissionBrowser.noDept')})</option>
                     ))}
                   </select>
                   {eligibleUsers.length === 0 && (
-                    <p className="text-[10px] text-slate-400 mt-1">No eligible users (all users already have this permission or lack prerequisites)</p>
+                    <p className="text-[10px] text-slate-400 mt-1">{t('permissionBrowser.noEligibleUsers')}</p>
                   )}
                 </div>
                 {permDef?.hasLimit && (
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Approval Limit ($)</label>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{t('permissionBrowser.approvalLimit')}</label>
                     <input
                       type="number" min={0} value={addLimit}
                       onChange={e => setAddLimit(e.target.value)}
-                      placeholder="unlimited"
+                      placeholder={t('permissionBrowser.unlimitedPlaceholder')}
                       className="w-28 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                   </div>
@@ -195,7 +197,7 @@ export default function PermissionBrowser() {
                   disabled={!selectedAddUserId || adding}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors"
                 >
-                  {adding ? 'Adding…' : 'Confirm'}
+                  {adding ? t('permissionBrowser.adding') : t('permissionBrowser.confirm')}
                 </button>
                 <button onClick={() => setShowAddUser(false)} className="p-2 text-slate-400 hover:text-slate-700">
                   <X size={15} />
@@ -206,23 +208,23 @@ export default function PermissionBrowser() {
             {/* Holders table */}
             {loadingHolders ? (
               <div className="flex items-center gap-2 text-slate-400 py-8">
-                <Loader2 size={16} className="animate-spin" /> Loading…
+                <Loader2 size={16} className="animate-spin" /> {t('permissionBrowser.loading')}
               </div>
             ) : holders.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-sm bg-white border border-slate-200 rounded-xl">
-                No users have this permission yet
+                {t('permissionBrowser.noHolders')}
               </div>
             ) : (
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Name</th>
-                      <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Department</th>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t('permissionBrowser.name')}</th>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t('permissionBrowser.department')}</th>
                       {permDef?.hasLimit && (
-                        <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Limit</th>
+                        <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t('permissionBrowser.limit')}</th>
                       )}
-                      <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Granted</th>
+                      <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t('permissionBrowser.granted')}</th>
                       <th className="px-3 py-3" />
                     </tr>
                   </thead>
@@ -237,7 +239,7 @@ export default function PermissionBrowser() {
                         </td>
                         {permDef?.hasLimit && (
                           <td className="px-5 py-3 text-slate-600 font-mono text-xs">
-                            {h.approval_limit != null ? `$${h.approval_limit.toLocaleString()}` : 'Unlimited'}
+                            {h.approval_limit != null ? `$${h.approval_limit.toLocaleString()}` : t('permissionBrowser.unlimited')}
                           </td>
                         )}
                         <td className="px-5 py-3 text-slate-400 text-xs">

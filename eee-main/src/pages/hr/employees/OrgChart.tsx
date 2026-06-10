@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { getUsers } from '../../../services/authApi';
 import type { ErpUser } from '../../../types/auth';
@@ -76,6 +77,7 @@ interface Props {
 }
 
 export default function OrgChart({ onSelectEmployee }: Props) {
+  const { t } = useTranslation('hr');
   const [roots, setRoots] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -86,14 +88,14 @@ export default function OrgChart({ onSelectEmployee }: Props) {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / People</p>
-        <h1 className="text-2xl font-bold text-slate-900">Org Chart</h1>
-        <p className="text-sm text-slate-500 mt-1">Click any node to view employee profile. Click the count button to expand/collapse.</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('orgChart.breadcrumb')}</p>
+        <h1 className="text-2xl font-bold text-slate-900">{t('orgChart.title')}</h1>
+        <p className="text-sm text-slate-500 mt-1">{t('orgChart.subtitle')}</p>
       </div>
 
       <main className="flex-1 overflow-auto px-10 py-10">
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-400 py-16 justify-center"><Loader2 size={18} className="animate-spin" /> Loading…</div>
+          <div className="flex items-center gap-2 text-slate-400 py-16 justify-center"><Loader2 size={18} className="animate-spin" /> {t('orgChart.loading')}</div>
         ) : (
           <div className="flex gap-12 flex-wrap justify-center">
             {roots.map(r => <NodeCard key={r.id} node={r} onSelect={onSelectEmployee} />)}

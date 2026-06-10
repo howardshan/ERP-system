@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, History, Plus, Printer } from 'lucide-react';
 import { productionLotDetail, ProductionLotDetail, formatQcDateTime, SubLot, listSubLotsForLot } from '../../services/qcApi';
 import { QcStatusBadge } from './components/QcStatusBadge';
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('production', 'trace', 'view');
   const canAddCarts = can('production', 'trace', 'add_carts');
@@ -61,16 +63,16 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
   }, [detail]);
 
   if (!canView) {
-    return <PermissionDenied permission="production.trace.view" feature="Batch Trace" />;
+    return <PermissionDenied permission="production.trace.view" feature={t('tracePage.featureBatchTrace')} />;
   }
 
   if (!detail) {
     return (
       <div className="p-8 max-w-5xl mx-auto">
         <button onClick={onBack} className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 mb-4">
-          <ArrowLeft size={14} /> Back to trace list
+          <ArrowLeft size={14} /> {t('tracePage.backToTraceList')}
         </button>
-        {error ? <p className="text-red-600 text-sm">{error}</p> : <p className="text-slate-400 text-sm">Loading…</p>}
+        {error ? <p className="text-red-600 text-sm">{error}</p> : <p className="text-slate-400 text-sm">{t('tracePage.loading')}</p>}
       </div>
     );
   }
@@ -78,13 +80,13 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <button onClick={onBack} className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 mb-4">
-        <ArrowLeft size={14} /> Back to trace list
+        <ArrowLeft size={14} /> {t('tracePage.backToTraceList')}
       </button>
 
       <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Trace · {detail.lot.lot_number}
+            {t('tracePage.titlePrefix')} · {detail.lot.lot_number}
             {typeof detail.lot.scanned_count === 'number' && typeof detail.lot.total_count === 'number' && (
               <span
                 className={
@@ -95,8 +97,8 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
                 }
                 title={
                   detail.lot.scanned_count >= detail.lot.total_count
-                    ? 'All carts scanned in'
-                    : `${detail.lot.total_count - detail.lot.scanned_count} cart(s) still on production floor`
+                    ? t('tracePage.allCartsScannedIn')
+                    : t('tracePage.cartsStillOnFloor', { count: detail.lot.total_count - detail.lot.scanned_count })
                 }
               >
                 {detail.lot.scanned_count}/{detail.lot.total_count}
@@ -112,7 +114,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
               onClick={() => setAddOpen(true)}
               className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white"
             >
-              <Plus size={12} /> Add carts
+              <Plus size={12} /> {t('tracePage.addCarts')}
             </button>
           )}
           {canReprint && (
@@ -126,7 +128,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
               disabled={maxSeq === 0}
               className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-40"
             >
-              <Printer size={12} /> Reprint sticker
+              <Printer size={12} /> {t('tracePage.reprintSticker')}
             </button>
           )}
         </div>
@@ -134,7 +136,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
 
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
 
-      <h2 className="font-semibold mb-2 text-slate-900 text-sm">Drying sub-lots</h2>
+      <h2 className="font-semibold mb-2 text-slate-900 text-sm">{t('tracePage.dryingSubLots')}</h2>
       <ul className="space-y-2 mb-6">
         {detail.sub_lots.map((s) => (
           <li key={s.id} className="bg-white border rounded-xl p-3 flex items-center gap-3">
@@ -151,24 +153,24 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
                 <QcStatusBadge status={s.status} />
               </div>
               <p className="text-xs text-slate-600">
-                In {formatQcDateTime(s.in_time)} · Out {formatQcDateTime(s.out_time)}
+                {t('tracePage.inLabel')} {formatQcDateTime(s.in_time)} · {t('tracePage.outLabel')} {formatQcDateTime(s.out_time)}
               </p>
             </button>
             {onOpenHistory && (
               <button
                 type="button"
                 onClick={() => onOpenHistory(s.id)}
-                title="View full history"
+                title={t('tracePage.viewFullHistory')}
                 className="text-[10px] font-bold px-2 py-1 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-500 flex items-center gap-1 shrink-0"
               >
-                <History size={10} /> History
+                <History size={10} /> {t('tracePage.history')}
               </button>
             )}
           </li>
         ))}
       </ul>
 
-      <h2 className="font-semibold mb-2 text-slate-900 text-sm">Quality events</h2>
+      <h2 className="font-semibold mb-2 text-slate-900 text-sm">{t('tracePage.qualityEvents')}</h2>
       <ul className="space-y-2">
         {detail.events.map((ev) => (
           <li
@@ -187,7 +189,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
             <p className="text-[11px] text-slate-500 mt-1.5">{formatQcDateTime(ev.created_at)}</p>
           </li>
         ))}
-        {detail.events.length === 0 && <p className="text-slate-500 text-sm">No events</p>}
+        {detail.events.length === 0 && <p className="text-slate-500 text-sm">{t('tracePage.noEvents')}</p>}
       </ul>
 
       <AddCartsDialog
@@ -197,7 +199,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
         existingMaxSeq={maxSeq}
         onClose={() => setAddOpen(false)}
         onSuccess={async (res) => {
-          setMsg(`Added ${res.added_count} cart(s) (${detail.lot.work_order_barcode}-${String(res.start_seq).padStart(3, '0')} … -${String(res.end_seq).padStart(3, '0')})`);
+          setMsg(t('tracePage.addedCartsMsg', { count: res.added_count, start: `${detail.lot.work_order_barcode}-${String(res.start_seq).padStart(3, '0')}`, end: `-${String(res.end_seq).padStart(3, '0')}` }));
           setAddOpen(false);
           // Reload detail synchronously so we can locate the just-created
           // carts and feed them into the print-confirm prompt.
@@ -263,13 +265,14 @@ function PrintConfirmPrompt({
   onYes: () => void;
   onNo: () => void;
 }) {
+  const { t } = useTranslation('qc');
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <button
         type="button"
         className="absolute inset-0 bg-black/40"
         onClick={onNo}
-        aria-label="Skip printing"
+        aria-label={t('tracePage.skipPrinting')}
       />
       <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl">
         <header className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
@@ -277,14 +280,14 @@ function PrintConfirmPrompt({
             <Printer size={18} />
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Print stickers?</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('tracePage.printStickersTitle')}</p>
             <h2 className="text-base font-bold text-slate-900 font-mono">{workOrder}</h2>
           </div>
         </header>
         <div className="px-5 py-4 text-sm text-slate-700">
-          Added <strong>{count}</strong> cart{count === 1 ? '' : 's'}. Print sticker{count === 1 ? '' : 's'} now?
+          {t('tracePage.printConfirmBody', { count })}
           <p className="text-xs text-slate-500 mt-2">
-            You can also reprint later via the <em>Reprint sticker</em> button.
+            {t('tracePage.reprintLaterHint')}
           </p>
         </div>
         <footer className="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50 rounded-b-2xl">
@@ -293,14 +296,14 @@ function PrintConfirmPrompt({
             onClick={onNo}
             className="px-4 py-2 rounded-lg text-xs font-bold border border-slate-300 text-slate-700 hover:bg-white"
           >
-            Skip
+            {t('tracePage.skip')}
           </button>
           <button
             type="button"
             onClick={onYes}
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white"
           >
-            <Printer size={13} /> Print {count} sticker{count === 1 ? '' : 's'}
+            <Printer size={13} /> {t('tracePage.printNStickers', { count })}
           </button>
         </footer>
       </div>

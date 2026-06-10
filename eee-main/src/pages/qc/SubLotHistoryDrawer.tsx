@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, MapPin, FlaskConical, ClipboardCheck, Thermometer, Activity } from 'lucide-react';
 import { subLotFullHistory, formatQcDateTime, SubLotFullHistory } from '../../services/qcApi';
 import { QcStatusBadge } from './components/QcStatusBadge';
@@ -31,6 +32,7 @@ function fmtMin(m: number | null | undefined): string {
 }
 
 export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'sub_lots', 'view_history');
   const [data, setData] = useState<SubLotFullHistory | null>(null);
@@ -48,10 +50,10 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
       items.push({
         ts: h.started_at,
         kind: 'spot',
-        title: `Placed in Dryer ${h.dryer_number ?? '—'} cell ${String(h.cell_number ?? 0).padStart(2, '0')}`,
+        title: t('subLotHistoryDrawer.placedInDryer', { dryer: h.dryer_number ?? '—', cell: String(h.cell_number ?? 0).padStart(2, '0') }),
         description: h.ended_at
-          ? `Held ${fmtMin(h.duration_minutes)} · ended by ${h.end_reason}`
-          : 'Currently here',
+          ? t('subLotHistoryDrawer.heldEndedBy', { duration: fmtMin(h.duration_minutes), reason: h.end_reason })
+          : t('subLotHistoryDrawer.currentlyHere'),
         closed_at: h.ended_at,
         duration_minutes: h.duration_minutes,
       });
@@ -60,23 +62,23 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
       items.push({
         ts: s.taken_at,
         kind: 'sample',
-        title: `Sample taken — ${s.sample_id}`,
-        description: s.status === 'voided' ? 'Voided' : s.result ? `Result: ${s.result.toUpperCase()} (Aw ${s.aw ?? '—'})` : 'Pending result',
+        title: t('subLotHistoryDrawer.sampleTaken', { sampleId: s.sample_id }),
+        description: s.status === 'voided' ? t('subLotHistoryDrawer.voided') : s.result ? t('subLotHistoryDrawer.resultAw', { result: s.result.toUpperCase(), aw: s.aw ?? '—' }) : t('subLotHistoryDrawer.pendingResult'),
       });
     }
     for (const ir of data.inspections) {
       items.push({
         ts: ir.submitted_at,
         kind: 'inspection',
-        title: `Inspection ${ir.result.toUpperCase()} · Aw ${ir.aw ?? '—'}`,
-        description: [ir.sample_id ? `Sample ${ir.sample_id}` : null, ir.remark ? `Remark: ${ir.remark}` : null]
+        title: t('subLotHistoryDrawer.inspectionResult', { result: ir.result.toUpperCase(), aw: ir.aw ?? '—' }),
+        description: [ir.sample_id ? t('subLotHistoryDrawer.sampleLabel', { sampleId: ir.sample_id }) : null, ir.remark ? t('subLotHistoryDrawer.remarkLabel', { remark: ir.remark }) : null]
           .filter(Boolean).join(' · ') || undefined,
       });
     }
     for (const d of data.dispositions) {
       const label = d.type === 'redry_dryer'
-        ? `Disposition: Re-dry in dryer (${d.redry_expected_dry_minutes ?? '?'} min)`
-        : `Disposition: ${d.type}`;
+        ? t('subLotHistoryDrawer.dispositionRedryDryer', { minutes: d.redry_expected_dry_minutes ?? '?' })
+        : t('subLotHistoryDrawer.dispositionType', { type: d.type });
       items.push({
         ts: d.created_at,
         kind: 'disposition',
@@ -88,10 +90,10 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
       items.push({
         ts: sess.started_at,
         kind: 'room_temp',
-        title: 'Room temp dry started',
+        title: t('subLotHistoryDrawer.roomTempStarted'),
         description: sess.ended_at
-          ? `Stopped after ${fmtMin(sess.duration_minutes)}`
-          : 'Still running',
+          ? t('subLotHistoryDrawer.stoppedAfter', { duration: fmtMin(sess.duration_minutes) })
+          : t('subLotHistoryDrawer.stillRunning'),
         closed_at: sess.ended_at,
       });
     }
@@ -115,16 +117,16 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
           type="button"
           className="absolute inset-0 bg-black/40"
           onClick={onClose}
-          aria-label="Close drawer"
+          aria-label={t('subLotHistoryDrawer.closeDrawer')}
         />
         <aside className="relative w-full max-w-xl h-full bg-white shadow-2xl flex flex-col">
           <header className="px-5 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
-            <p className="text-sm font-bold text-slate-900">Sub-lot history</p>
+            <p className="text-sm font-bold text-slate-900">{t('subLotHistoryDrawer.title')}</p>
             <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded">
               <X size={16} />
             </button>
           </header>
-          <PermissionDenied permission="qc.sub_lots.view_history" feature="Sub-lot history" />
+          <PermissionDenied permission="qc.sub_lots.view_history" feature={t('subLotHistoryDrawer.title')} />
         </aside>
       </div>
     );
@@ -141,7 +143,7 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
       <aside className="relative w-full max-w-xl h-full bg-white shadow-2xl flex flex-col">
         <header className="px-5 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Sub-lot history</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('subLotHistoryDrawer.title')}</p>
             <h2 className="text-base font-mono font-bold text-slate-900">
               {data?.sub_lot.sub_lot_code ?? '…'}
             </h2>
@@ -157,23 +159,23 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
           <>
             <div className="px-5 py-3 border-b border-slate-200 bg-slate-50">
               <dl className="grid grid-cols-2 gap-y-1 text-xs">
-                <dt className="text-slate-500">Status</dt>
+                <dt className="text-slate-500">{t('subLotHistoryDrawer.status')}</dt>
                 <dd><QcStatusBadge status={data.sub_lot.status} /></dd>
-                <dt className="text-slate-500">SKU</dt>
+                <dt className="text-slate-500">{t('subLotHistoryDrawer.sku')}</dt>
                 <dd className="text-slate-900">{data.sub_lot.sku_name ?? '—'}</dd>
-                <dt className="text-slate-500">Batch</dt>
+                <dt className="text-slate-500">{t('subLotHistoryDrawer.batch')}</dt>
                 <dd className="font-mono text-slate-900">{data.sub_lot.lot_number ?? data.sub_lot.lot_barcode ?? '—'}</dd>
-                <dt className="text-slate-500">Target dry</dt>
-                <dd className="text-slate-900">{data.sub_lot.expected_dry_minutes ?? '—'} min</dd>
-                <dt className="text-slate-500">Total dried</dt>
+                <dt className="text-slate-500">{t('subLotHistoryDrawer.targetDry')}</dt>
+                <dd className="text-slate-900">{data.sub_lot.expected_dry_minutes ?? '—'} {t('subLotHistoryDrawer.min')}</dd>
+                <dt className="text-slate-500">{t('subLotHistoryDrawer.totalDried')}</dt>
                 <dd className="text-slate-900">{fmtMin(data.sub_lot.total_dried_minutes)}</dd>
               </dl>
             </div>
 
             <div className="flex-1 overflow-auto px-5 py-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Timeline</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">{t('subLotHistoryDrawer.timeline')}</h3>
               {timeline.length === 0 ? (
-                <p className="text-sm text-slate-500">No events yet.</p>
+                <p className="text-sm text-slate-500">{t('subLotHistoryDrawer.noEvents')}</p>
               ) : (
                 <ol className="relative border-l-2 border-slate-200 ml-2 space-y-3">
                   {timeline.map((it, i) => (

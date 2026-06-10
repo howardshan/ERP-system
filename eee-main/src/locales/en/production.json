@@ -1,0 +1,33 @@
+{
+  "productionDashboard": {
+    "title": "Production Dashboard",
+    "subtitle": "Per-SKU snapshot of every cart currently in the production → packaging pipeline. Auto-refresh every 15s.",
+    "refresh": "Refresh",
+    "loading": "Loading…",
+    "empty": "No carts in any pipeline stage yet. Create a work order in Production to populate this dashboard.",
+    "loadFailed": "Load failed",
+    "sku": "SKU",
+    "total": "Total",
+    "colProduction": "Production",
+    "colDryRoom": "Dry Room",
+    "colTesting": "Testing",
+    "colReleased": "Released",
+    "colPackaged": "Packaged",
+    "statusMapping": "Status mapping"
+  },
+  "productionModule": {
+    "brandTitle": "Production & Mfg",
+    "allModules": "All Modules",
+    "dashboard": "Dashboard",
+    "sectionFloor": "Floor",
+    "production": "Production",
+    "sectionTraceability": "Traceability",
+    "batchTrace": "Batch Trace",
+    "sectionMasterData": "Master Data",
+    "products": "Products",
+    "testTypes": "Test Types",
+    "support": "Support",
+    "moduleHub": "Module Hub",
+    "headerTitle": "Production & Manufacturing"
+  }
+}

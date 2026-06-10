@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CheckCircle2, Clock, LogOut, Move, X, AlertTriangle, RotateCcw, QrCode } from 'lucide-react';
 import {
   listAwaitingCheckIn,
@@ -53,6 +54,7 @@ type Mode =
   | { kind: 'move'; subLotId: string; fromCell: number };
 
 export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpenHistory }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'dry_rooms', 'view_status');
   const canCheckIn = can('qc', 'dry_rooms', 'check_in');
@@ -94,7 +96,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
       setInDryer(drying);
       setLocations(locs);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Load failed');
+      setError(e instanceof Error ? e.message : t('dryRoomDetail.loadFailed'));
     }
   };
 
@@ -131,17 +133,17 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
     // PLACE MODE: register awaiting/recheck cart at empty cell
     if (mode.kind === 'place') {
       if (occupant) {
-        setError('That cell is occupied. Pick an empty cell, or cancel placement.');
+        setError(t('dryRoomDetail.cellOccupied'));
         return;
       }
       setBusy(true);
       try {
         await registerInDryer({ sub_lot_id: mode.subLotId, location_id: loc.id });
-        setMsg(`Placed at cell ${String(cell).padStart(2, '0')}`);
+        setMsg(t('dryRoomDetail.placedAtCell', { cell: String(cell).padStart(2, '0') }));
         setMode({ kind: 'idle' });
         load();
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Placement failed');
+        setError(e instanceof Error ? e.message : t('dryRoomDetail.placementFailed'));
       }
       setBusy(false);
       return;
@@ -173,13 +175,13 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
     setError('');
     try {
       await moveSubLot({ sub_lot_id: subLotId, new_location_id: newLocationId });
-      setMsg(`Moved to cell ${String(newCell).padStart(2, '0')}`);
+      setMsg(t('dryRoomDetail.movedToCell', { cell: String(newCell).padStart(2, '0') }));
       setMode({ kind: 'idle' });
       setOpenCell(null);
       setPendingDisplace(null);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Move failed');
+      setError(e instanceof Error ? e.message : t('dryRoomDetail.moveFailed'));
     }
     setBusy(false);
   };
@@ -189,12 +191,12 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
     setError('');
     try {
       await checkOutSubLot(s.id);
-      setMsg(`${s.sub_lot_code} checked out`);
+      setMsg(t('dryRoomDetail.checkedOut', { code: s.sub_lot_code }));
       setOpenCell(null);
       if (onCheckedOut) onCheckedOut(s.id);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Check-out failed');
+      setError(e instanceof Error ? e.message : t('dryRoomDetail.checkOutFailed'));
     }
     setBusy(false);
   };
@@ -225,7 +227,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
         try {
           await scanCartForCheckIn(sl.id);
         } catch (e) {
-          setError(e instanceof Error ? e.message : `Failed to register ${sl.sub_lot_code}`);
+          setError(e instanceof Error ? e.message : t('dryRoomDetail.registerFailed', { code: sl.sub_lot_code }));
           return;
         }
       }
@@ -234,7 +236,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
         subLotId: sl.id,
         source: sl.status === 'awaiting_recheck' ? 'recheck' : 'created',
       });
-      setMsg(`${sl.sub_lot_code} ready to place — click a green cell`);
+      setMsg(t('dryRoomDetail.readyToPlace', { code: sl.sub_lot_code }));
       load();
       return;
     }
@@ -246,20 +248,20 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
         return;
       }
       setOpenCell(sl.cell_number);
-      setMsg(`Showing cell ${String(sl.cell_number).padStart(2, '0')} (${sl.sub_lot_code})`);
+      setMsg(t('dryRoomDetail.showingCell', { cell: String(sl.cell_number).padStart(2, '0'), code: sl.sub_lot_code }));
       return;
     }
     // (c) In a different dryer
     if (sl.status === 'drying' && sl.dryer_number != null && sl.dryer_number !== dryerNumber) {
-      setError(`${sl.sub_lot_code} is in Dryer ${sl.dryer_number} cell ${String(sl.cell_number ?? '').padStart(2, '0')} — switch dryer to act on it.`);
+      setError(t('dryRoomDetail.inOtherDryer', { code: sl.sub_lot_code, dryer: sl.dryer_number, cell: String(sl.cell_number ?? '').padStart(2, '0') }));
       return;
     }
     // (d) Other status (pending / inspecting / passed / hold / room_temp / closed)
-    setError(`${sl.sub_lot_code} status is "${sl.status}" — no action available in Dry Rooms. (Try Testing or History.)`);
+    setError(t('dryRoomDetail.noActionForStatus', { code: sl.sub_lot_code, status: sl.status }));
   };
 
   if (!canView) {
-    return <PermissionDenied permission="qc.dry_rooms.view_status" feature="Dry Rooms" />;
+    return <PermissionDenied permission="qc.dry_rooms.view_status" feature={t('dryRoomDetail.feature')} />;
   }
 
   return (
@@ -268,14 +270,16 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
         onClick={onBack}
         className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 mb-3"
       >
-        <ArrowLeft size={14} /> All dry rooms
+        <ArrowLeft size={14} /> {t('dryRoomDetail.allDryRooms')}
       </button>
 
       <div className="flex items-center justify-between gap-3 mb-1">
         <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-bold text-slate-900">Dryer {dryerNumber}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('dryRoomDetail.dryerTitle', { number: dryerNumber })}</h1>
           <span className="text-sm text-slate-500">
-            {inDryer.length}/100 {spotSelectionEnabled ? 'cells' : 'slots'} occupied
+            {spotSelectionEnabled
+              ? t('dryRoomDetail.occupiedCells', { count: inDryer.length })
+              : t('dryRoomDetail.occupiedSlots', { count: inDryer.length })}
           </span>
         </div>
         {spotSelectionEnabled && (
@@ -283,9 +287,9 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
             type="button"
             onClick={() => setScanOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-700 text-white"
-            title="Scan a cart barcode: created → place mode, drying → check-out prompt"
+            title={t('dryRoomDetail.scanQrTitle')}
           >
-            <QrCode size={13} /> Scan QR
+            <QrCode size={13} /> {t('dryRoomDetail.scanQr')}
           </button>
         )}
       </div>
@@ -331,7 +335,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
             type="button"
             className="absolute inset-0 bg-black/40"
             onClick={() => setScanCheckOutConfirm(null)}
-            aria-label="Cancel"
+            aria-label={t('dryRoomDetail.cancel')}
           />
           <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl">
             <header className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
@@ -339,16 +343,16 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
                 <QrCode size={18} />
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Scan check-out</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('dryRoomDetail.scanCheckOut')}</p>
                 <h2 className="text-base font-bold text-slate-900 font-mono">{scanCheckOutConfirm.sub_lot_code}</h2>
               </div>
             </header>
             <div className="px-5 py-4 text-sm text-slate-700">
-              Currently in <strong>Dryer {scanCheckOutConfirm.dryer_number}</strong>
+              {t('dryRoomDetail.currentlyIn')} <strong>{t('dryRoomDetail.dryerLabel', { number: scanCheckOutConfirm.dryer_number })}</strong>
               {scanCheckOutConfirm.cell_number != null && (
-                <> · Cell <strong>{String(scanCheckOutConfirm.cell_number).padStart(2, '0')}</strong></>
+                <> · {t('dryRoomDetail.cellLabel')} <strong>{String(scanCheckOutConfirm.cell_number).padStart(2, '0')}</strong></>
               )}
-              .  Check out now (→ Testing queue)?
+              .  {t('dryRoomDetail.checkOutNowPrompt')}
             </div>
             <footer className="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50 rounded-b-2xl">
               <button
@@ -359,7 +363,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
                 }}
                 className="px-4 py-2 rounded-lg text-xs font-bold border border-slate-300 text-slate-700 hover:bg-white"
               >
-                Just show cell
+                {t('dryRoomDetail.justShowCell')}
               </button>
               <button
                 type="button"
@@ -371,7 +375,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40"
               >
-                Check out
+                {t('dryRoomDetail.checkOut')}
               </button>
             </footer>
           </div>
@@ -393,7 +397,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
         {/* ── Left: grid ─────────────────────────────────────────────── */}
         <section className="bg-white border rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-slate-900 text-sm">Occupancy grid</h2>
+            <h2 className="font-semibold text-slate-900 text-sm">{t('dryRoomDetail.occupancyGrid')}</h2>
             <Legend />
           </div>
           <div className="grid grid-cols-10 gap-1 max-w-[640px] mx-auto">
@@ -466,7 +470,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
           {awaitingRecheck.length > 0 && (
             <section className="bg-white border-2 border-amber-300 rounded-xl p-3">
               <h2 className="font-semibold text-amber-800 text-sm mb-2 px-1 flex items-center gap-1.5">
-                <AlertTriangle size={13} /> Awaiting re-placement (paused)
+                <AlertTriangle size={13} /> {t('dryRoomDetail.awaitingReplacement')}
                 <span className="ml-1 text-amber-600 font-normal">({awaitingRecheck.length})</span>
               </h2>
               <ul className="space-y-1.5 max-h-[160px] overflow-auto">
@@ -486,8 +490,8 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
                       >
                         <div className="font-mono font-bold text-slate-900">{s.sub_lot_code}</div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
-                          Dried {fmtMin(s.total_dried_minutes)} · paused
-                          {s.expected_dry_minutes ? ` · target ${s.expected_dry_minutes}m` : ''}
+                          {t('dryRoomDetail.driedPaused', { dried: fmtMin(s.total_dried_minutes) })}
+                          {s.expected_dry_minutes ? t('dryRoomDetail.targetSuffix', { minutes: s.expected_dry_minutes }) : ''}
                         </div>
                       </button>
                     </li>
@@ -500,11 +504,11 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
           {/* Awaiting check-in (new from Production) */}
           <section className="bg-white border rounded-xl p-3">
             <h2 className="font-semibold text-slate-900 text-sm mb-2 px-1">
-              Awaiting check-in
+              {t('dryRoomDetail.awaitingCheckIn')}
               <span className="ml-1 text-slate-400 font-normal">({awaiting.length})</span>
             </h2>
             {awaiting.length === 0 ? (
-              <p className="text-xs text-slate-500 px-1">No sub-lots awaiting placement.</p>
+              <p className="text-xs text-slate-500 px-1">{t('dryRoomDetail.noAwaitingPlacement')}</p>
             ) : (
               <ul className="space-y-1.5 max-h-[160px] overflow-auto">
                 {awaiting.map(s => {
@@ -524,7 +528,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
                         <div className="font-mono font-bold text-slate-900">{s.sub_lot_code}</div>
                         <div className="text-[10px] text-slate-500 mt-0.5">
                           {s.sku_name ?? '—'}
-                          {s.expected_dry_minutes ? ` · ${s.expected_dry_minutes}m target` : ''}
+                          {s.expected_dry_minutes ? t('dryRoomDetail.targetSuffixShort', { minutes: s.expected_dry_minutes }) : ''}
                         </div>
                       </button>
                     </li>
@@ -537,11 +541,11 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
           {/* Sub-lots in this dryer (sorted) */}
           <section className="bg-white border rounded-xl p-3">
             <h2 className="font-semibold text-slate-900 text-sm mb-2 px-1">
-              In this dryer · finish soonest first
+              {t('dryRoomDetail.inThisDryer')}
               <span className="ml-1 text-slate-400 font-normal">({inDryer.length})</span>
             </h2>
             {inDryer.length === 0 ? (
-              <p className="text-xs text-slate-500 px-1">Empty.</p>
+              <p className="text-xs text-slate-500 px-1">{t('dryRoomDetail.empty')}</p>
             ) : (
               <ul className="space-y-2 max-h-[420px] overflow-auto">
                 {inDryer.map(s => {
@@ -558,17 +562,17 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
                         >
                           <div className="font-mono font-bold text-sm text-slate-900">{s.sub_lot_code}</div>
                           <div className="text-[10px] text-slate-500">
-                            Cell {String(s.cell_number ?? '—').padStart(2, '0')} · {s.sku_name ?? ''}
+                            {t('dryRoomDetail.cellLabel')} {String(s.cell_number ?? '—').padStart(2, '0')} · {s.sku_name ?? ''}
                           </div>
                         </button>
                         <QcStatusBadge status={s.status} />
                       </div>
                       <dl className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] mb-2">
-                        <dt className="text-slate-500">Check-in</dt>
+                        <dt className="text-slate-500">{t('dryRoomDetail.checkInLabel')}</dt>
                         <dd className="text-slate-800 font-mono">{formatQcDateTime(s.in_time)}</dd>
-                        <dt className="text-slate-500">Dried</dt>
+                        <dt className="text-slate-500">{t('dryRoomDetail.driedLabel')}</dt>
                         <dd className="text-slate-800 font-mono">{fmtMin(s.total_dried_minutes)}</dd>
-                        <dt className="text-slate-500 flex items-center gap-1"><Clock size={9} /> Remaining</dt>
+                        <dt className="text-slate-500 flex items-center gap-1"><Clock size={9} /> {t('dryRoomDetail.remainingLabel')}</dt>
                         <dd className={cn('font-mono', overdue ? 'text-red-700 font-bold' : 'text-slate-800')}>
                           {fmtMin(remaining)}
                         </dd>
@@ -586,7 +590,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
                           )}
                         >
                           <LogOut size={11} />
-                          {ready ? 'Check out · Ready' : 'Check out early'}
+                          {ready ? t('dryRoomDetail.checkOutReady') : t('dryRoomDetail.checkOutEarly')}
                         </button>
                       )}
                     </li>
@@ -605,6 +609,7 @@ export default function DryRoomDetail({ dryerNumber, onBack, onCheckedOut, onOpe
 // ─── Subcomponents ──────────────────────────────────────────────────────────
 
 function ModeBanner({ mode, subLot, onCancel }: { mode: Mode; subLot: SubLot | null; onCancel: () => void }) {
+  const { t } = useTranslation('qc');
   if (mode.kind === 'idle') return null;
   const isMove = mode.kind === 'move';
   return (
@@ -615,10 +620,10 @@ function ModeBanner({ mode, subLot, onCancel }: { mode: Mode; subLot: SubLot | n
       {isMove ? <Move size={15} /> : <CheckCircle2 size={15} />}
       <span className="flex-1">
         {isMove
-          ? <>Moving <code className="font-mono font-bold">{subLot?.sub_lot_code ?? '…'}</code> — click any cell as the new spot (occupied cells will displace).</>
-          : <>Placing <code className="font-mono font-bold">{subLot?.sub_lot_code ?? '…'}</code> — click an empty (green) cell.</>}
+          ? <>{t('dryRoomDetail.movingPrefix')} <code className="font-mono font-bold">{subLot?.sub_lot_code ?? '…'}</code> {t('dryRoomDetail.movingSuffix')}</>
+          : <>{t('dryRoomDetail.placingPrefix')} <code className="font-mono font-bold">{subLot?.sub_lot_code ?? '…'}</code> {t('dryRoomDetail.placingSuffix')}</>}
       </span>
-      <button type="button" onClick={onCancel} className="text-xs font-bold underline">Cancel</button>
+      <button type="button" onClick={onCancel} className="text-xs font-bold underline">{t('dryRoomDetail.cancel')}</button>
     </div>
   );
 }
@@ -635,16 +640,17 @@ function CellDetailCard({
   canCheckOut: boolean;
   busy: boolean;
 }) {
+  const { t } = useTranslation('qc');
   const remaining = liveRemaining(s);
   const overdue = remaining != null && remaining < 0;
   return (
     <section className="bg-white border-2 border-amber-400 rounded-xl p-4 shadow-md">
       <div className="flex items-start justify-between mb-2">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-amber-700 font-bold">Cell {String(s.cell_number ?? '—').padStart(2, '0')}</p>
+          <p className="text-[10px] uppercase tracking-wider text-amber-700 font-bold">{t('dryRoomDetail.cellLabel')} {String(s.cell_number ?? '—').padStart(2, '0')}</p>
           <h2 className="font-mono font-bold text-base text-slate-900">{s.sub_lot_code}</h2>
         </div>
-        <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1" aria-label="Close">
+        <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1" aria-label={t('dryRoomDetail.close')}>
           <X size={14} />
         </button>
       </div>

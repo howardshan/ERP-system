@@ -1,0 +1,162 @@
+{
+  "accountSettings": {
+    "backToHome": "Volver al inicio",
+    "title": "Configuración de la cuenta",
+    "subtitle": "Administra tu cuenta y tus preferencias de notificaciones",
+    "loading": "Cargando…",
+    "noProfile": "No hay ningún perfil de ERP vinculado a tu cuenta.",
+    "account": "Cuenta",
+    "name": "Nombre",
+    "email": "Correo electrónico",
+    "role": "Rol",
+    "department": "Departamento",
+    "notificationSettings": "Configuración de notificaciones",
+    "noNotifications": "Aún no tienes configuraciones de notificaciones. Tu administrador gestiona qué notificaciones recibes.",
+    "managedByAdmin": "Gestionado por tu administrador",
+    "on": "Activado",
+    "off": "Desactivado",
+    "turnOff": "Desactivar",
+    "turnOn": "Activar"
+  },
+  "docsPage": {
+    "home": "Inicio",
+    "documentation": "Documentación",
+    "group": {
+      "overview": "Resumen",
+      "modules": "Módulos",
+      "database": "Base de datos"
+    },
+    "nav": {
+      "overview": "Resumen del proyecto",
+      "gl": "Libro mayor",
+      "approvals": "Flujo de aprobaciones",
+      "apAr": "Cuentas por pagar / por cobrar",
+      "reports": "Reportes y periodos",
+      "workflow": "Estudio de flujos de trabajo",
+      "schema": "Esquema de base de datos",
+      "rpc": "Funciones RPC",
+      "migrations": "Migraciones y Edge Functions"
+    }
+  },
+  "homePage": {
+    "moduleHub": "Centro de módulos",
+    "selectModule": "Seleccione un módulo para comenzar",
+    "accountSettings": "Configuración de la cuenta",
+    "reloadPermissions": "Recargar permisos",
+    "signOut": "Cerrar sesión",
+    "active": "Activo",
+    "comingSoon": "Próximamente",
+    "openModule": "Abrir módulo",
+    "inDevelopment": "En desarrollo",
+    "modules": {
+      "finance": {
+        "label": "Gestión financiera",
+        "description": "Libro mayor, pólizas contables, CxP/CxC, balanza de comprobación y flujos de aprobación de varios niveles.",
+        "features": {
+          "0": "Catálogo de cuentas",
+          "1": "Pólizas contables",
+          "2": "Flujo de aprobación",
+          "3": "Balanza de comprobación"
+        }
+      },
+      "warehouse": {
+        "label": "Almacén e inventario",
+        "description": "Inventario con seguimiento por lote, entradas de mercancía, traspasos de existencias y kárdex de saldos en tiempo real.",
+        "features": {
+          "0": "Trazabilidad por lote",
+          "1": "Entrada de mercancía",
+          "2": "Traspaso de existencias",
+          "3": "Saldo de inventario"
+        }
+      },
+      "sales": {
+        "label": "Ventas y distribución",
+        "description": "Pedidos de venta, planeación de embarques, facturación a clientes e integración con CxC.",
+        "features": {
+          "0": "Pedidos de venta",
+          "1": "Seguimiento de embarques",
+          "2": "Facturación de CxC",
+          "3": "Portal de clientes"
+        }
+      },
+      "production": {
+        "label": "Producción y manufactura",
+        "description": "Tablero de flujo por SKU, creación de órdenes de trabajo con etiquetas de carro, trazabilidad de lotes y datos maestros de productos/plantillas.",
+        "features": {
+          "0": "Tablero de flujo",
+          "1": "Órdenes de trabajo + etiquetas",
+          "2": "Trazabilidad de lotes",
+          "3": "Productos y tipos de prueba"
+        }
+      },
+      "workflow": {
+        "label": "Estudio de flujos de trabajo",
+        "description": "Cree automatizaciones personalizadas arrastrando nodos: conecte fuentes de datos, aplique lógica y dispare acciones en todos los módulos.",
+        "features": {
+          "0": "Lienzo de arrastrar y soltar",
+          "1": "Nodos de fuente de datos",
+          "2": "Lógica y ramificación",
+          "3": "Automatización de acciones"
+        }
+      },
+      "docs": {
+        "label": "Documentación",
+        "description": "Arquitectura del proyecto, especificaciones de módulos, esquema de base de datos, funciones RPC, índice de migraciones y tokens de diseño.",
+        "features": {
+          "0": "Estructura de rutas",
+          "1": "Especificaciones de módulos",
+          "2": "Esquema de BD y RPC",
+          "3": "Índice de migraciones"
+        }
+      },
+      "qc": {
+        "label": "Control de calidad",
+        "description": "Flujo de inspección post-secado: lotes de producción, sublotes de secado, cola pendiente, disposición en retención y trazabilidad de lotes.",
+        "features": {
+          "0": "Entrada/salida de sublotes",
+          "1": "Cola pendiente",
+          "2": "Disposición en retención",
+          "3": "Trazabilidad de lotes"
+        }
+      },
+      "packaging": {
+        "label": "Empaque",
+        "description": "Envíe a empaque los carros de CC liberados. Selección de carros por orden PEPS, soporte de escaneo y seguimiento de días en existencia.",
+        "features": {
+          "0": "Despacho PEPS",
+          "1": "Escanear código QR",
+          "2": "Alerta de días en existencia",
+          "3": "Registro de salida"
+        }
+      },
+      "hr": {
+        "label": "Recursos humanos",
+        "description": "Directorio de empleados, puestos, departamentos, líneas de reporte y gestión de perfiles.",
+        "features": {
+          "0": "Directorio de empleados",
+          "1": "Puestos y roles",
+          "2": "Departamento y jefe",
+          "3": "Edición de perfil"
+        }
+      },
+      "auth": {
+        "label": "Usuarios y autenticación",
+        "description": "Cuentas de usuario, control de acceso basado en roles, asignación de niveles de aprobación y registros de auditoría.",
+        "features": {
+          "0": "Gestión de usuarios",
+          "1": "Roles y permisos",
+          "2": "Niveles de aprobación",
+          "3": "Registro de auditoría"
+        }
+      }
+    }
+  },
+  "loginPage": {
+    "subtitle": "Inicia sesión en tu cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "signingIn": "Iniciando sesión…",
+    "signIn": "Iniciar sesión",
+    "contactAdmin": "Contacta a tu administrador para obtener acceso."
+  }
+}

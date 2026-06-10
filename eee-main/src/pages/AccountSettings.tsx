@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Bell, Lock, Loader2, User as UserIcon } from 'lucide-react';
 import { usePermissions } from '../contexts/PermissionContext';
 import { PERMISSION_STRUCTURE } from '../lib/permissionStructure';
@@ -20,6 +21,7 @@ function moduleLabel(moduleId: string): string {
 }
 
 export default function AccountSettings({ onHome }: Props) {
+  const { t: tr } = useTranslation('app');
   const { erpUser, loading: permLoading } = usePermissions();
   const [types, setTypes] = useState<NotificationType[]>([]);
   const [settings, setSettings] = useState<Record<string, UserNotificationSetting>>({});
@@ -66,10 +68,10 @@ export default function AccountSettings({ onHome }: Props) {
             onClick={onHome}
             className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 text-xs font-bold transition-colors mb-4"
           >
-            <ArrowLeft size={14} /> Back to Home
+            <ArrowLeft size={14} /> {tr('accountSettings.backToHome')}
           </button>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Account Settings</h1>
-          <p className="text-slate-500 text-sm mt-2">Manage your account and notification preferences</p>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{tr('accountSettings.title')}</h1>
+          <p className="text-slate-500 text-sm mt-2">{tr('accountSettings.subtitle')}</p>
         </div>
       </header>
 
@@ -78,11 +80,11 @@ export default function AccountSettings({ onHome }: Props) {
       <main className="flex-1 px-12 pb-12 max-w-2xl">
         {loading || permLoading ? (
           <div className="flex items-center gap-2 text-slate-400 text-sm">
-            <Loader2 size={16} className="animate-spin" /> Loading…
+            <Loader2 size={16} className="animate-spin" /> {tr('accountSettings.loading')}
           </div>
         ) : !erpUser ? (
           <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500">
-            No ERP profile is linked to your account.
+            {tr('accountSettings.noProfile')}
           </div>
         ) : (
           <div className="space-y-8">
@@ -90,26 +92,26 @@ export default function AccountSettings({ onHome }: Props) {
             <section className="bg-white border border-slate-200 rounded-xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <UserIcon size={15} className="text-slate-500" />
-                <h2 className="text-sm font-bold text-slate-900">Account</h2>
+                <h2 className="text-sm font-bold text-slate-900">{tr('accountSettings.account')}</h2>
               </div>
               <dl className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-slate-500">Name</dt>
+                  <dt className="text-slate-500">{tr('accountSettings.name')}</dt>
                   <dd className="font-medium text-slate-900">{erpUser.full_name}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-500">Email</dt>
+                  <dt className="text-slate-500">{tr('accountSettings.email')}</dt>
                   <dd className="font-medium text-slate-900">{erpUser.email}</dd>
                 </div>
                 {erpUser.role && (
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Role</dt>
+                    <dt className="text-slate-500">{tr('accountSettings.role')}</dt>
                     <dd className="font-medium text-slate-900">{erpUser.role}</dd>
                   </div>
                 )}
                 {erpUser.department && (
                   <div className="flex justify-between">
-                    <dt className="text-slate-500">Department</dt>
+                    <dt className="text-slate-500">{tr('accountSettings.department')}</dt>
                     <dd className="font-medium text-slate-900">{erpUser.department}</dd>
                   </div>
                 )}
@@ -120,13 +122,12 @@ export default function AccountSettings({ onHome }: Props) {
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <Bell size={15} className="text-slate-500" />
-                <h2 className="text-sm font-bold text-slate-900">Notification Settings</h2>
+                <h2 className="text-sm font-bold text-slate-900">{tr('accountSettings.notificationSettings')}</h2>
               </div>
 
               {visibleTypes.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500">
-                  You have no notification settings yet. Your administrator manages which
-                  notifications you receive.
+                  {tr('accountSettings.noNotifications')}
                 </div>
               ) : (
                 <div className="space-y-5">
@@ -151,7 +152,7 @@ export default function AccountSettings({ onHome }: Props) {
                                 )}
                                 {locked && (
                                   <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                                    <Lock size={11} /> Managed by your administrator
+                                    <Lock size={11} /> {tr('accountSettings.managedByAdmin')}
                                   </p>
                                 )}
                               </div>
@@ -159,7 +160,7 @@ export default function AccountSettings({ onHome }: Props) {
                                 <span className={`text-[11px] font-bold px-2 py-1 rounded-full shrink-0 ${
                                   on ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
                                 }`}>
-                                  {on ? 'On' : 'Off'}
+                                  {on ? tr('accountSettings.on') : tr('accountSettings.off')}
                                 </span>
                               ) : (
                                 <button
@@ -168,7 +169,7 @@ export default function AccountSettings({ onHome }: Props) {
                                   className={`w-9 h-5 rounded-full transition-colors shrink-0 relative ${
                                     on ? 'bg-blue-600' : 'bg-slate-300'
                                   } disabled:opacity-50`}
-                                  title={on ? 'Turn off' : 'Turn on'}
+                                  title={on ? tr('accountSettings.turnOff') : tr('accountSettings.turnOn')}
                                 >
                                   <div className={`w-4 h-4 bg-white rounded-full shadow absolute top-0.5 transition-all ${
                                     on ? 'left-4' : 'left-0.5'

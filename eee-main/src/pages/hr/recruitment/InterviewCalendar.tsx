@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
 import { getCalendarEvents } from '../../../services/hrApi';
 import type { CalendarEvent } from '../../../services/hrApi';
@@ -62,6 +63,7 @@ function eventColorClass(status: CalendarEvent['status']): string {
 }
 
 export default function InterviewCalendar({ currentErpId, onRespond }: Props) {
+  const { t } = useTranslation('hr');
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -109,12 +111,12 @@ export default function InterviewCalendar({ currentErpId, onRespond }: Props) {
     <div className="min-h-screen bg-[#faf8f5] flex flex-col" onClick={() => setPopup(null)}>
       {/* Header */}
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Recruitment</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('interviewCalendar.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Interview Calendar</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('interviewCalendar.title')}</h1>
           <div className="flex items-center gap-2">
             <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"><ChevronLeft size={18} /></button>
-            <button onClick={goToday} className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">Today</button>
+            <button onClick={goToday} className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">{t('interviewCalendar.today')}</button>
             <button onClick={nextWeek} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"><ChevronRight size={18} /></button>
             <span className="ml-3 text-sm font-semibold text-slate-700">
               {fmtLabel(weekStart)} – {fmtLabel(addDays(weekStart, 6))}
@@ -125,7 +127,7 @@ export default function InterviewCalendar({ currentErpId, onRespond }: Props) {
 
       <main className="flex-1 overflow-auto px-6 py-5">
         {loading && (
-          <div className="flex items-center justify-center py-16 text-slate-400 text-sm">Loading…</div>
+          <div className="flex items-center justify-center py-16 text-slate-400 text-sm">{t('interviewCalendar.loading')}</div>
         )}
 
         {!loading && (
@@ -138,7 +140,7 @@ export default function InterviewCalendar({ currentErpId, onRespond }: Props) {
                 const isToday = fmtDate(d) === fmtDate(new Date());
                 return (
                   <div key={day} className={`py-3 text-center border-r border-slate-100 last:border-r-0 ${isToday ? 'bg-teal-50' : ''}`}>
-                    <p className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-teal-600' : 'text-slate-400'}`}>{day}</p>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-teal-600' : 'text-slate-400'}`}>{t(`interviewCalendar.days.${day}`)}</p>
                     <p className={`text-sm font-bold mt-0.5 ${isToday ? 'text-teal-700' : 'text-slate-700'}`}>{d.getDate()}</p>
                   </div>
                 );
@@ -207,11 +209,11 @@ export default function InterviewCalendar({ currentErpId, onRespond }: Props) {
         {/* Legend */}
         <div className="flex items-center gap-5 mt-4 px-1">
           {[
-            { status: 'tentative', label: 'Tentative', cls: 'bg-amber-200' },
-            { status: 'confirmed', label: 'Confirmed', cls: 'bg-teal-200' },
-            { status: 'declined',  label: 'Declined',  cls: 'bg-slate-200' },
-          ].map(({ label, cls }) => (
-            <div key={label} className="flex items-center gap-1.5">
+            { status: 'tentative', label: t('interviewCalendar.status.tentative'), cls: 'bg-amber-200' },
+            { status: 'confirmed', label: t('interviewCalendar.status.confirmed'), cls: 'bg-teal-200' },
+            { status: 'declined',  label: t('interviewCalendar.status.declined'),  cls: 'bg-slate-200' },
+          ].map(({ status, label, cls }) => (
+            <div key={status} className="flex items-center gap-1.5">
               <span className={`w-3 h-3 rounded ${cls}`} />
               <span className="text-xs text-slate-500">{label}</span>
             </div>
@@ -231,10 +233,10 @@ export default function InterviewCalendar({ currentErpId, onRespond }: Props) {
               popup.ev.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
               popup.ev.status === 'tentative' ? 'bg-amber-100 text-amber-700' :
               'bg-slate-100 text-slate-500'
-            }`}>{popup.ev.status}</span>
+            }`}>{t(`interviewCalendar.status.${popup.ev.status}`)}</span>
           </div>
           {popup.ev.candidate_name && (
-            <p className="text-xs text-slate-500 mb-1">Candidate: {popup.ev.candidate_name}</p>
+            <p className="text-xs text-slate-500 mb-1">{t('interviewCalendar.candidate', { name: popup.ev.candidate_name })}</p>
           )}
           <p className="text-xs text-slate-500 mb-3">
             {fmtTime(popup.ev.start_time)} – {fmtTime(popup.ev.end_time)}
@@ -249,13 +251,13 @@ export default function InterviewCalendar({ currentErpId, onRespond }: Props) {
                 disabled={responding}
                 onClick={() => handleRespond(popup.ev.id, 'confirmed')}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-lg disabled:opacity-50">
-                <CheckCircle2 size={13} /> Accept
+                <CheckCircle2 size={13} /> {t('interviewCalendar.accept')}
               </button>
               <button
                 disabled={responding}
                 onClick={() => handleRespond(popup.ev.id, 'declined')}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg disabled:opacity-50">
-                <XCircle size={13} /> Decline
+                <XCircle size={13} /> {t('interviewCalendar.decline')}
               </button>
             </div>
           )}

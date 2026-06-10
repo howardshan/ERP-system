@@ -1,0 +1,35 @@
+{
+  "packagingModule": {
+    "moduleHub": "Module Hub",
+    "tag": "Packaging",
+    "title": "Packaging",
+    "subtitle": "Dispatch released QC carts — FIFO order, scan support, days-in-stock tracking"
+  },
+  "packagingPage": {
+    "errLoadSkus": "Failed to load SKUs",
+    "errLoadCarts": "Failed to load carts",
+    "errDispatch": "Dispatch failed",
+    "scanNotFound": "Cart \"{{code}}\" not found or not available",
+    "dispatchSuccess": "Dispatched {{count}} cart(s) (outbound #{{outboundId}})",
+    "feature": "Packaging",
+    "productsInStock": "Products in Stock",
+    "selectProductHint": "Select a product to view available carts",
+    "noReleasedCarts": "No released carts in packaging queue.",
+    "cartsLabel": "carts",
+    "scanPlaceholder": "Scan cart QR code...",
+    "selectToBegin": "Select a product from the left to begin.",
+    "noProductSelected": "No product selected",
+    "chooseProductHint": "Choose a product on the left to view available carts",
+    "noCartsAvailable": "No carts available",
+    "noCartsAvailableHint": "All carts for this product have been dispatched or none are released yet.",
+    "summaryCount": "{{woCount}} work order(s) · {{cartCount}} cart(s)",
+    "noWorkOrder": "(no work order)",
+    "noPackagingAssigned": "No packaging assigned",
+    "cartCount": "{{count}} cart(s)",
+    "cartsSelected": "{{count}} cart(s) selected",
+    "notePlaceholder": "Optional dispatch note...",
+    "dispatchPermissionTitle": "Missing packaging.outbound.dispatch permission",
+    "dispatching": "Dispatching…",
+    "dispatch": "Dispatch"
+  }
+}

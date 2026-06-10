@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart3,
   Factory,
@@ -59,6 +60,7 @@ function NavSection({ title }: { title: string }) {
 
 export default function ProductionModule({ onHome }: Props) {
   const { can } = usePermissions();
+  const { t } = useTranslation('production');
   const [screen, setScreen] = useState<string>('dashboard');
   const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
   const [historySubLotId, setHistorySubLotId] = useState<string | null>(null);
@@ -122,9 +124,9 @@ export default function ProductionModule({ onHome }: Props) {
               <LayoutGrid size={14} className="text-white" />
             </div>
             <div>
-              <p className="text-white font-bold text-sm leading-none">Production &amp; Mfg</p>
+              <p className="text-white font-bold text-sm leading-none">{t('productionModule.brandTitle')}</p>
               <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mt-0.5 group-hover:text-slate-400 transition-colors">
-                ← All Modules
+                ← {t('productionModule.allModules')}
               </p>
             </div>
           </button>
@@ -132,20 +134,20 @@ export default function ProductionModule({ onHome }: Props) {
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 pb-4">
           {canViewDashboard && (
-            <NavItem icon={BarChart3} label="Dashboard" isActive={isActive('dashboard')} onClick={() => navigate('dashboard')} />
+            <NavItem icon={BarChart3} label={t('productionModule.dashboard')} isActive={isActive('dashboard')} onClick={() => navigate('dashboard')} />
           )}
 
           {canCreateBatch && (
             <>
-              <NavSection title="Floor" />
-              <NavItem icon={Factory} label="Production" isActive={isActive('production')} onClick={() => navigate('production')} />
+              <NavSection title={t('productionModule.sectionFloor')} />
+              <NavItem icon={Factory} label={t('productionModule.production')} isActive={isActive('production')} onClick={() => navigate('production')} />
             </>
           )}
 
           {canViewTrace && (
             <>
-              <NavSection title="Traceability" />
-              <NavItem icon={GitBranch} label="Batch Trace"
+              <NavSection title={t('productionModule.sectionTraceability')} />
+              <NavItem icon={GitBranch} label={t('productionModule.batchTrace')}
                        isActive={isActive('trace') || isActive('trace-detail')}
                        onClick={() => navigate('trace')} />
             </>
@@ -153,9 +155,9 @@ export default function ProductionModule({ onHome }: Props) {
 
           {canManageProducts && (
             <>
-              <NavSection title="Master Data" />
-              <NavItem icon={Package}      label="Products"   isActive={isActive('products')}   onClick={() => navigate('products')} />
-              <NavItem icon={FlaskConical} label="Test Types" isActive={isActive('test-types')} onClick={() => navigate('test-types')} />
+              <NavSection title={t('productionModule.sectionMasterData')} />
+              <NavItem icon={Package}      label={t('productionModule.products')}   isActive={isActive('products')}   onClick={() => navigate('products')} />
+              <NavItem icon={FlaskConical} label={t('productionModule.testTypes')} isActive={isActive('test-types')} onClick={() => navigate('test-types')} />
             </>
           )}
         </nav>
@@ -163,7 +165,7 @@ export default function ProductionModule({ onHome }: Props) {
         <div className="p-4 border-t border-white/5">
           <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
             <HelpCircle size={18} />
-            <span>Support</span>
+            <span>{t('productionModule.support')}</span>
           </button>
         </div>
       </aside>
@@ -174,12 +176,12 @@ export default function ProductionModule({ onHome }: Props) {
             onClick={onHome}
             className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
           >
-            <ArrowLeft size={14} /> Module Hub
+            <ArrowLeft size={14} /> {t('productionModule.moduleHub')}
           </button>
           <div className="flex items-center gap-3">
             <PrinterSettingsPopover />
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
-              Production &amp; Manufacturing
+              {t('productionModule.headerTitle')}
             </span>
           </div>
         </header>

@@ -1,0 +1,29 @@
+{
+  "financials": "Financials",
+  "allModules": "All Modules",
+  "section": {
+    "overview": "Overview",
+    "generalLedger": "General Ledger",
+    "payablesReceivables": "Payables & Receivables",
+    "reports": "Reports",
+    "administration": "Administration"
+  },
+  "item": {
+    "dashboard": "Dashboard",
+    "chartOfAccounts": "Chart of Accounts",
+    "newJournalEntry": "New Journal Entry",
+    "journalEntries": "Journal Entries",
+    "approvals": "Approvals",
+    "accountsPayable": "Accounts Payable",
+    "accountsReceivable": "Accounts Receivable",
+    "trialBalance": "Trial Balance",
+    "profitLoss": "Profit & Loss",
+    "balanceSheet": "Balance Sheet",
+    "accountingPeriods": "Accounting Periods",
+    "auditLog": "Audit Log"
+  },
+  "dashboardLayout": {
+    "erpStatus": "ERP Status: Active",
+    "server": "Server: US-WEST-1 (Production)"
+  }
+}

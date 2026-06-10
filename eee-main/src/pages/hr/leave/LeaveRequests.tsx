@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, XCircle, CalendarDays } from 'lucide-react';
 import { getLeaveRequests, approveLeaveRequest, rejectLeaveRequest, getLeaveTypes } from '../../../services/hrApi';
 import type { LeaveRequest, LeaveType } from '../../../services/hrApi';
@@ -14,6 +15,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function LeaveRequests() {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canApprove = can('hr', 'leave', 'approve');
 
@@ -62,8 +64,8 @@ export default function LeaveRequests() {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Time & Leave</p>
-        <h1 className="text-2xl font-bold text-slate-900">Leave Requests</h1>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('leaveRequests.breadcrumb')}</p>
+        <h1 className="text-2xl font-bold text-slate-900">{t('leaveRequests.title')}</h1>
       </div>
 
       <main className="flex-1 overflow-y-auto px-10 py-7">
@@ -71,7 +73,7 @@ export default function LeaveRequests() {
           {['','pending','approved','rejected','cancelled'].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 text-xs font-bold rounded-full transition-colors ${statusFilter === s ? 'bg-teal-600 text-white' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>
-              {s || 'All'}
+              {s ? t(`leaveRequests.status.${s}`) : t('leaveRequests.filterAll')}
             </button>
           ))}
         </div>
@@ -83,12 +85,12 @@ export default function LeaveRequests() {
             {requests.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
                 <CalendarDays size={32} className="opacity-40" />
-                <p className="text-sm">No leave requests</p>
+                <p className="text-sm">{t('leaveRequests.empty')}</p>
               </div>
             ) : (
               <table className="w-full">
                 <thead><tr className="bg-slate-50 border-b border-slate-200">
-                  {['Employee','Type','Period','Days','Reason','Status',''].map(h => <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                  {['employee','type','period','days','reason','status','actions'].map(h => <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h === 'actions' ? '' : t(`leaveRequests.col.${h}`)}</th>)}
                 </tr></thead>
                 <tbody className="divide-y divide-slate-100">
                   {requests.map(r => (
@@ -99,7 +101,7 @@ export default function LeaveRequests() {
                       <td className="px-5 py-3.5 text-slate-500 text-sm">{r.days_requested}</td>
                       <td className="px-5 py-3.5 text-slate-500 text-sm max-w-xs truncate">{r.reason ?? '—'}</td>
                       <td className="px-5 py-3.5">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[r.status] ?? 'bg-slate-100 text-slate-500'}`}>{r.status}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[r.status] ?? 'bg-slate-100 text-slate-500'}`}>{t(`leaveRequests.status.${r.status}`, { defaultValue: r.status })}</span>
                         {r.status === 'rejected' && r.rejection_reason && (
                           <p className="text-[10px] text-red-500 mt-0.5">{r.rejection_reason}</p>
                         )}
@@ -108,11 +110,11 @@ export default function LeaveRequests() {
                         {canApprove && r.status === 'pending' && (
                           <div className="flex gap-1.5">
                             <button onClick={() => approve(r.id)} disabled={processing === r.id}
-                              className="p-1.5 rounded hover:bg-emerald-50 text-emerald-600 disabled:opacity-50 transition-colors" title="Approve">
+                              className="p-1.5 rounded hover:bg-emerald-50 text-emerald-600 disabled:opacity-50 transition-colors" title={t('leaveRequests.approve')}>
                               <CheckCircle2 size={15} />
                             </button>
                             <button onClick={() => { setRejectModal({ id: r.id }); setRejectReason(''); }}
-                              className="p-1.5 rounded hover:bg-red-50 text-red-500 transition-colors" title="Reject">
+                              className="p-1.5 rounded hover:bg-red-50 text-red-500 transition-colors" title={t('leaveRequests.reject')}>
                               <XCircle size={15} />
                             </button>
                           </div>
@@ -130,15 +132,15 @@ export default function LeaveRequests() {
       {rejectModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-4">Reject Leave Request</h2>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Reason *</label>
-            <textarea rows={3} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Provide a reason for rejection…"
+            <h2 className="text-lg font-bold text-slate-900 mb-4">{t('leaveRequests.rejectModalTitle')}</h2>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('leaveRequests.reasonLabel')}</label>
+            <textarea rows={3} value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder={t('leaveRequests.reasonPlaceholder')}
               className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" />
             <div className="flex justify-end gap-3 mt-5">
-              <button onClick={() => setRejectModal(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setRejectModal(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('leaveRequests.cancel')}</button>
               <button onClick={() => reject(rejectModal.id)} disabled={!rejectReason.trim()}
                 className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                Reject
+                {t('leaveRequests.reject')}
               </button>
             </div>
           </div>

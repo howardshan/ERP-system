@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Plus, CheckCircle2, XCircle } from 'lucide-react';
 import { getOvertimeRequests, submitOvertime, approveOvertime, rejectOvertime } from '../../../services/hrApi';
 import type { OvertimeRequest } from '../../../services/hrApi';
@@ -16,6 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
 const TYPE_RATE: Record<string, string> = { weekday: '1.5×', weekend: '2×', holiday: '3×' };
 
 export default function OvertimePage() {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canApprove = can('hr', 'payroll', 'approve');
   const canCreate  = can('hr', 'payroll', 'create');
@@ -65,13 +67,13 @@ export default function OvertimePage() {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Payroll</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('overtimePage.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Overtime</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('overtimePage.title')}</h1>
           {canCreate && (
             <button onClick={() => { setModal(true); setForm({ employee_id: currentErpId, date: '', hours: '', type: 'weekday', reason: '', project_code: '' }); }}
               className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg transition-colors">
-              <Plus size={14} /> Log Overtime
+              <Plus size={14} /> {t('overtimePage.logOvertime')}
             </button>
           )}
         </div>
@@ -84,11 +86,11 @@ export default function OvertimePage() {
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <table className="w-full">
               <thead><tr className="bg-slate-50 border-b border-slate-200">
-                {['Employee','Date','Hours','Type','Rate','Reason','Status',''].map(h => <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                {[['employee', t('overtimePage.colEmployee')], ['date', t('overtimePage.colDate')], ['hours', t('overtimePage.colHours')], ['type', t('overtimePage.colType')], ['rate', t('overtimePage.colRate')], ['reason', t('overtimePage.colReason')], ['status', t('overtimePage.colStatus')], ['actions', '']].map(([k, h]) => <th key={k} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
               </tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {requests.length === 0 ? (
-                  <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-400">No overtime records</td></tr>
+                  <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-400">{t('overtimePage.empty')}</td></tr>
                 ) : requests.map(r => (
                   <tr key={r.id} className="text-sm hover:bg-slate-50">
                     <td className="px-5 py-3.5 font-semibold text-slate-900">{r.employee_name ?? r.employee_id}</td>
@@ -117,55 +119,55 @@ export default function OvertimePage() {
       {modal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-5">Log Overtime</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-5">{t('overtimePage.logOvertime')}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Employee</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('overtimePage.colEmployee')}</label>
                 <select value={form.employee_id} onChange={e => setForm(p => ({ ...p, employee_id: e.target.value }))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                  <option value="">Select employee</option>
+                  <option value="">{t('overtimePage.selectEmployee')}</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Date</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('overtimePage.colDate')}</label>
                   <input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Hours</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('overtimePage.colHours')}</label>
                   <input type="number" min={0.5} step={0.5} value={form.hours} onChange={e => setForm(p => ({ ...p, hours: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Type</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('overtimePage.colType')}</label>
                   <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                    <option value="weekday">Weekday (1.5×)</option>
-                    <option value="weekend">Weekend (2×)</option>
-                    <option value="holiday">Holiday (3×)</option>
+                    <option value="weekday">{t('overtimePage.typeWeekday')}</option>
+                    <option value="weekend">{t('overtimePage.typeWeekend')}</option>
+                    <option value="holiday">{t('overtimePage.typeHoliday')}</option>
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Reason</label>
-                  <input value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} placeholder="Project / task"
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('overtimePage.colReason')}</label>
+                  <input value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} placeholder={t('overtimePage.reasonPlaceholder')}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Project Code</label>
-                  <input value={form.project_code} onChange={e => setForm(p => ({ ...p, project_code: e.target.value }))} placeholder="e.g. PROJ-001"
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('overtimePage.projectCode')}</label>
+                  <input value={form.project_code} onChange={e => setForm(p => ({ ...p, project_code: e.target.value }))} placeholder={t('overtimePage.projectCodePlaceholder')}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('overtimePage.cancel')}</button>
               <button onClick={submit} disabled={saving || !form.employee_id || !form.date || !form.hours}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Submitting…' : 'Submit'}
+                {saving ? t('overtimePage.submitting') : t('overtimePage.submit')}
               </button>
             </div>
           </div>

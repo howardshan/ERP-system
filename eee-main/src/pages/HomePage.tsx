@@ -14,8 +14,10 @@ import {
   RefreshCw,
   Settings,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../contexts/PermissionContext';
 import { PrinterSettingsPopover } from '../components/PrinterSettingsPopover';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 interface Module {
   id: string;
@@ -227,6 +229,7 @@ interface HomePageProps {
 }
 
 export default function HomePage({ onNavigate, onLogout, userName, userEmail }: HomePageProps) {
+  const { t } = useTranslation('app');
   const { reload, canAccessModule } = usePermissions();
   const [reloading, setReloading] = useState(false);
 
@@ -248,26 +251,27 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
             <span className="text-slate-900 font-bold text-lg tracking-tight">PetFood ERP</span>
           </div>
           <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
-            Module Hub
+            {t('homePage.moduleHub')}
           </h1>
           <p className="text-slate-500 text-sm mt-2">
-            Select a module to get started
+            {t('homePage.selectModule')}
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <LanguageSwitcher />
           <PrinterSettingsPopover />
           <div className="w-px h-5 bg-slate-200" />
           <button
             onClick={() => onNavigate('account-settings')}
             className="text-right group"
-            title="Account settings"
+            title={t('homePage.accountSettings')}
           >
             <p className="text-sm font-bold text-slate-900 group-hover:text-blue-700 transition-colors">{userName}</p>
             <p className="text-[11px] text-slate-400 mt-0.5">{userEmail}</p>
           </button>
           <button
             onClick={() => onNavigate('account-settings')}
-            title="Account settings"
+            title={t('homePage.accountSettings')}
             className="p-2 text-slate-400 hover:text-slate-700 transition-colors"
           >
             <Settings size={15} />
@@ -275,7 +279,7 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
           <button
             onClick={handleReload}
             disabled={reloading}
-            title="Reload permissions"
+            title={t('homePage.reloadPermissions')}
             className="p-2 text-slate-400 hover:text-slate-700 disabled:opacity-40 transition-colors"
           >
             <RefreshCw size={15} className={reloading ? 'animate-spin' : ''} />
@@ -284,7 +288,7 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
             onClick={onLogout}
             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors"
           >
-            Sign Out
+            {t('homePage.signOut')}
           </button>
         </div>
       </header>
@@ -320,22 +324,22 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
                     text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border
                     ${mod.color.badge} ${mod.color.badgeText}
                   `}>
-                    {isActive ? 'Active' : 'Coming Soon'}
+                    {isActive ? t('homePage.active') : t('homePage.comingSoon')}
                   </span>
                 </div>
 
                 {/* Title + description */}
                 <div>
-                  <h2 className="text-slate-900 font-bold text-base mb-1.5">{mod.label}</h2>
-                  <p className="text-slate-500 text-xs leading-relaxed">{mod.description}</p>
+                  <h2 className="text-slate-900 font-bold text-base mb-1.5">{t(`homePage.modules.${mod.id}.label`)}</h2>
+                  <p className="text-slate-500 text-xs leading-relaxed">{t(`homePage.modules.${mod.id}.description`)}</p>
                 </div>
 
                 {/* Feature list */}
                 <ul className="space-y-1.5">
-                  {mod.features.map((f) => (
+                  {mod.features.map((f, i) => (
                     <li key={f} className="flex items-center gap-2 text-xs text-slate-500">
                       <ChevronRight size={12} className={mod.color.chevron} />
-                      {f}
+                      {t(`homePage.modules.${mod.id}.features.${i}`)}
                     </li>
                   ))}
                 </ul>
@@ -352,9 +356,9 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
                   `}
                 >
                   {isActive ? (
-                    <>Open Module <ArrowRight size={13} /></>
+                    <>{t('homePage.openModule')} <ArrowRight size={13} /></>
                   ) : (
-                    'In Development'
+                    t('homePage.inDevelopment')
                   )}
                 </button>
               </div>

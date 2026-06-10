@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   listPendingInspections,
   submitInspectionsBulk,
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export default function PendingQueue({ onInspectSubLot }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'testing', 'view_status');
   const canSubmit = can('qc', 'testing', 'submit_inspection');
@@ -53,7 +55,7 @@ export default function PendingQueue({ onInspectSubLot }: Props) {
   const bulkSubmit = async () => {
     const aw = parseFloat(bulkAw);
     if (!Number.isFinite(aw) || aw < 0 || aw > 2) {
-      setError('Enter a valid Aw value (0–2)');
+      setError(t('pendingQueue.invalidAw'));
       return;
     }
     setBusy(true);
@@ -63,25 +65,25 @@ export default function PendingQueue({ onInspectSubLot }: Props) {
       const results = await submitInspectionsBulk(submissions);
       const passed = results.filter(r => r.result === 'pass').length;
       const failed = results.filter(r => r.result === 'fail').length;
-      setMsg(`Submitted ${results.length} inspection(s): ${passed} pass, ${failed} hold`);
+      setMsg(t('pendingQueue.submitResult', { count: results.length, passed, failed }));
       setSelected(new Set());
       setShowBulkInput(false);
       setBulkAw('');
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Bulk submission failed');
+      setError(e instanceof Error ? e.message : t('pendingQueue.bulkFailed'));
     }
     setBusy(false);
   };
 
   if (!canView) {
-    return <PermissionDenied permission="qc.testing.view_status" feature="Testing Queue" />;
+    return <PermissionDenied permission="qc.testing.view_status" feature={t('pendingQueue.featureName')} />;
   }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900">Testing</h1>
-      <p className="text-xs text-slate-500 mt-1 mb-4">Sub-lots awaiting inspection · sorted by check-out time · refreshes every 5s</p>
+      <h1 className="text-2xl font-bold text-slate-900">{t('pendingQueue.title')}</h1>
+      <p className="text-xs text-slate-500 mt-1 mb-4">{t('pendingQueue.subtitle')}</p>
 
       {error && <p className="text-red-600 mb-3 text-sm">{error}</p>}
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
@@ -96,7 +98,7 @@ export default function PendingQueue({ onInspectSubLot }: Props) {
                 onClick={() => setShowBulkInput(true)}
                 className="px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
               >
-                Bulk submit ({selected.size})
+                {t('pendingQueue.bulkSubmit', { count: selected.size })}
               </button>
             ) : (
               <>
@@ -105,7 +107,7 @@ export default function PendingQueue({ onInspectSubLot }: Props) {
                   step="0.01"
                   min="0"
                   max="2"
-                  placeholder="Aw"
+                  placeholder={t('pendingQueue.awPlaceholder')}
                   value={bulkAw}
                   onChange={(e) => setBulkAw(e.target.value)}
                   className="border rounded-lg px-2 py-1 text-sm w-20"
@@ -116,14 +118,14 @@ export default function PendingQueue({ onInspectSubLot }: Props) {
                   disabled={busy || !bulkAw}
                   className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
                 >
-                  {busy ? 'Submitting…' : `Apply Aw to ${selected.size}`}
+                  {busy ? t('pendingQueue.submitting') : t('pendingQueue.applyAw', { count: selected.size })}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setShowBulkInput(false); setBulkAw(''); }}
                   className="px-2 py-1.5 text-xs text-slate-600"
                 >
-                  Cancel
+                  {t('pendingQueue.cancel')}
                 </button>
               </>
             )}
@@ -164,17 +166,17 @@ export default function PendingQueue({ onInspectSubLot }: Props) {
                   <QcStatusBadge status={s.status} />
                 </div>
                 <div className="text-xs mt-2 text-slate-600 space-y-0.5">
-                  <p>In: {formatQcDateTime(s.in_time)}</p>
-                  <p>Out: {formatQcDateTime(s.out_time)}</p>
+                  <p>{t('pendingQueue.in')}: {formatQcDateTime(s.in_time)}</p>
+                  <p>{t('pendingQueue.out')}: {formatQcDateTime(s.out_time)}</p>
                   {s.wait_minutes != null && (
-                    <p className="text-amber-800 font-medium">Waiting {s.wait_minutes} min</p>
+                    <p className="text-amber-800 font-medium">{t('pendingQueue.waiting', { minutes: s.wait_minutes })}</p>
                   )}
                 </div>
               </button>
             </li>
           );
         })}
-        {items.length === 0 && <p className="text-slate-500 text-sm">No pending sub-lots</p>}
+        {items.length === 0 && <p className="text-slate-500 text-sm">{t('pendingQueue.empty')}</p>}
       </ul>
     </div>
   );

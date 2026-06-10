@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Printer, X } from 'lucide-react';
 import { SubLot } from '../../../services/qcApi';
 import { SelectAllCheckbox } from './SelectAllCheckbox';
@@ -19,6 +20,7 @@ interface Props {
  * the parent feeds the selection into <CartStickerSheet/> for printing.
  */
 export function ReprintPickerDialog({ open, subLots, onConfirm, onClose }: Props) {
+  const { t } = useTranslation('qc');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export function ReprintPickerDialog({ open, subLots, onConfirm, onClose }: Props
         type="button"
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t('reprintPickerDialog.close')}
       />
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl max-h-[80vh] flex flex-col">
         <header className="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
@@ -62,11 +64,11 @@ export function ReprintPickerDialog({ open, subLots, onConfirm, onClose }: Props
               <Printer size={18} />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Reprint stickers</p>
-              <h2 className="text-base font-bold text-slate-900">Pick carts</h2>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('reprintPickerDialog.title')}</p>
+              <h2 className="text-base font-bold text-slate-900">{t('reprintPickerDialog.heading')}</h2>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100" aria-label="Close">
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100" aria-label={t('reprintPickerDialog.close')}>
             <X size={16} />
           </button>
         </header>
@@ -78,7 +80,7 @@ export function ReprintPickerDialog({ open, subLots, onConfirm, onClose }: Props
             onToggleAll={toggleAll}
           />
           <span className="text-xs text-slate-500">
-            {selected.size} of {subLots.length} selected
+            {t('reprintPickerDialog.selectedCount', { selected: selected.size, total: subLots.length })}
           </span>
         </div>
 
@@ -108,7 +110,7 @@ export function ReprintPickerDialog({ open, subLots, onConfirm, onClose }: Props
             );
           })}
           {subLots.length === 0 && (
-            <li className="px-5 py-6 text-center text-sm text-slate-400">No carts in this work order.</li>
+            <li className="px-5 py-6 text-center text-sm text-slate-400">{t('reprintPickerDialog.emptyState')}</li>
           )}
         </ul>
 
@@ -118,7 +120,7 @@ export function ReprintPickerDialog({ open, subLots, onConfirm, onClose }: Props
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-xs font-bold border border-slate-300 text-slate-700 hover:bg-white"
           >
-            Cancel
+            {t('reprintPickerDialog.cancel')}
           </button>
           <button
             type="button"
@@ -127,7 +129,9 @@ export function ReprintPickerDialog({ open, subLots, onConfirm, onClose }: Props
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Printer size={13} />
-            Print {selected.size > 0 ? `${selected.size} sticker${selected.size === 1 ? '' : 's'}` : ''}
+            {selected.size > 0
+              ? t('reprintPickerDialog.printWithCount', { count: selected.size })
+              : t('reprintPickerDialog.print')}
           </button>
         </footer>
       </div>

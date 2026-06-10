@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, X } from 'lucide-react';
 import { warnBeep } from '../../../lib/audio';
 
@@ -20,6 +21,7 @@ interface Props {
 export function DuplicateScanDialog({
   open, subLotCode, contextLabel, onConfirm, onCancel,
 }: Props) {
+  const { t } = useTranslation('qc');
   useEffect(() => {
     if (open) warnBeep();
   }, [open]);
@@ -32,7 +34,7 @@ export function DuplicateScanDialog({
         type="button"
         className="absolute inset-0 bg-black/50"
         onClick={onCancel}
-        aria-label="Close"
+        aria-label={t('duplicateScanDialog.close')}
       />
       <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border-2 border-amber-300">
         <header className="px-5 py-4 border-b border-amber-200 flex items-center justify-between bg-amber-50 rounded-t-2xl">
@@ -42,15 +44,15 @@ export function DuplicateScanDialog({
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-amber-700 font-bold">
-                Duplicate scan
+                {t('duplicateScanDialog.eyebrow')}
               </p>
-              <h2 className="text-base font-bold text-amber-900">Already scanned</h2>
+              <h2 className="text-base font-bold text-amber-900">{t('duplicateScanDialog.title')}</h2>
             </div>
           </div>
           <button
             onClick={onCancel}
             className="p-1 rounded hover:bg-amber-100"
-            aria-label="Dismiss"
+            aria-label={t('duplicateScanDialog.dismiss')}
           >
             <X size={16} />
           </button>
@@ -58,13 +60,13 @@ export function DuplicateScanDialog({
 
         <div className="px-5 py-4 space-y-2">
           <p className="text-sm text-slate-700">
-            This cart code has already been scanned{contextLabel ? ` (${contextLabel})` : ''}:
+            {t('duplicateScanDialog.alreadyScanned')}{contextLabel ? ` (${contextLabel})` : ''}:
           </p>
           <p className="text-center font-mono font-bold text-lg text-slate-900 bg-slate-50 border border-slate-200 rounded-lg py-2">
             {subLotCode}
           </p>
           <p className="text-xs text-slate-500">
-            Verify the cart wasn't double-counted, then click Confirm to keep it selected, or Cancel to ignore this scan.
+            {t('duplicateScanDialog.helpText')}
           </p>
         </div>
 
@@ -74,7 +76,7 @@ export function DuplicateScanDialog({
             onClick={onCancel}
             className="px-4 py-2 rounded-lg text-xs font-bold border border-slate-300 text-slate-700 hover:bg-white"
           >
-            Cancel scan
+            {t('duplicateScanDialog.cancel')}
           </button>
           <button
             type="button"
@@ -82,7 +84,7 @@ export function DuplicateScanDialog({
             className="px-4 py-2 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white"
             autoFocus
           >
-            Confirm — keep selected
+            {t('duplicateScanDialog.confirm')}
           </button>
         </footer>
       </div>

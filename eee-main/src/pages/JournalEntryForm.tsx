@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Plus, Trash2, CheckCircle2, AlertCircle, Save, Send,
   Loader2, Paperclip, X, FileText, Image, FileSpreadsheet, File, ChevronDown,
@@ -54,6 +55,7 @@ function AccountCombobox({
   value: number | '';
   onChange: (id: number | '') => void;
 }) {
+  const { t } = useTranslation('finance');
   const selected = accounts.find(a => a.id === value) ?? null;
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -124,7 +126,7 @@ function AccountCombobox({
           ref={inputRef}
           type="text"
           className="flex-1 min-w-0 px-2 py-1.5 bg-transparent focus:outline-none text-sm placeholder:text-slate-400"
-          placeholder={selected ? '' : '— Select Account —'}
+          placeholder={selected ? '' : t('journalEntryForm.selectAccount')}
           value={open ? query : ''}
           onChange={e => { setQuery(e.target.value); setHighlighted(0); }}
           onFocus={() => setOpen(true)}
@@ -153,7 +155,7 @@ function AccountCombobox({
           className="absolute z-50 left-0 top-full mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg text-sm"
         >
           {filtered.length === 0 ? (
-            <li className="px-3 py-2.5 text-slate-400 text-xs">No accounts found</li>
+            <li className="px-3 py-2.5 text-slate-400 text-xs">{t('journalEntryForm.noAccountsFound')}</li>
           ) : (
             filtered.map((a, i) => (
               <li
@@ -197,6 +199,7 @@ function AttachmentPanel({
   onDelete: (a: JournalEntryAttachment) => void;
   isReadOnly?: boolean;
 }) {
+  const { t } = useTranslation('finance');
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -210,7 +213,7 @@ function AttachmentPanel({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-          <Paperclip size={12} /> Attachments · Vouchers
+          <Paperclip size={12} /> {t('journalEntryForm.attachmentsVouchers')}
           {attachments.length > 0 && (
             <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
               {attachments.length}
@@ -226,7 +229,7 @@ function AttachmentPanel({
               className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {uploading ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-              Upload File
+              {t('journalEntryForm.uploadFile')}
             </button>
             <input
               ref={inputRef}
@@ -254,7 +257,7 @@ function AttachmentPanel({
         >
           <Paperclip size={20} className="text-slate-300" />
           <p className="text-xs text-slate-400 font-medium text-center">
-            Drag & drop or click to upload · PDF, JPG, PNG, XLSX · max 10 MB
+            {t('journalEntryForm.dropZoneHint')}
           </p>
         </div>
       )}
@@ -281,7 +284,7 @@ function AttachmentPanel({
                       const url = await getAttachmentUrl(a.storage_path);
                       window.open(url, '_blank', 'noopener,noreferrer');
                     } catch {
-                      alert('Could not open file. Please try again.');
+                      alert(t('journalEntryForm.couldNotOpenFile'));
                     }
                   }}
                   className="text-sm font-medium text-blue-600 hover:underline truncate block text-left w-full"
@@ -311,7 +314,7 @@ function AttachmentPanel({
                 className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-blue-600 transition-colors"
               >
                 {uploading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                Add more
+                {t('journalEntryForm.addMore')}
               </button>
             </div>
           )}
@@ -332,6 +335,7 @@ export default function JournalEntryForm({
   onNavigate?: (screen: string) => void;
   editEntryId?: number;
 }) {
+  const { t } = useTranslation('finance');
   const { can } = usePermissions();
   const canCreate  = can('finance', 'journal_entry', 'create');
   const canEdit    = can('finance', 'journal_entry', 'edit');
@@ -432,7 +436,7 @@ export default function JournalEntryForm({
 
   async function handleSaveDraft() {
     setError('');
-    if (!description.trim()) { setError('Entry description is required.'); return; }
+    if (!description.trim()) { setError(t('journalEntryForm.errorDescriptionRequired')); return; }
     setSaving(true);
     try {
       if (savedId) {
@@ -471,8 +475,8 @@ export default function JournalEntryForm({
 
   async function handlePost() {
     setError('');
-    if (!description.trim()) { setError('Entry description is required.'); return; }
-    if (lines.some(l => l.gl_account_id === '')) { setError('All lines need an account.'); return; }
+    if (!description.trim()) { setError(t('journalEntryForm.errorDescriptionRequired')); return; }
+    if (lines.some(l => l.gl_account_id === '')) { setError(t('journalEntryForm.errorAllLinesNeedAccount')); return; }
     setPosting(true);
     try {
       let id = savedId;
@@ -504,8 +508,8 @@ export default function JournalEntryForm({
 
   async function handleSubmitForApproval() {
     setError('');
-    if (!description.trim()) { setError('Entry description is required.'); return; }
-    if (lines.some(l => l.gl_account_id === '')) { setError('All lines need an account.'); return; }
+    if (!description.trim()) { setError(t('journalEntryForm.errorDescriptionRequired')); return; }
+    if (lines.some(l => l.gl_account_id === '')) { setError(t('journalEntryForm.errorAllLinesNeedAccount')); return; }
     setSubmitting(true);
     try {
       let id = savedId;
@@ -528,7 +532,7 @@ export default function JournalEntryForm({
       setEntryStatus('pending_approval');
       const log = await getEditLog(id);
       setEditLog(log);
-      setSuccess(`${buildJeNumber(id)} submitted for approval`);
+      setSuccess(t('journalEntryForm.submittedForApproval', { number: buildJeNumber(id) }));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -543,7 +547,7 @@ export default function JournalEntryForm({
     setError('');
     try {
       const newId = await reverseJournalEntry(savedId);
-      setSuccess(`Reversed → JE-${new Date(date).getFullYear()}-${String(newId).padStart(6, '0')}`);
+      setSuccess(t('journalEntryForm.reversedTo', { number: `JE-${new Date(date).getFullYear()}-${String(newId).padStart(6, '0')}` }));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -554,9 +558,9 @@ export default function JournalEntryForm({
   async function handleSavePosted() {
     if (!savedId) return;
     setError('');
-    if (!description.trim()) { setError('Entry description is required.'); return; }
-    if (lines.some(l => l.gl_account_id === '')) { setError('All lines need an account.'); return; }
-    if (!isBalanced) { setError('Entry must be balanced before saving.'); return; }
+    if (!description.trim()) { setError(t('journalEntryForm.errorDescriptionRequired')); return; }
+    if (lines.some(l => l.gl_account_id === '')) { setError(t('journalEntryForm.errorAllLinesNeedAccount')); return; }
+    if (!isBalanced) { setError(t('journalEntryForm.errorMustBeBalanced')); return; }
     setSaving(true);
     try {
       await updateJePosted({
@@ -585,7 +589,7 @@ export default function JournalEntryForm({
       let entryId = savedId;
       if (!entryId) {
         if (!description.trim()) {
-          setError('Please enter a description before uploading.');
+          setError(t('journalEntryForm.errorDescriptionBeforeUpload'));
           return;
         }
         entryId = await saveOrGetId();
@@ -618,7 +622,7 @@ export default function JournalEntryForm({
           <CheckCircle2 size={40} />
         </div>
         <div>
-          <h3 className="text-xl font-bold text-slate-900">Entry Posted</h3>
+          <h3 className="text-xl font-bold text-slate-900">{t('journalEntryForm.entryPosted')}</h3>
           <p className="text-sm font-mono text-slate-500 mt-1">{success}</p>
         </div>
         <div className="flex gap-4 justify-center">
@@ -631,7 +635,7 @@ export default function JournalEntryForm({
               }}
               className="px-6 py-2 text-sm font-bold bg-blue-600 text-white rounded hover:bg-blue-700"
             >
-              New Entry
+              {t('journalEntryForm.newEntry')}
             </button>
           )}
           {onNavigate && (
@@ -639,7 +643,7 @@ export default function JournalEntryForm({
               onClick={() => onNavigate('je-list')}
               className="px-6 py-2 text-sm font-bold border border-slate-200 rounded hover:bg-slate-50"
             >
-              View All Entries
+              {t('journalEntryForm.viewAllEntries')}
             </button>
           )}
         </div>
@@ -651,7 +655,7 @@ export default function JournalEntryForm({
     return (
       <div className="flex items-center justify-center py-40 gap-3 text-slate-400">
         <Loader2 size={24} className="animate-spin" />
-        <span className="text-sm font-medium">Loading entry...</span>
+        <span className="text-sm font-medium">{t('journalEntryForm.loadingEntry')}</span>
       </div>
     );
   }
@@ -670,12 +674,12 @@ export default function JournalEntryForm({
               onClick={() => onNavigate('je-list')}
               className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 font-bold uppercase tracking-wide mb-2"
             >
-              <ArrowLeft size={13} /> Back to Journal Entries
+              <ArrowLeft size={13} /> {t('journalEntryForm.backToJournalEntries')}
             </button>
           )}
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-              {isEditMode ? (isReadOnly ? 'View Entry' : 'Edit Entry') : 'Create Journal Entry'}
+              {isEditMode ? (isReadOnly ? t('journalEntryForm.viewEntry') : t('journalEntryForm.editEntry')) : t('journalEntryForm.createJournalEntry')}
             </h2>
             <span className={cn(
               'px-3 py-1 rounded font-mono text-sm font-bold tracking-wider',
@@ -692,7 +696,7 @@ export default function JournalEntryForm({
             )}
           </div>
           <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
-            {isReadOnly ? `${entryStatus} · read-only` : savedNumber ? 'Draft · not yet posted' : 'Number assigned on first save'}
+            {isReadOnly ? t('journalEntryForm.statusReadOnly', { status: entryStatus }) : savedNumber ? t('journalEntryForm.draftNotPosted') : t('journalEntryForm.numberAssignedOnSave')}
           </p>
         </div>
 
@@ -705,10 +709,10 @@ export default function JournalEntryForm({
         )}>
           {isBalanced ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
           {isBalanced
-            ? 'Balanced'
+            ? t('journalEntryForm.balanced')
             : totalDebit === 0 && totalCredit === 0
-              ? 'Out of balance by $0.00'
-              : `Out of balance by ${formatCurrency(Math.abs(totalDebit - totalCredit))}`}
+              ? t('journalEntryForm.outOfBalanceBy', { amount: '$0.00' })
+              : t('journalEntryForm.outOfBalanceBy', { amount: formatCurrency(Math.abs(totalDebit - totalCredit)) })}
         </div>
       </div>
 
@@ -717,7 +721,7 @@ export default function JournalEntryForm({
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
           <AlertCircle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-amber-700">
-            <span className="font-bold">Editing a posted entry.</span> All changes are logged in the audit trail. The entry will remain posted after saving.
+            <span className="font-bold">{t('journalEntryForm.editingPostedTitle')}</span> {t('journalEntryForm.editingPostedDetail')}
           </p>
         </div>
       )}
@@ -727,7 +731,7 @@ export default function JournalEntryForm({
         <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-3">
           <AlertCircle size={18} className="text-rose-500 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-bold text-rose-700">Entry Rejected — corrections required</p>
+            <p className="text-sm font-bold text-rose-700">{t('journalEntryForm.entryRejected')}</p>
             {(editLog.find(l => l.action === 'rejected'))?.summary && (
               <p className="text-sm text-rose-600 mt-0.5">
                 {(editLog.find(l => l.action === 'rejected'))!.summary!.replace('Rejected: ', '')}
@@ -742,7 +746,7 @@ export default function JournalEntryForm({
         <div className="p-6 bg-slate-50 border-b border-slate-200">
           <div className="grid grid-cols-12 gap-4">
             <div className="col-span-2 space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('journalEntryForm.date')}</label>
               <input
                 type="date"
                 value={date}
@@ -751,23 +755,23 @@ export default function JournalEntryForm({
               />
             </div>
             <div className="col-span-2 space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Type</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('journalEntryForm.type')}</label>
               <select
                 value={journalType}
                 onChange={e => setJournalType(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
-                <option value="general">General</option>
-                <option value="adjusting">Adjusting</option>
-                <option value="closing">Closing</option>
-                <option value="reversing">Reversing</option>
+                <option value="general">{t('journalEntryForm.typeGeneral')}</option>
+                <option value="adjusting">{t('journalEntryForm.typeAdjusting')}</option>
+                <option value="closing">{t('journalEntryForm.typeClosing')}</option>
+                <option value="reversing">{t('journalEntryForm.typeReversing')}</option>
               </select>
             </div>
             <div className="col-span-8 space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Description *</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('journalEntryForm.descriptionLabel')}</label>
               <input
                 type="text"
-                placeholder="Brief purpose of this entry..."
+                placeholder={t('journalEntryForm.descriptionPlaceholder')}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -781,10 +785,10 @@ export default function JournalEntryForm({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                <th className="px-6 py-3 w-72">Account</th>
-                <th className="px-6 py-3">Line Description</th>
-                <th className="px-6 py-3 w-36 text-right">Debit</th>
-                <th className="px-6 py-3 w-36 text-right">Credit</th>
+                <th className="px-6 py-3 w-72">{t('journalEntryForm.colAccount')}</th>
+                <th className="px-6 py-3">{t('journalEntryForm.colLineDescription')}</th>
+                <th className="px-6 py-3 w-36 text-right">{t('journalEntryForm.colDebit')}</th>
+                <th className="px-6 py-3 w-36 text-right">{t('journalEntryForm.colCredit')}</th>
                 <th className="px-6 py-3 w-12"></th>
               </tr>
             </thead>
@@ -811,7 +815,7 @@ export default function JournalEntryForm({
                   <td className="px-6 py-3">
                     <input
                       type="text"
-                      placeholder="Line detail..."
+                      placeholder={t('journalEntryForm.lineDetailPlaceholder')}
                       readOnly={isReadOnly}
                       className={cn('w-full bg-transparent text-sm rounded p-1', isReadOnly ? 'text-slate-600 cursor-default' : 'focus:outline-none focus:ring-1 focus:ring-blue-500')}
                       value={line.description ?? ''}
@@ -858,16 +862,16 @@ export default function JournalEntryForm({
               onClick={() => setLines(prev => [...prev, emptyLine()])}
               className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 uppercase tracking-wide"
             >
-              <Plus size={16} /> Add Line
+              <Plus size={16} /> {t('journalEntryForm.addLine')}
             </button>
           )}
           <div className="flex gap-12 text-right">
             <div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Debit</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{t('journalEntryForm.totalDebit')}</p>
               <p className="text-xl font-mono font-bold text-slate-900">{formatCurrency(totalDebit)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Credit</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">{t('journalEntryForm.totalCredit')}</p>
               <p className="text-xl font-mono font-bold text-slate-900">{formatCurrency(totalCredit)}</p>
             </div>
           </div>
@@ -879,11 +883,11 @@ export default function JournalEntryForm({
         {/* Notes */}
         <Card className="p-5">
           <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">
-            Notes / Memo
+            {t('journalEntryForm.notesMemo')}
           </label>
           <textarea
             rows={4}
-            placeholder="Internal memo, audit trail notes, approval remarks..."
+            placeholder={t('journalEntryForm.notesPlaceholder')}
             value={notes}
             readOnly={isReadOnly}
             onChange={e => !isReadOnly && setNotes(e.target.value)}
@@ -919,7 +923,7 @@ export default function JournalEntryForm({
               onClick={() => onNavigate('reports')}
               className="flex-shrink-0 px-3 py-1 text-xs font-bold bg-rose-600 text-white rounded hover:bg-rose-700"
             >
-              Go to Accounting Periods →
+              {t('journalEntryForm.goToAccountingPeriods')}
             </button>
           )}
         </div>
@@ -935,12 +939,12 @@ export default function JournalEntryForm({
               <>
                 <button onClick={() => { setIsEditingPosted(false); setError(''); }}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded">
-                  <X size={16} /> Cancel
+                  <X size={16} /> {t('journalEntryForm.cancel')}
                 </button>
                 <button onClick={handleSavePosted} disabled={saving || !isBalanced}
                   className="flex items-center gap-2 px-6 py-2.5 rounded text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                  Save Changes
+                  {t('journalEntryForm.saveChanges')}
                 </button>
               </>
             ) : (
@@ -948,20 +952,20 @@ export default function JournalEntryForm({
               <>
                 <button onClick={() => onNavigate?.('je-list')}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded">
-                  <ArrowLeft size={16} /> Back
+                  <ArrowLeft size={16} /> {t('journalEntryForm.back')}
                 </button>
                 <div className="flex items-center gap-3">
                   {entryStatus === 'posted' && canEdit && (
                     <button onClick={() => { setIsEditingPosted(true); setError(''); }}
                       className="flex items-center gap-2 px-5 py-2.5 rounded text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200">
-                      Edit Entry
+                      {t('journalEntryForm.editEntryBtn')}
                     </button>
                   )}
                   {entryStatus === 'posted' && canReverse && (
                     <button onClick={handleReverse} disabled={reversing}
                       className="flex items-center gap-2 px-6 py-2.5 rounded text-sm font-bold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50">
                       {reversing ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-                      Reverse Entry
+                      {t('journalEntryForm.reverseEntry')}
                     </button>
                   )}
                 </div>
@@ -973,10 +977,10 @@ export default function JournalEntryForm({
           <>
             <button onClick={() => onNavigate?.('je-list')}
               className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded">
-              <ArrowLeft size={16} /> Back
+              <ArrowLeft size={16} /> {t('journalEntryForm.back')}
             </button>
             <span className="text-sm text-amber-600 font-semibold flex items-center gap-2">
-              <Clock size={16} /> Awaiting approval
+              <Clock size={16} /> {t('journalEntryForm.awaitingApproval')}
             </span>
           </>
         ) : (
@@ -986,7 +990,7 @@ export default function JournalEntryForm({
               <button onClick={handleSaveDraft} disabled={saving || submitting}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded disabled:opacity-50">
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                Save Draft
+                {t('journalEntryForm.saveDraft')}
               </button>
             )}
             {(canCreate || canEdit) && (
@@ -1001,7 +1005,7 @@ export default function JournalEntryForm({
                 )}
               >
                 {submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                Submit for Approval
+                {t('journalEntryForm.submitForApproval')}
               </button>
             )}
           </>
@@ -1013,7 +1017,7 @@ export default function JournalEntryForm({
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-4">
             <Clock size={14} className="text-slate-400" />
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Modification History</span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('journalEntryForm.modificationHistory')}</span>
           </div>
           <ol className="relative border-l border-slate-200 space-y-4 pl-5">
             {editLog.map(log => (

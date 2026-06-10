@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Search, Users } from 'lucide-react';
 import { getUsers } from '../../../services/authApi';
 import type { ErpUser } from '../../../types/auth';
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export default function EmployeeDirectory({ onSelectEmployee }: Props) {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canExport = can('hr', 'employees', 'export');
   const [users, setUsers]   = useState<ErpUser[]>([]);
@@ -63,12 +65,12 @@ export default function EmployeeDirectory({ onSelectEmployee }: Props) {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / People</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('employeeDirectory.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Employee Directory</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('employeeDirectory.title')}</h1>
           {canExport && (
             <button onClick={exportCSV} className="px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">
-              Export CSV
+              {t('employeeDirectory.exportCsv')}
             </button>
           )}
         </div>
@@ -81,7 +83,7 @@ export default function EmployeeDirectory({ onSelectEmployee }: Props) {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search name, email, ID…"
+              placeholder={t('employeeDirectory.searchPlaceholder')}
               className="w-full pl-8 pr-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
@@ -90,28 +92,28 @@ export default function EmployeeDirectory({ onSelectEmployee }: Props) {
             onChange={e => setDeptFilter(e.target.value)}
             className="px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
           >
-            <option value="">All Departments</option>
+            <option value="">{t('employeeDirectory.allDepartments')}</option>
             {departments.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
 
         {loading ? (
           <div className="flex items-center gap-2 text-slate-400 py-16 justify-center">
-            <Loader2 size={18} className="animate-spin" /> Loading…
+            <Loader2 size={18} className="animate-spin" /> {t('employeeDirectory.loading')}
           </div>
         ) : (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
                 <Users size={32} className="opacity-40" />
-                <p className="text-sm">No employees found</p>
+                <p className="text-sm">{t('employeeDirectory.noEmployees')}</p>
               </div>
             ) : (
               <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    {['ID','Name','Role','Department','Manager','Email','Status'].map(h => (
-                      <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>
+                    {['id','name','role','department','manager','email','status'].map(h => (
+                      <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t(`employeeDirectory.col.${h}`)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -144,7 +146,7 @@ export default function EmployeeDirectory({ onSelectEmployee }: Props) {
             )}
           </div>
         )}
-        <p className="text-xs text-slate-400 mt-3">{filtered.length} employee{filtered.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs text-slate-400 mt-3">{t('employeeDirectory.count', { count: filtered.length })}</p>
       </main>
     </div>
   );

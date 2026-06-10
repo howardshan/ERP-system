@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, ClipboardList, CheckCircle2, Circle, Clock } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { getUsers } from '../../../services/authApi';
@@ -60,6 +61,7 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 export default function OnboardingDashboard() {
+  const { t } = useTranslation('hr');
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [templates, setTemplates]   = useState<any[]>([]);
   const [employees, setEmployees]   = useState<ErpUser[]>([]);
@@ -97,11 +99,11 @@ export default function OnboardingDashboard() {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Onboarding</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('onboardingDashboard.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Onboarding Tasks</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('onboardingDashboard.title')}</h1>
           <button onClick={() => setModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg transition-colors">
-            Start Onboarding
+            {t('onboardingDashboard.startOnboarding')}
           </button>
         </div>
       </div>
@@ -112,7 +114,7 @@ export default function OnboardingDashboard() {
         ) : checklists.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
             <ClipboardList size={40} className="opacity-40" />
-            <p className="text-sm">No onboarding in progress</p>
+            <p className="text-sm">{t('onboardingDashboard.empty')}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -125,7 +127,7 @@ export default function OnboardingDashboard() {
                   <div className="px-6 py-4 flex items-center gap-4 cursor-pointer hover:bg-slate-50" onClick={() => setExpanded(p => { const n = new Set(p); n.has(cl.id) ? n.delete(cl.id) : n.add(cl.id); return n; })}>
                     <div className="flex-1">
                       <p className="font-semibold text-slate-900">{cl.employee_name}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">Started {new Date(cl.created_at).toLocaleDateString()}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{t('onboardingDashboard.started', { date: new Date(cl.created_at).toLocaleDateString() })}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -147,7 +149,7 @@ export default function OnboardingDashboard() {
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm font-semibold ${task.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.task_name}</p>
                             {task.description && <p className="text-xs text-slate-400 mt-0.5">{task.description}</p>}
-                            {task.due_date && <p className="text-[10px] text-slate-400 mt-1">Due: {task.due_date}</p>}
+                            {task.due_date && <p className="text-[10px] text-slate-400 mt-1">{t('onboardingDashboard.due', { date: task.due_date })}</p>}
                           </div>
                         </div>
                       ))}
@@ -163,30 +165,30 @@ export default function OnboardingDashboard() {
       {modal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-5">Start Employee Onboarding</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-5">{t('onboardingDashboard.modalTitle')}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Employee</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('onboardingDashboard.employee')}</label>
                 <select value={form.employee_id} onChange={e => setForm(p => ({ ...p, employee_id: e.target.value }))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                  <option value="">Select employee</option>
+                  <option value="">{t('onboardingDashboard.selectEmployee')}</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Onboarding Template</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('onboardingDashboard.template')}</label>
                 <select value={form.template_id} onChange={e => setForm(p => ({ ...p, template_id: Number(e.target.value) }))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                  <option value={0}>Select template</option>
+                  <option value={0}>{t('onboardingDashboard.selectTemplate')}</option>
                   {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('onboardingDashboard.cancel')}</button>
               <button onClick={startChecklist} disabled={saving || !form.employee_id || !form.template_id}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Starting…' : 'Start Onboarding'}
+                {saving ? t('onboardingDashboard.starting') : t('onboardingDashboard.startOnboarding')}
               </button>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, FlaskConical, Package } from 'lucide-react';
 import {
   listProducts,
@@ -40,13 +41,16 @@ function productToForm(p: Product): ProductInput {
       .filter(t => t.test_type_id != null)
       .map(t => ({
         test_type_id: t.test_type_id!,
-        lower_limit: t.lower_limit,
-        upper_limit: t.upper_limit,
+        lower_limit:      t.lower_limit,
+        upper_limit:      t.upper_limit,
+        soft_lower_limit: t.soft_lower_limit,
+        soft_upper_limit: t.soft_upper_limit,
       })),
   };
 }
 
 export default function ProductManagement() {
+  const { t: tr } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('production', 'products', 'view');
   const canCreate = can('production', 'products', 'create');
@@ -136,13 +140,19 @@ export default function ProductManagement() {
     setError('');
     // Validate limits — DecimalField emits NaN for empty/partial input, so we
     // reject here instead of letting NaN propagate to the backend.
-    for (const t of form.templates) {
-      if (!Number.isFinite(t.lower_limit) || !Number.isFinite(t.upper_limit)) {
-        setError('Each test needs a lower and upper limit.');
+    for (const tmpl of form.templates) {
+      if (!Number.isFinite(tmpl.lower_limit) || !Number.isFinite(tmpl.upper_limit) ||
+          !Number.isFinite(tmpl.soft_lower_limit) || !Number.isFinite(tmpl.soft_upper_limit)) {
+        setError(tr('productManagement.errNeedFourLimits'));
         return;
       }
-      if (t.lower_limit > t.upper_limit) {
-        setError('Lower limit must be ≤ upper limit.');
+      if (tmpl.lower_limit > tmpl.upper_limit) {
+        setError(tr('productManagement.errHardLowerGtUpper'));
+        return;
+      }
+      // M-118: soft must wrap hard so the DB CHECK matches.
+      if (tmpl.soft_lower_limit > tmpl.lower_limit || tmpl.soft_upper_limit < tmpl.upper_limit) {
+        setError(tr('productManagement.errSoftMustWrap'));
         return;
       }
     }
@@ -159,12 +169,12 @@ export default function ProductManagement() {
       if (editingId) {
         await updateProduct(editingId, payload);
         skuId = editingId;
-        setMsg('Product updated');
+        setMsg(tr('productManagement.msgUpdated'));
         setEditingId(null);
       } else {
         const created = await createProduct(payload);
         skuId = created.id;
-        setMsg('Product created');
+        setMsg(tr('productManagement.msgCreated'));
         setCreating(false);
       }
       await syncSkuItemLinks(skuId);
@@ -172,20 +182,20 @@ export default function ProductManagement() {
       setSelectedItemIds(new Set());
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
+      setError(err instanceof Error ? err.message : tr('productManagement.errSaveFailed'));
     }
   };
 
   const remove = async (id: string, code: string) => {
-    if (!confirm(`Delete product ${code}?`)) return;
+    if (!confirm(tr('productManagement.confirmDeleteProduct', { code }))) return;
     try {
       await deleteProduct(id);
       if (editingId === id) cancel();
-      setMsg('Deleted');
+      setMsg(tr('productManagement.msgDeleted'));
       setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; });
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Delete failed');
+      setError(err instanceof Error ? err.message : tr('productManagement.errDeleteFailed'));
     }
   };
 
@@ -213,12 +223,12 @@ export default function ProductManagement() {
     setError('');
     try {
       await deleteProducts([...selected]);
-      setMsg(`Deleted ${selected.size} product(s)`);
+      setMsg(tr('productManagement.msgBulkDeleted', { count: selected.size }));
       setSelected(new Set());
       setConfirmBulkDelete(false);
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Bulk delete failed');
+      setError(err instanceof Error ? err.message : tr('productManagement.errBulkDeleteFailed'));
     }
     setBusy(false);
   };
@@ -226,14 +236,14 @@ export default function ProductManagement() {
   const isBusy = creating || editingId !== null;
 
   if (!canView) {
-    return <PermissionDenied permission="production.products.view" feature="Products & Templates" />;
+    return <PermissionDenied permission="production.products.view" feature={tr('productManagement.featureProductsTemplates')} />;
   }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Products</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{tr('productManagement.title')}</h1>
       <p className="text-slate-600 mb-4 text-sm">
-        Maintain SKU, reference dry time (SOP), and post-dry inspection limits.
+        {tr('productManagement.subtitle')}
       </p>
 
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
@@ -250,7 +260,7 @@ export default function ProductManagement() {
               creating ? 'bg-slate-200 text-slate-700' : 'bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50',
             )}
           >
-            <Plus size={13} /> {creating ? 'Cancel new' : 'Add product'}
+            <Plus size={13} /> {creating ? tr('productManagement.cancelNew') : tr('productManagement.addProduct')}
           </button>
         )}
       </div>
@@ -270,14 +280,14 @@ export default function ProductManagement() {
             )}
           >
             <Trash2 size={12} />
-            {confirmBulkDelete ? `Confirm delete (${selected.size})` : `Delete ${selected.size}`}
+            {confirmBulkDelete ? tr('productManagement.confirmDeleteCount', { count: selected.size }) : tr('productManagement.deleteCount', { count: selected.size })}
           </button>
         )}
       </div>
 
       {creating && (
         <form onSubmit={submit} className="bg-white border-2 border-blue-400 rounded-xl p-4 mb-6 space-y-4 shadow-sm">
-          <h2 className="font-semibold text-blue-800 text-sm">New product</h2>
+          <h2 className="font-semibold text-blue-800 text-sm">{tr('productManagement.newProduct')}</h2>
           <ProductFormFields
                     form={form}
                     setForm={setForm}
@@ -287,8 +297,8 @@ export default function ProductManagement() {
                     onToggleItem={toggleItemId}
                   />
           <div className="flex gap-2">
-            <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">Save</button>
-            <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>Cancel</button>
+            <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">{tr('productManagement.save')}</button>
+            <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>{tr('productManagement.cancel')}</button>
           </div>
         </form>
       )}
@@ -305,7 +315,7 @@ export default function ProductManagement() {
             )}>
               {isEditing ? (
                 <form onSubmit={submit} className="space-y-4">
-                  <h2 className="font-semibold text-blue-800 text-sm">Edit · {p.name}</h2>
+                  <h2 className="font-semibold text-blue-800 text-sm">{tr('productManagement.editHeading', { name: p.name })}</h2>
                   <ProductFormFields
                     form={form}
                     setForm={setForm}
@@ -315,8 +325,8 @@ export default function ProductManagement() {
                     onToggleItem={toggleItemId}
                   />
                   <div className="flex gap-2">
-                    <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">Save</button>
-                    <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>Cancel</button>
+                    <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">{tr('productManagement.save')}</button>
+                    <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>{tr('productManagement.cancel')}</button>
                   </div>
                 </form>
               ) : (
@@ -341,7 +351,7 @@ export default function ProductManagement() {
                             disabled={isBusy}
                             onClick={() => startEdit(p)}
                           >
-                            Edit
+                            {tr('productManagement.edit')}
                           </button>
                         )}
                         {canDelete && (
@@ -351,31 +361,41 @@ export default function ProductManagement() {
                             disabled={isBusy}
                             onClick={() => remove(p.id, p.code)}
                           >
-                            Delete
+                            {tr('productManagement.delete')}
                           </button>
                         )}
                       </div>
                     </div>
                     <dl className="mt-3 grid sm:grid-cols-3 gap-2 text-xs">
                       <div>
-                        <dt className="text-slate-500">Reference dry</dt>
-                        <dd className="text-slate-800">{p.standard_drying_minutes != null ? fmtDays(p.standard_drying_minutes) : 'Not set'}</dd>
+                        <dt className="text-slate-500">{tr('productManagement.referenceDry')}</dt>
+                        <dd className="text-slate-800">{p.standard_drying_minutes != null ? fmtDays(p.standard_drying_minutes) : tr('productManagement.notSet')}</dd>
                       </div>
                       <div>
-                        <dt className="text-slate-500">Sampling rate</dt>
+                        <dt className="text-slate-500">{tr('productManagement.samplingRate')}</dt>
                         <dd className="text-slate-800">
-                          1 per <span className="font-mono font-bold">{p.sample_every_n_carts ?? 1}</span> cart(s)
+                          {tr('productManagement.onePerPrefix')} <span className="font-mono font-bold">{p.sample_every_n_carts ?? 1}</span> {tr('productManagement.cartsSuffix')}
                         </dd>
                       </div>
                       {p.templates.length > 0 && (
                         <div className="sm:col-span-2">
-                          <dt className="text-slate-500 mb-1">Required tests</dt>
+                          <dt className="text-slate-500 mb-1">{tr('productManagement.requiredTests')}</dt>
                           <dd className="flex flex-wrap gap-1.5">
-                            {p.templates.map(tmpl => (
-                              <span key={tmpl.id} className="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded px-2 py-0.5">
-                                {tmpl.item_name} · [{tmpl.lower_limit}, {tmpl.upper_limit}]
-                              </span>
-                            ))}
+                            {p.templates.map(tmpl => {
+                              const hasSoftBand =
+                                tmpl.soft_lower_limit < tmpl.lower_limit ||
+                                tmpl.soft_upper_limit > tmpl.upper_limit;
+                              return (
+                                <span key={tmpl.id} className="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded px-2 py-0.5">
+                                  {tmpl.item_name} · [{tmpl.lower_limit}, {tmpl.upper_limit}]
+                                  {hasSoftBand && (
+                                    <span className="ml-1 text-amber-700">
+                                      {tr('productManagement.softBadgePrefix')} [{tmpl.soft_lower_limit}, {tmpl.soft_upper_limit}]
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
                           </dd>
                         </div>
                       )}
@@ -386,7 +406,7 @@ export default function ProductManagement() {
             </li>
           );
         })}
-        {products.length === 0 && <p className="text-slate-500 text-sm">No products</p>}
+        {products.length === 0 && <p className="text-slate-500 text-sm">{tr('productManagement.noProducts')}</p>}
       </ul>
     </div>
   );
@@ -402,6 +422,7 @@ function ProductFormFields({
   selectedItemIds: Set<number>;
   onToggleItem: (id: number) => void;
 }) {
+  const { t: tr } = useTranslation('qc');
   const daysValue = minutesToDays(form.standard_drying_minutes);
   const usedTypeIds = new Set(form.templates.map(t => t.test_type_id));
   const availableTypes = testTypes.filter(tt => tt.is_active && !usedTypeIds.has(tt.id));
@@ -418,8 +439,13 @@ function ProductFormFields({
   const addTemplate = (typeId: number) => {
     setForm({
       ...form,
-      // Start empty (NaN) so operator types fresh values; submit validates.
-      templates: [...form.templates, { test_type_id: typeId, lower_limit: NaN, upper_limit: NaN }],
+      // M-118: 4 empty fields. Operator must fill hard PASS range AND soft
+      // tolerance range; submit validates wrap (soft ⊇ hard) and finiteness.
+      templates: [...form.templates, {
+        test_type_id: typeId,
+        lower_limit: NaN, upper_limit: NaN,
+        soft_lower_limit: NaN, soft_upper_limit: NaN,
+      }],
     });
   };
 
@@ -427,20 +453,20 @@ function ProductFormFields({
     <>
       <div className="grid sm:grid-cols-[180px_1fr] gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">SKU code</span>
+          <span className="text-xs font-medium text-slate-700">{tr('productManagement.skuCode')}</span>
           <input
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm font-mono"
             value={form.code ?? ''}
             onChange={(e) => setForm({ ...form, code: e.target.value })}
-            placeholder="auto"
+            placeholder={tr('productManagement.autoPlaceholder')}
             spellCheck={false}
           />
           <span className="mt-0.5 block text-[10px] text-slate-500">
-            Leave blank to auto-generate (SKU-NNNN).
+            {tr('productManagement.skuCodeHint')}
           </span>
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">Product name</span>
+          <span className="text-xs font-medium text-slate-700">{tr('productManagement.productName')}</span>
           <input
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             value={form.name}
@@ -502,25 +528,63 @@ function ProductFormFields({
                   <Trash2 size={13} />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block">
-                  <span className="text-[11px] text-slate-600">Lower limit</span>
-                  <DecimalField
-                    allowNegative
-                    className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
-                    value={tmpl.lower_limit}
-                    onChange={(n) => updateTemplate(idx, { lower_limit: n })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-[11px] text-slate-600">Upper limit</span>
-                  <DecimalField
-                    allowNegative
-                    className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
-                    value={tmpl.upper_limit}
-                    onChange={(n) => updateTemplate(idx, { upper_limit: n })}
-                  />
-                </label>
+              {/* M-118: Hard PASS range — auto-pass. */}
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-2">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 mb-1.5">
+                  Hard PASS range
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="text-[11px] text-slate-600">Lower</span>
+                    <DecimalField
+                      allowNegative
+                      className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                      value={tmpl.lower_limit}
+                      onChange={(n) => updateTemplate(idx, { lower_limit: n })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] text-slate-600">Upper</span>
+                    <DecimalField
+                      allowNegative
+                      className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                      value={tmpl.upper_limit}
+                      onChange={(n) => updateTemplate(idx, { upper_limit: n })}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* M-118: Soft tolerance — supervisor-only override window.
+                  Must wrap hard. soft = hard means no override is possible
+                  (anything outside hard is forced FAIL). */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-2">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-amber-700 mb-1.5">
+                  Soft tolerance (supervisor discretion)
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="text-[11px] text-slate-600">Lower</span>
+                    <DecimalField
+                      allowNegative
+                      className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                      value={tmpl.soft_lower_limit}
+                      onChange={(n) => updateTemplate(idx, { soft_lower_limit: n })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] text-slate-600">Upper</span>
+                    <DecimalField
+                      allowNegative
+                      className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                      value={tmpl.soft_upper_limit}
+                      onChange={(n) => updateTemplate(idx, { soft_upper_limit: n })}
+                    />
+                  </label>
+                </div>
+                <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+                  Must wrap the hard range. Set equal to hard to disable supervisor override (anything outside hard ⇒ forced FAIL).
+                </p>
               </div>
             </div>
           );

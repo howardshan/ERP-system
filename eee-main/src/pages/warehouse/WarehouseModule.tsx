@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Package,
   Boxes,
@@ -52,6 +53,7 @@ function NavSection({ title }: { title: string }) {
 }
 
 export default function WarehouseModule({ onHome }: Props) {
+  const { t } = useTranslation('warehouse');
   const { can } = usePermissions();
   const [screen, setScreen] = useState('home');
   const [selectedLotId, setSelectedLotId] = useState<number | null>(null);
@@ -91,44 +93,44 @@ export default function WarehouseModule({ onHome }: Props) {
               <LayoutGrid size={14} className="text-white" />
             </div>
             <div>
-              <p className="text-white font-bold text-sm leading-none">Warehouse</p>
+              <p className="text-white font-bold text-sm leading-none">{t('warehouseModule.brandName')}</p>
               <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mt-0.5 group-hover:text-slate-400 transition-colors">
-                ← All Modules
+                {t('warehouseModule.allModules')}
               </p>
             </div>
           </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 pb-4">
-          <NavItem icon={Package} label="Overview" isActive={isActive('home')} onClick={() => navigate('home')} />
+          <NavItem icon={Package} label={t('warehouseModule.nav.overview')} isActive={isActive('home')} onClick={() => navigate('home')} />
 
-          {(canViewInventory || canViewReceipts) && <NavSection title="Inventory" />}
+          {(canViewInventory || canViewReceipts) && <NavSection title={t('warehouseModule.section.inventory')} />}
           {canViewInventory && (
-            <NavItem icon={Layers} label="Balance" isActive={isActive('balance')} onClick={() => navigate('balance')} />
+            <NavItem icon={Layers} label={t('warehouseModule.nav.balance')} isActive={isActive('balance')} onClick={() => navigate('balance')} />
           )}
           {canViewReceipts && (
-            <NavItem icon={Truck} label="Goods Receipt" isActive={isActive('goods-receipt')} onClick={() => navigate('goods-receipt')} />
+            <NavItem icon={Truck} label={t('warehouseModule.nav.goodsReceipt')} isActive={isActive('goods-receipt')} onClick={() => navigate('goods-receipt')} />
           )}
           {canViewLots && (
-            <NavItem icon={Tags} label="Lots" isActive={isActive('lots') || isActive('lot-detail')} onClick={() => navigate('lots')} />
+            <NavItem icon={Tags} label={t('warehouseModule.nav.lots')} isActive={isActive('lots') || isActive('lot-detail')} onClick={() => navigate('lots')} />
           )}
           {canViewLots && (
-            <NavItem icon={AlertTriangle} label="Expiring" isActive={isActive('expiring')} onClick={() => navigate('expiring')} />
+            <NavItem icon={AlertTriangle} label={t('warehouseModule.nav.expiring')} isActive={isActive('expiring')} onClick={() => navigate('expiring')} />
           )}
 
-          {(canViewItems || canViewLocations) && <NavSection title="Master Data" />}
+          {(canViewItems || canViewLocations) && <NavSection title={t('warehouseModule.section.masterData')} />}
           {canViewItems && (
-            <NavItem icon={Boxes} label="Items" isActive={isActive('items')} onClick={() => navigate('items')} />
+            <NavItem icon={Boxes} label={t('warehouseModule.nav.items')} isActive={isActive('items')} onClick={() => navigate('items')} />
           )}
           {canViewLocations && (
-            <NavItem icon={MapPin} label="Locations" isActive={isActive('locations')} onClick={() => navigate('locations')} />
+            <NavItem icon={MapPin} label={t('warehouseModule.nav.locations')} isActive={isActive('locations')} onClick={() => navigate('locations')} />
           )}
         </nav>
 
         <div className="p-4 border-t border-white/5">
           <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
             <HelpCircle size={18} />
-            <span>Support</span>
+            <span>{t('warehouseModule.support')}</span>
           </button>
         </div>
       </aside>
@@ -139,10 +141,10 @@ export default function WarehouseModule({ onHome }: Props) {
             onClick={onHome}
             className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
           >
-            <ArrowLeft size={14} /> Module Hub
+            <ArrowLeft size={14} /> {t('warehouseModule.moduleHub')}
           </button>
           <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
-            Warehouse &amp; Inventory
+            {t('warehouseModule.title')}
           </span>
         </header>
         <div className="flex-1">
@@ -154,25 +156,25 @@ export default function WarehouseModule({ onHome }: Props) {
 }
 
 function WarehouseHome() {
+  const { t } = useTranslation('warehouse');
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Warehouse &amp; Inventory</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('warehouseModule.title')}</h1>
       <p className="text-slate-600 mb-6 text-sm">
-        Sprint 0 — master data foundation. Inventory ledger, goods receipt, transfers and QC
-        release sync arrive in later sprints.
+        {t('warehouseModule.home.intro')}
       </p>
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="rounded-xl border bg-white p-5">
           <div className="flex items-center gap-2 text-emerald-700 font-semibold mb-1">
-            <Boxes size={18} /> Items
+            <Boxes size={18} /> {t('warehouseModule.nav.items')}
           </div>
-          <p className="text-sm text-slate-600">Maintain item master data (SKU, type, base UOM, lot control, shelf life).</p>
+          <p className="text-sm text-slate-600">{t('warehouseModule.home.itemsDesc')}</p>
         </div>
         <div className="rounded-xl border bg-white p-5">
           <div className="flex items-center gap-2 text-emerald-700 font-semibold mb-1">
-            <MapPin size={18} /> Locations
+            <MapPin size={18} /> {t('warehouseModule.nav.locations')}
           </div>
-          <p className="text-sm text-slate-600">The 7 logical zones of the main warehouse (raw material → finished goods).</p>
+          <p className="text-sm text-slate-600">{t('warehouseModule.home.locationsDesc')}</p>
         </div>
       </div>
     </div>

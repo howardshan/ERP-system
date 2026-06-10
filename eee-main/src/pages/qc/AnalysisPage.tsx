@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BarChart3, ChevronRight, Filter, RefreshCw, X } from 'lucide-react';
 import {
   listProducts,
@@ -52,21 +53,22 @@ function fmtDateTime(iso: string): string {
   return fmtDallasTime(iso);
 }
 
-const PRESETS: Array<{ key: RangePreset; label: string }> = [
-  { key: 'month',  label: 'Past month' },
-  { key: 'week',   label: 'Past week' },
-  { key: 'day',    label: 'Today' },
-  { key: 'all',    label: 'All time' },
-  { key: 'custom', label: 'Custom' },
+const PRESETS: Array<{ key: RangePreset; labelKey: string }> = [
+  { key: 'month',  labelKey: 'presetMonth' },
+  { key: 'week',   labelKey: 'presetWeek' },
+  { key: 'day',    labelKey: 'presetDay' },
+  { key: 'all',    labelKey: 'presetAll' },
+  { key: 'custom', labelKey: 'presetCustom' },
 ];
 
-const RECOVERY_LABELS: Record<RecoveryType, string> = {
-  retest:        'Retest (no re-dry)',
-  redry_dryer:   'Re-dry in Dry Room',
-  room_temp_dry: 'Room Temp Dry',
+const RECOVERY_LABEL_KEYS: Record<RecoveryType, string> = {
+  retest:        'recoveryRetest',
+  redry_dryer:   'recoveryRedry',
+  room_temp_dry: 'recoveryRoomTemp',
 };
 
 export default function AnalysisPage() {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   // Analysis is also accessible to anyone who can view the dashboard
   // (read-only reporting) — see QualityControlModule's canViewAnalysis.
@@ -158,7 +160,7 @@ export default function AnalysisPage() {
       });
       setMetrics(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Load failed');
+      setError(e instanceof Error ? e.message : t('analysisPage.loadFailed'));
     }
     setLoading(false);
   };
@@ -287,7 +289,7 @@ export default function AnalysisPage() {
   const fmtMin = (v: number | null) => v == null ? '—' : fmtDays(v);
 
   if (!canView) {
-    return <PermissionDenied permission="qc.analysis.view" feature="Analysis" />;
+    return <PermissionDenied permission="qc.analysis.view" feature={t('analysisPage.featureName')} />;
   }
 
   return (
@@ -295,10 +297,10 @@ export default function AnalysisPage() {
       <div className="flex items-end justify-between mb-3 flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <BarChart3 size={22} className="text-blue-600" /> Analysis
+            <BarChart3 size={22} className="text-blue-600" /> {t('analysisPage.title')}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Aggregated QC metrics. Filters compose — pick any combination.
+            {t('analysisPage.subtitle')}
           </p>
         </div>
         <button
@@ -307,7 +309,7 @@ export default function AnalysisPage() {
           disabled={loading}
           className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700 disabled:opacity-50"
         >
-          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh
+          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> {t('analysisPage.refresh')}
         </button>
       </div>
 
@@ -317,71 +319,71 @@ export default function AnalysisPage() {
       <section className="bg-white border rounded-xl p-4 mb-5">
         <div className="flex items-center gap-2 mb-3">
           <Filter size={14} className="text-slate-400" />
-          <h2 className="text-xs font-bold text-slate-600 uppercase tracking-widest">Filters</h2>
+          <h2 className="text-xs font-bold text-slate-600 uppercase tracking-widest">{t('analysisPage.filters')}</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label className="block">
-            <span className="text-[11px] font-medium text-slate-600">Product SKU</span>
+            <span className="text-[11px] font-medium text-slate-600">{t('analysisPage.productSku')}</span>
             <select
               value={skuId}
               onChange={(e) => setSkuId(e.target.value)}
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             >
-              <option value="">All products</option>
+              <option value="">{t('analysisPage.allProducts')}</option>
               {products.map(p => (
                 <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
               ))}
             </select>
           </label>
           <label className="block">
-            <span className="text-[11px] font-medium text-slate-600">Dry room</span>
+            <span className="text-[11px] font-medium text-slate-600">{t('analysisPage.dryRoom')}</span>
             <select
               value={dryer}
               onChange={(e) => setDryer(e.target.value)}
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             >
-              <option value="">All dryers</option>
+              <option value="">{t('analysisPage.allDryers')}</option>
               {[1, 2, 3, 4, 5].map(d => (
-                <option key={d} value={d}>Dryer {d}</option>
+                <option key={d} value={d}>{t('analysisPage.dryer', { n: d })}</option>
               ))}
             </select>
           </label>
           <label className="block">
-            <span className="text-[11px] font-medium text-slate-600">Work order</span>
+            <span className="text-[11px] font-medium text-slate-600">{t('analysisPage.workOrder')}</span>
             <select
               value={lotId}
               onChange={(e) => setLotId(e.target.value)}
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             >
-              <option value="">All work orders</option>
+              <option value="">{t('analysisPage.allWorkOrders')}</option>
               {visibleLots.map(l => (
                 <option key={l.id} value={l.id}>{l.lot_number}</option>
               ))}
             </select>
           </label>
           <div className="block">
-            <span className="text-[11px] font-medium text-slate-600 block mb-1">Date range</span>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
+            <span className="text-[11px] font-medium text-slate-600 block mb-1">{t('analysisPage.dateRange')}</span>
+            <div className="flex flex-wrap gap-1">
               {PRESETS.map(p => (
                 <button
                   key={p.key}
                   type="button"
                   onClick={() => setPreset(p.key)}
                   className={cn(
-                    'px-2 py-1.5 rounded text-[11px] font-bold border transition-colors',
+                    'px-2 py-1.5 rounded text-[11px] font-bold border transition-colors whitespace-nowrap',
                     preset === p.key
                       ? 'bg-blue-600 border-blue-600 text-white'
                       : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300',
                   )}
                 >
-                  {p.label}
+                  {t(`analysisPage.${p.labelKey}`)}
                 </button>
               ))}
             </div>
             {preset === 'custom' && (
               <div className="grid grid-cols-2 gap-2 mt-2">
                 <label className="block">
-                  <span className="text-[10px] font-medium text-slate-500">From</span>
+                  <span className="text-[10px] font-medium text-slate-500">{t('analysisPage.from')}</span>
                   <input
                     type="date"
                     value={customFrom}
@@ -391,7 +393,7 @@ export default function AnalysisPage() {
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[10px] font-medium text-slate-500">To</span>
+                  <span className="text-[10px] font-medium text-slate-500">{t('analysisPage.to')}</span>
                   <input
                     type="date"
                     value={customTo}
@@ -408,14 +410,14 @@ export default function AnalysisPage() {
 
       {/* Metrics */}
       {loading && !metrics ? (
-        <p className="text-sm text-slate-400 italic py-10 text-center">Loading metrics…</p>
+        <p className="text-sm text-slate-400 italic py-10 text-center">{t('analysisPage.loadingMetrics')}</p>
       ) : metrics ? (
         <div className="space-y-5">
           {/* Top-line */}
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Metric label="Sub-lots in scope" value={String(metrics.total_sub_lots)} />
+            <Metric label={t('analysisPage.subLotsInScope')} value={String(metrics.total_sub_lots)} />
             <Metric
-              label="Avg dry time"
+              label={t('analysisPage.avgDryTime')}
               value={fmtMin(metrics.avg_dry_minutes)}
               onClick={() => toggleMetric('avg_dry')}
               active={enabledMetrics.has('avg_dry')}
@@ -430,7 +432,7 @@ export default function AnalysisPage() {
               onFailClick={() => toggleMetric('fail')}
             />
             <Metric
-              label="Pass rate (first try)"
+              label={t('analysisPage.passRateFirstTry')}
               value={fmtPct(metrics.pass_rate)}
               accent="emerald"
               onClick={() => toggleMetric('pass_rate')}
@@ -458,14 +460,14 @@ export default function AnalysisPage() {
           {/* Recovery paths */}
           <section className="bg-white border rounded-xl p-4">
             <h3 className="text-xs font-bold text-slate-600 uppercase tracking-widest mb-3">
-              Recovery paths (after first failure)
+              {t('analysisPage.recoveryPaths')}
             </h3>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               {(
                 [
-                  { type: 'retest' as RecoveryType, label: 'Retest (no re-dry)', count: metrics.retest_count, avgMinutes: null, passRate: metrics.retest_pass_rate, tone: 'blue' as const },
-                  { type: 'redry_dryer' as RecoveryType, label: 'Re-dry in Dry Room', count: metrics.redry_count, avgMinutes: metrics.redry_avg_minutes, passRate: metrics.redry_pass_rate, tone: 'amber' as const },
-                  { type: 'room_temp_dry' as RecoveryType, label: 'Room Temp Dry', count: metrics.room_temp_count, avgMinutes: metrics.room_temp_avg_minutes, passRate: metrics.room_temp_pass_rate, tone: 'orange' as const },
+                  { type: 'retest' as RecoveryType, label: t('analysisPage.recoveryRetest'), count: metrics.retest_count, avgMinutes: null, passRate: metrics.retest_pass_rate, tone: 'blue' as const },
+                  { type: 'redry_dryer' as RecoveryType, label: t('analysisPage.recoveryRedry'), count: metrics.redry_count, avgMinutes: metrics.redry_avg_minutes, passRate: metrics.redry_pass_rate, tone: 'amber' as const },
+                  { type: 'room_temp_dry' as RecoveryType, label: t('analysisPage.recoveryRoomTemp'), count: metrics.room_temp_count, avgMinutes: metrics.room_temp_avg_minutes, passRate: metrics.room_temp_pass_rate, tone: 'orange' as const },
                 ]
               ).map(tile => (
                 <RecoveryTile
@@ -484,7 +486,7 @@ export default function AnalysisPage() {
             {/* Detail panel — inline below tiles */}
             {detailType && (
               <RecoveryDetailPanel
-                label={RECOVERY_LABELS[detailType]}
+                label={t(`analysisPage.${RECOVERY_LABEL_KEYS[detailType]}`)}
                 items={detailItems}
                 loading={detailLoading}
                 onClose={closeDetail}
@@ -493,7 +495,7 @@ export default function AnalysisPage() {
           </section>
         </div>
       ) : (
-        <p className="text-sm text-slate-500 italic py-6 text-center">No data available.</p>
+        <p className="text-sm text-slate-500 italic py-6 text-center">{t('analysisPage.noDataAvailable')}</p>
       )}
     </div>
   );
@@ -532,13 +534,14 @@ function FirstTimeTestTile({
   passActive?: boolean; failActive?: boolean;
   onPassClick?: () => void; onFailClick?: () => void;
 }) {
+  const { t } = useTranslation('qc');
   return (
     <div className="bg-white border rounded-xl p-3">
       <div className="flex items-baseline justify-between gap-2 mb-2">
         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-          First time test
+          {t('analysisPage.firstTimeTest')}
         </p>
-        <p className="text-[11px] font-bold text-slate-400 tabular-nums">total {total}</p>
+        <p className="text-[11px] font-bold text-slate-400 tabular-nums">{t('analysisPage.total', { count: total })}</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <button
@@ -551,7 +554,7 @@ function FirstTimeTestTile({
             passActive && 'border-2 border-emerald-600 ring-2 ring-emerald-200',
           )}
         >
-          <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">Pass</p>
+          <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">{t('analysisPage.pass')}</p>
           <p className="text-2xl font-bold tabular-nums text-emerald-800 leading-none mt-1">{pass}</p>
         </button>
         <button
@@ -564,7 +567,7 @@ function FirstTimeTestTile({
             failActive && 'border-2 border-red-600 ring-2 ring-red-200',
           )}
         >
-          <p className="text-[10px] uppercase tracking-wider font-bold text-red-700">Fail</p>
+          <p className="text-[10px] uppercase tracking-wider font-bold text-red-700">{t('analysisPage.fail')}</p>
           <p className="text-2xl font-bold tabular-nums text-red-800 leading-none mt-1">{fail}</p>
         </button>
       </div>
@@ -583,6 +586,7 @@ function RecoveryTile({
   active: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation('qc');
   const borderTone = tone === 'blue'
     ? active ? 'border-blue-500' : 'border-blue-200'
     : tone === 'amber'
@@ -622,14 +626,14 @@ function RecoveryTile({
       </div>
       <p className="text-2xl font-bold tabular-nums text-slate-900 mt-1">{count}</p>
       <dl className="mt-2 text-[11px] grid grid-cols-2 gap-1">
-        <dt className="text-slate-500">Avg dwell</dt>
+        <dt className="text-slate-500">{t('analysisPage.avgDwell')}</dt>
         <dd className="font-mono text-slate-800 text-right">{avgMinutes != null ? fmtDays(avgMinutes) : '—'}</dd>
-        <dt className="text-slate-500">Pass rate</dt>
+        <dt className="text-slate-500">{t('analysisPage.passRate')}</dt>
         <dd className="font-mono text-slate-800 text-right">{passRate != null ? `${passRate.toFixed(1)}%` : '—'}</dd>
       </dl>
       {count > 0 && (
         <p className={cn('text-[10px] mt-2 font-medium', textTone)}>
-          {active ? 'Click to collapse' : 'Click to see details →'}
+          {active ? t('analysisPage.clickToCollapse') : t('analysisPage.clickToSeeDetails')}
         </p>
       )}
     </button>
@@ -644,14 +648,15 @@ function RecoveryDetailPanel({
   loading: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation('qc');
   return (
     <div className="mt-4 border rounded-xl overflow-hidden bg-white animate-in slide-in-from-top-2 duration-150">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b">
         <div>
-          <h4 className="text-sm font-bold text-slate-900">{label} — detail</h4>
+          <h4 className="text-sm font-bold text-slate-900">{t('analysisPage.detailTitle', { label })}</h4>
           {!loading && (
-            <p className="text-[11px] text-slate-500 mt-0.5">{items.length} record{items.length !== 1 ? 's' : ''}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{t('analysisPage.recordCount', { count: items.length })}</p>
           )}
         </div>
         <button
@@ -664,22 +669,22 @@ function RecoveryDetailPanel({
       </div>
 
       {loading ? (
-        <div className="p-6 text-center text-sm text-slate-400 animate-pulse">Loading…</div>
+        <div className="p-6 text-center text-sm text-slate-400 animate-pulse">{t('analysisPage.loading')}</div>
       ) : items.length === 0 ? (
-        <div className="p-6 text-center text-sm text-slate-400">No records found.</div>
+        <div className="p-6 text-center text-sm text-slate-400">{t('analysisPage.noRecordsFound')}</div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-slate-50">
-                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">Cart</th>
-                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">SKU</th>
-                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">Work Order</th>
-                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">Sent for recovery</th>
-                <th className="px-4 py-2 text-right text-[10px] uppercase tracking-wider font-bold text-slate-500">Dwell</th>
-                <th className="px-4 py-2 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500">Re-test result</th>
-                <th className="px-4 py-2 text-right text-[10px] uppercase tracking-wider font-bold text-slate-500">Aw</th>
-                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">Remark</th>
+                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">{t('analysisPage.colCart')}</th>
+                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">{t('analysisPage.colSku')}</th>
+                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">{t('analysisPage.colWorkOrder')}</th>
+                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">{t('analysisPage.colSentForRecovery')}</th>
+                <th className="px-4 py-2 text-right text-[10px] uppercase tracking-wider font-bold text-slate-500">{t('analysisPage.colDwell')}</th>
+                <th className="px-4 py-2 text-center text-[10px] uppercase tracking-wider font-bold text-slate-500">{t('analysisPage.colRetestResult')}</th>
+                <th className="px-4 py-2 text-right text-[10px] uppercase tracking-wider font-bold text-slate-500">{t('analysisPage.colAw')}</th>
+                <th className="px-4 py-2 text-left text-[10px] uppercase tracking-wider font-bold text-slate-500">{t('analysisPage.colRemark')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -698,18 +703,18 @@ function RecoveryDetailPanel({
                     {fmtDateTime(item.disposition_at)}
                   </td>
                   <td className="px-4 py-2.5 text-xs font-mono text-slate-700 text-right whitespace-nowrap">
-                    {item.dwell_minutes != null ? fmtDays(item.dwell_minutes) : <span className="text-slate-400">in progress</span>}
+                    {item.dwell_minutes != null ? fmtDays(item.dwell_minutes) : <span className="text-slate-400">{t('analysisPage.inProgress')}</span>}
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     {item.next_result == null ? (
-                      <span className="text-[10px] text-slate-400">pending</span>
+                      <span className="text-[10px] text-slate-400">{t('analysisPage.pending')}</span>
                     ) : item.next_result === 'pass' ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                        PASS
+                        {t('analysisPage.passBadge')}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">
-                        FAIL
+                        {t('analysisPage.failBadge')}
                       </span>
                     )}
                   </td>

@@ -299,6 +299,11 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'view_dashboard',           label: 'View Testing Dashboard (forecast)',   prereq: 'view_status' },
           { id: 'take_sample',              label: 'Take Sample',                         prereq: 'view_status' },
           { id: 'submit_inspection',        label: 'Submit Inspection (input WA)',        prereq: 'view_status' },
+          // M-118: gate manual override of the auto-judged PASS/FAIL.
+          // Required to flip the verdict inside the hard PASS range or to
+          // make any decision in the soft tolerance band. Outside soft, even
+          // supervisors must FAIL — no override allowed there.
+          { id: 'supervisor_judge',         label: 'Supervisor Judge (override / soft band decisions)', prereq: 'submit_inspection' },
           { id: 'dispose_redry',            label: 'Dispose: Re-dry in dryer',            prereq: 'view_status' },
           { id: 'dispose_room_temp',        label: 'Dispose: Room temp dry',              prereq: 'view_status' },
           { id: 'dispose_retest',           label: 'Dispose: Retest (no re-dry)',         prereq: 'view_status' },

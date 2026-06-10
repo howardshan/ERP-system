@@ -1,0 +1,33 @@
+{
+  "productionDashboard": {
+    "title": "生产看板",
+    "subtitle": "按 SKU 展示当前处于生产 → 包装流程中每一车的快照。每 15 秒自动刷新。",
+    "refresh": "刷新",
+    "loading": "加载中…",
+    "empty": "目前各流程阶段均无车次。请在生产模块创建工单以填充此看板。",
+    "loadFailed": "加载失败",
+    "sku": "SKU",
+    "total": "合计",
+    "colProduction": "生产",
+    "colDryRoom": "干燥间",
+    "colTesting": "检测",
+    "colReleased": "已放行",
+    "colPackaged": "已包装",
+    "statusMapping": "状态映射"
+  },
+  "productionModule": {
+    "brandTitle": "生产与制造",
+    "allModules": "所有模块",
+    "dashboard": "仪表盘",
+    "sectionFloor": "车间",
+    "production": "生产",
+    "sectionTraceability": "追溯",
+    "batchTrace": "批次追溯",
+    "sectionMasterData": "主数据",
+    "products": "产品",
+    "testTypes": "检测类型",
+    "support": "支持",
+    "moduleHub": "模块中心",
+    "headerTitle": "生产与制造"
+  }
+}

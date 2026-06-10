@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
 import {
   listItems,
@@ -16,17 +17,17 @@ import {
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn } from '../../lib/utils';
 
-const ITEM_TYPES: { value: ItemType; label: string }[] = [
-  { value: 'raw_material',  label: '原材料 (raw_material)' },
-  { value: 'packaging',     label: '包装材料 (packaging)' },
-  { value: 'intermediate',  label: '半成品 (intermediate)' },
-  { value: 'finished_good', label: '成品 (finished_good)' },
+const ITEM_TYPES: { value: ItemType; labelKey: string }[] = [
+  { value: 'raw_material',  labelKey: 'itemsPage.itemType.raw_material' },
+  { value: 'packaging',     labelKey: 'itemsPage.itemType.packaging' },
+  { value: 'intermediate',  labelKey: 'itemsPage.itemType.intermediate' },
+  { value: 'finished_good', labelKey: 'itemsPage.itemType.finished_good' },
 ];
 
-const COSTING_METHODS: { value: CostingMethod; label: string }[] = [
-  { value: 'weighted_average', label: '加权平均 (weighted_average)' },
-  { value: 'standard',         label: '标准成本 (standard)' },
-  { value: 'fifo',             label: 'FIFO' },
+const COSTING_METHODS: { value: CostingMethod; labelKey: string }[] = [
+  { value: 'weighted_average', labelKey: 'itemsPage.costingMethod.weighted_average' },
+  { value: 'standard',         labelKey: 'itemsPage.costingMethod.standard' },
+  { value: 'fifo',             labelKey: 'itemsPage.costingMethod.fifo' },
 ];
 
 const emptyForm = (): ItemInput => ({
@@ -62,6 +63,7 @@ function itemToForm(it: WarehouseItem): ItemInput {
 }
 
 export default function ItemsPage() {
+  const { t } = useTranslation('warehouse');
   const { can } = usePermissions();
   const canCreate = can('warehouse', 'items', 'create');
   const canEdit = can('warehouse', 'items', 'edit');
@@ -101,21 +103,21 @@ export default function ItemsPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!form.base_uom_id) { setError('请选择基础单位 (base UOM)'); return; }
+    if (!form.base_uom_id) { setError(t('itemsPage.selectBaseUomError')); return; }
     try {
       if (editingId) {
         await updateItem(editingId, form);
-        setMsg('物料已更新');
+        setMsg(t('itemsPage.itemUpdated'));
         setEditingId(null);
       } else {
         await createItem(form);
-        setMsg('物料已创建');
+        setMsg(t('itemsPage.itemCreated'));
         setCreating(false);
       }
       setForm(emptyForm());
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存失败');
+      setError(err instanceof Error ? err.message : t('itemsPage.saveFailed'));
     }
   };
 
@@ -123,10 +125,10 @@ export default function ItemsPage() {
     setError('');
     try {
       await updateItem(it.id, { status: it.status === 'active' ? 'inactive' : 'active' });
-      setMsg(it.status === 'active' ? '已停用' : '已启用');
+      setMsg(it.status === 'active' ? t('itemsPage.deactivated') : t('itemsPage.activated'));
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败');
+      setError(err instanceof Error ? err.message : t('itemsPage.operationFailed'));
     }
   };
 
@@ -134,9 +136,9 @@ export default function ItemsPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Items</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('itemsPage.title')}</h1>
       <p className="text-slate-600 mb-4 text-sm">
-        物料主数据：SKU、类型、基础单位、批次控制、保质期。
+        {t('itemsPage.subtitle')}
       </p>
 
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
@@ -153,18 +155,18 @@ export default function ItemsPage() {
               creating ? 'bg-slate-200 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50',
             )}
           >
-            <Plus size={13} /> {creating ? 'Cancel new' : 'Add item'}
+            <Plus size={13} /> {creating ? t('itemsPage.cancelNew') : t('itemsPage.addItem')}
           </button>
         )}
       </div>
 
       {creating && (
         <form onSubmit={submit} className="bg-white border-2 border-emerald-400 rounded-xl p-4 mb-6 space-y-4 shadow-sm">
-          <h2 className="font-semibold text-emerald-800 text-sm">New item</h2>
+          <h2 className="font-semibold text-emerald-800 text-sm">{t('itemsPage.newItem')}</h2>
           <ItemFormFields form={form} setForm={setForm} uoms={uoms} categories={categories} />
           <div className="flex gap-2">
-            <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">Save</button>
-            <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>Cancel</button>
+            <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">{t('itemsPage.save')}</button>
+            <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>{t('itemsPage.cancel')}</button>
           </div>
         </form>
       )}
@@ -179,11 +181,11 @@ export default function ItemsPage() {
             )}>
               {isEditing ? (
                 <form onSubmit={submit} className="space-y-4">
-                  <h2 className="font-semibold text-emerald-800 text-sm">Edit · {it.name}</h2>
+                  <h2 className="font-semibold text-emerald-800 text-sm">{t('itemsPage.editPrefix')} · {it.name}</h2>
                   <ItemFormFields form={form} setForm={setForm} uoms={uoms} categories={categories} />
                   <div className="flex gap-2">
-                    <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">Save</button>
-                    <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>Cancel</button>
+                    <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">{t('itemsPage.save')}</button>
+                    <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>{t('itemsPage.cancel')}</button>
                   </div>
                 </form>
               ) : (
@@ -194,7 +196,7 @@ export default function ItemsPage() {
                         <div className="font-semibold text-slate-900 flex items-center gap-2">
                           {it.name}
                           {it.status === 'inactive' && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">停用</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">{t('itemsPage.inactiveBadge')}</span>
                           )}
                         </div>
                         <div className="text-xs text-slate-500 mt-0.5">{it.sku}</div>
@@ -207,7 +209,7 @@ export default function ItemsPage() {
                             disabled={isBusy}
                             onClick={() => startEdit(it)}
                           >
-                            Edit
+                            {t('itemsPage.edit')}
                           </button>
                         )}
                         {canEdit && (
@@ -217,26 +219,26 @@ export default function ItemsPage() {
                             disabled={isBusy}
                             onClick={() => toggleStatus(it)}
                           >
-                            {it.status === 'active' ? '停用' : '启用'}
+                            {it.status === 'active' ? t('itemsPage.deactivate') : t('itemsPage.activate')}
                           </button>
                         )}
                       </div>
                     </div>
                     <dl className="mt-3 grid sm:grid-cols-4 gap-2 text-xs">
                       <div>
-                        <dt className="text-slate-500">类型</dt>
+                        <dt className="text-slate-500">{t('itemsPage.type')}</dt>
                         <dd className="text-slate-800">{it.item_type}</dd>
                       </div>
                       <div>
-                        <dt className="text-slate-500">基础单位</dt>
+                        <dt className="text-slate-500">{t('itemsPage.baseUom')}</dt>
                         <dd className="text-slate-800">{uomLabel(it.base_uom_id)}</dd>
                       </div>
                       <div>
-                        <dt className="text-slate-500">批次控制</dt>
-                        <dd className="text-slate-800">{it.is_lot_controlled ? '是' : '否'}</dd>
+                        <dt className="text-slate-500">{t('itemsPage.lotControlled')}</dt>
+                        <dd className="text-slate-800">{it.is_lot_controlled ? t('itemsPage.yes') : t('itemsPage.no')}</dd>
                       </div>
                       <div>
-                        <dt className="text-slate-500">保质期(天)</dt>
+                        <dt className="text-slate-500">{t('itemsPage.shelfLifeDays')}</dt>
                         <dd className="text-slate-800">{it.shelf_life_days ?? '—'}</dd>
                       </div>
                     </dl>
@@ -246,7 +248,7 @@ export default function ItemsPage() {
             </li>
           );
         })}
-        {items.length === 0 && <p className="text-slate-500 text-sm">暂无物料</p>}
+        {items.length === 0 && <p className="text-slate-500 text-sm">{t('itemsPage.empty')}</p>}
       </ul>
     </div>
   );
@@ -258,11 +260,12 @@ function ItemFormFields({ form, setForm, uoms, categories }: {
   uoms: Uom[];
   categories: ItemCategory[];
 }) {
+  const { t } = useTranslation('warehouse');
   return (
     <>
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">SKU</span>
+          <span className="text-xs font-medium text-slate-700">{t('itemsPage.sku')}</span>
           <input
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             value={form.sku}
@@ -271,7 +274,7 @@ function ItemFormFields({ form, setForm, uoms, categories }: {
           />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">名称</span>
+          <span className="text-xs font-medium text-slate-700">{t('itemsPage.name')}</span>
           <input
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             value={form.name}
@@ -283,24 +286,24 @@ function ItemFormFields({ form, setForm, uoms, categories }: {
 
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">类型</span>
+          <span className="text-xs font-medium text-slate-700">{t('itemsPage.type')}</span>
           <select
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white"
             value={form.item_type}
             onChange={(e) => setForm({ ...form, item_type: e.target.value as ItemType })}
           >
-            {ITEM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            {ITEM_TYPES.map((it) => <option key={it.value} value={it.value}>{t(it.labelKey)}</option>)}
           </select>
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">基础单位 (base UOM)</span>
+          <span className="text-xs font-medium text-slate-700">{t('itemsPage.baseUomLabel')}</span>
           <select
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white"
             value={form.base_uom_id || ''}
             onChange={(e) => setForm({ ...form, base_uom_id: Number(e.target.value) })}
             required
           >
-            <option value="" disabled>选择单位…</option>
+            <option value="" disabled>{t('itemsPage.selectUom')}</option>
             {uoms.map((u) => <option key={u.id} value={u.id}>{u.code} · {u.name}</option>)}
           </select>
         </label>
@@ -308,31 +311,31 @@ function ItemFormFields({ form, setForm, uoms, categories }: {
 
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">类别 (可选)</span>
+          <span className="text-xs font-medium text-slate-700">{t('itemsPage.categoryOptional')}</span>
           <select
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white"
             value={form.category_id ?? ''}
             onChange={(e) => setForm({ ...form, category_id: e.target.value ? Number(e.target.value) : null })}
           >
-            <option value="">— 无 —</option>
+            <option value="">{t('itemsPage.none')}</option>
             {categories.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}
           </select>
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">成本方法</span>
+          <span className="text-xs font-medium text-slate-700">{t('itemsPage.costingMethodLabel')}</span>
           <select
             className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white"
             value={form.costing_method}
             onChange={(e) => setForm({ ...form, costing_method: e.target.value as CostingMethod })}
           >
-            {COSTING_METHODS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            {COSTING_METHODS.map((c) => <option key={c.value} value={c.value}>{t(c.labelKey)}</option>)}
           </select>
         </label>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">保质期 (天，可空)</span>
+          <span className="text-xs font-medium text-slate-700">{t('itemsPage.shelfLifeLabel')}</span>
           <input
             type="number"
             min={0}
@@ -348,7 +351,7 @@ function ItemFormFields({ form, setForm, uoms, categories }: {
             onChange={(e) => setForm({ ...form, is_lot_controlled: e.target.checked })}
             className="w-4 h-4 rounded accent-emerald-600"
           />
-          <span className="text-xs font-medium text-slate-700">批次控制 (lot-controlled)</span>
+          <span className="text-xs font-medium text-slate-700">{t('itemsPage.lotControlledLabel')}</span>
         </label>
       </div>
     </>
