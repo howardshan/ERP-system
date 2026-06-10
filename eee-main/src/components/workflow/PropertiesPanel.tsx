@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { type Node } from '@xyflow/react';
 import { X, Settings2 } from 'lucide-react';
 import type { WorkflowNodeData, NodeCategory } from '../../types/workflow';
@@ -12,42 +13,43 @@ const CATEGORY_ACCENT: Record<NodeCategory, string> = {
 };
 
 // Static config fields per subtype
-const CONFIG_FIELDS: Record<string, { key: string; label: string; type: 'text' | 'select' | 'number'; options?: string[] }[]> = {
-  schedule:           [{ key: 'cron', label: 'Cron Expression', type: 'text' }],
-  on_je_created:      [{ key: 'status_filter', label: 'Status Filter', type: 'select', options: ['any','draft','pending_approval','posted'] }],
-  on_inventory_change:[{ key: 'item_sku', label: 'Item SKU (blank = all)', type: 'text' }],
-  gl_accounts:        [{ key: 'account_type', label: 'Account Type', type: 'select', options: ['all','asset','liability','equity','revenue','expense'] }],
+// `labelKey` is an i18n key under `propertiesPanel.fields.*`, resolved at render time.
+const CONFIG_FIELDS: Record<string, { key: string; labelKey: string; type: 'text' | 'select' | 'number'; options?: string[] }[]> = {
+  schedule:           [{ key: 'cron', labelKey: 'cronExpression', type: 'text' }],
+  on_je_created:      [{ key: 'status_filter', labelKey: 'statusFilter', type: 'select', options: ['any','draft','pending_approval','posted'] }],
+  on_inventory_change:[{ key: 'item_sku', labelKey: 'itemSku', type: 'text' }],
+  gl_accounts:        [{ key: 'account_type', labelKey: 'accountType', type: 'select', options: ['all','asset','liability','equity','revenue','expense'] }],
   journal_entries:    [
-    { key: 'status', label: 'Status', type: 'select', options: ['all','draft','pending_approval','posted','reversed'] },
-    { key: 'date_range', label: 'Date Range', type: 'text' },
+    { key: 'status', labelKey: 'status', type: 'select', options: ['all','draft','pending_approval','posted','reversed'] },
+    { key: 'date_range', labelKey: 'dateRange', type: 'text' },
   ],
-  inventory_balance:  [{ key: 'warehouse', label: 'Warehouse Code', type: 'text' }],
-  filter:             [{ key: 'condition', label: 'Condition (e.g. balance > 0)', type: 'text' }],
-  branch:             [{ key: 'condition', label: 'If Condition', type: 'text' }],
+  inventory_balance:  [{ key: 'warehouse', labelKey: 'warehouseCode', type: 'text' }],
+  filter:             [{ key: 'condition', labelKey: 'condition', type: 'text' }],
+  branch:             [{ key: 'condition', labelKey: 'ifCondition', type: 'text' }],
   aggregate:          [
-    { key: 'function', label: 'Function', type: 'select', options: ['sum','count','avg','min','max'] },
-    { key: 'field', label: 'Field', type: 'text' },
+    { key: 'function', labelKey: 'function', type: 'select', options: ['sum','count','avg','min','max'] },
+    { key: 'field', labelKey: 'field', type: 'text' },
   ],
-  transform:          [{ key: 'mapping', label: 'Field Mapping (JSON)', type: 'text' }],
+  transform:          [{ key: 'mapping', labelKey: 'fieldMapping', type: 'text' }],
   create_je:          [
-    { key: 'journal_type', label: 'Journal Type', type: 'select', options: ['general','adjustment','accrual','depreciation'] },
-    { key: 'description_template', label: 'Description Template', type: 'text' },
+    { key: 'journal_type', labelKey: 'journalType', type: 'select', options: ['general','adjustment','accrual','depreciation'] },
+    { key: 'description_template', labelKey: 'descriptionTemplate', type: 'text' },
   ],
-  post_je:            [{ key: 'on_error', label: 'On Error', type: 'select', options: ['stop','skip','notify'] }],
+  post_je:            [{ key: 'on_error', labelKey: 'onError', type: 'select', options: ['stop','skip','notify'] }],
   send_notification:  [
-    { key: 'channel', label: 'Channel', type: 'select', options: ['email','in_app','webhook'] },
-    { key: 'message', label: 'Message Template', type: 'text' },
+    { key: 'channel', labelKey: 'channel', type: 'select', options: ['email','in_app','webhook'] },
+    { key: 'message', labelKey: 'messageTemplate', type: 'text' },
   ],
-  export_csv:         [{ key: 'filename', label: 'Filename Template', type: 'text' }],
+  export_csv:         [{ key: 'filename', labelKey: 'filenameTemplate', type: 'text' }],
   email_report:       [
-    { key: 'to', label: 'To (email)', type: 'text' },
-    { key: 'subject', label: 'Subject Template', type: 'text' },
+    { key: 'to', labelKey: 'toEmail', type: 'text' },
+    { key: 'subject', labelKey: 'subjectTemplate', type: 'text' },
   ],
   webhook:            [
-    { key: 'url', label: 'Endpoint URL', type: 'text' },
-    { key: 'method', label: 'Method', type: 'select', options: ['POST','GET','PUT'] },
+    { key: 'url', labelKey: 'endpointUrl', type: 'text' },
+    { key: 'method', labelKey: 'method', type: 'select', options: ['POST','GET','PUT'] },
   ],
-  dashboard_widget:   [{ key: 'widget_title', label: 'Widget Title', type: 'text' }],
+  dashboard_widget:   [{ key: 'widget_title', labelKey: 'widgetTitle', type: 'text' }],
 };
 
 interface PropertiesPanelProps {
@@ -57,6 +59,7 @@ interface PropertiesPanelProps {
 }
 
 export function PropertiesPanel({ node, onUpdate, onClose }: PropertiesPanelProps) {
+  const { t } = useTranslation('workflowBuilder');
   const [label, setLabel] = useState('');
   const [config, setConfig] = useState<Record<string, string>>({});
 
@@ -75,7 +78,7 @@ export function PropertiesPanel({ node, onUpdate, onClose }: PropertiesPanelProp
     return (
       <div className="w-72 bg-[#faf8f5] border-l border-slate-200 flex flex-col items-center justify-center gap-3 text-slate-400">
         <Settings2 size={28} />
-        <p className="text-xs text-center px-6">Click a node to configure its properties</p>
+        <p className="text-xs text-center px-6">{t('propertiesPanel.emptyState')}</p>
       </div>
     );
   }
@@ -111,7 +114,7 @@ export function PropertiesPanel({ node, onUpdate, onClose }: PropertiesPanelProp
         {/* Label */}
         <div>
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-            Node Label
+            {t('propertiesPanel.nodeLabel')}
           </label>
           <input
             value={label}
@@ -124,7 +127,7 @@ export function PropertiesPanel({ node, onUpdate, onClose }: PropertiesPanelProp
         {fields.map(field => (
           <div key={field.key}>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-              {field.label}
+              {t(`propertiesPanel.fields.${field.labelKey}`)}
             </label>
             {field.type === 'select' ? (
               <select
@@ -149,7 +152,7 @@ export function PropertiesPanel({ node, onUpdate, onClose }: PropertiesPanelProp
         ))}
 
         {fields.length === 0 && (
-          <p className="text-slate-400 text-xs">No configuration needed for this node.</p>
+          <p className="text-slate-400 text-xs">{t('propertiesPanel.noConfig')}</p>
         )}
       </div>
 
@@ -159,7 +162,7 @@ export function PropertiesPanel({ node, onUpdate, onClose }: PropertiesPanelProp
           onClick={handleSave}
           className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider py-2.5 rounded-xl transition-colors"
         >
-          Apply Changes
+          {t('propertiesPanel.applyChanges')}
         </button>
       </div>
     </div>

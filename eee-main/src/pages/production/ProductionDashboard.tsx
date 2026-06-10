@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw, Factory, Flame, FlaskConical, CheckCircle2, Package } from 'lucide-react';
 import { productionPipelineSummary, ProductionPipelineItem } from '../../services/qcApi';
 import { cn } from '../../lib/utils';
@@ -16,6 +17,7 @@ import { cn } from '../../lib/utils';
  *   Packaged          — status='dispatched'
  */
 export default function ProductionDashboard() {
+  const { t } = useTranslation('production');
   const [rows, setRows] = useState<ProductionPipelineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,7 +29,7 @@ export default function ProductionDashboard() {
       setRows(await productionPipelineSummary());
       setError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Load failed');
+      setError(e instanceof Error ? e.message : t('productionDashboard.loadFailed'));
     }
     setLoading(false);
     setRefreshing(false);
@@ -35,8 +37,8 @@ export default function ProductionDashboard() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 15_000);
-    return () => clearInterval(t);
+    const timer = setInterval(load, 15_000);
+    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -44,10 +46,9 @@ export default function ProductionDashboard() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-end justify-between mb-1">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Production Dashboard</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('productionDashboard.title')}</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Per-SKU snapshot of every cart currently in the production → packaging pipeline.
-            Auto-refresh every 15s.
+            {t('productionDashboard.subtitle')}
           </p>
         </div>
         <button
@@ -57,30 +58,30 @@ export default function ProductionDashboard() {
           className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700 disabled:opacity-50"
         >
           <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-          Refresh
+          {t('productionDashboard.refresh')}
         </button>
       </div>
 
       {error && <p className="text-red-600 bg-red-50 p-2 rounded-lg mt-3 text-sm">{error}</p>}
 
       {loading ? (
-        <p className="text-slate-400 text-sm mt-6">Loading…</p>
+        <p className="text-slate-400 text-sm mt-6">{t('productionDashboard.loading')}</p>
       ) : rows.length === 0 ? (
         <div className="bg-white border rounded-xl p-8 text-center text-sm text-slate-500 mt-6">
-          No carts in any pipeline stage yet.  Create a work order in Production to populate this dashboard.
+          {t('productionDashboard.empty')}
         </div>
       ) : (
         <div className="mt-5 bg-white border-2 border-slate-200 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wider font-bold text-slate-500">
-                <th className="px-4 py-2.5 text-left">SKU</th>
-                <ColHeader icon={Factory}      label="Production" />
-                <ColHeader icon={Flame}        label="Dry Room" />
-                <ColHeader icon={FlaskConical} label="Testing" />
-                <ColHeader icon={CheckCircle2} label="Released" />
-                <ColHeader icon={Package}      label="Packaged" />
-                <th className="px-4 py-2.5 text-right">Total</th>
+                <th className="px-4 py-2.5 text-left">{t('productionDashboard.sku')}</th>
+                <ColHeader icon={Factory}      label={t('productionDashboard.colProduction')} />
+                <ColHeader icon={Flame}        label={t('productionDashboard.colDryRoom')} />
+                <ColHeader icon={FlaskConical} label={t('productionDashboard.colTesting')} />
+                <ColHeader icon={CheckCircle2} label={t('productionDashboard.colReleased')} />
+                <ColHeader icon={Package}      label={t('productionDashboard.colPackaged')} />
+                <th className="px-4 py-2.5 text-right">{t('productionDashboard.total')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -103,7 +104,7 @@ export default function ProductionDashboard() {
                 </tr>
               ))}
               <tr className="bg-slate-50 font-bold text-slate-700">
-                <td className="px-4 py-2.5 text-right">Total</td>
+                <td className="px-4 py-2.5 text-right">{t('productionDashboard.total')}</td>
                 <SumCell rows={rows} field="production_count" />
                 <SumCell rows={rows} field="dry_room_count" />
                 <SumCell rows={rows} field="testing_count" />
@@ -119,11 +120,11 @@ export default function ProductionDashboard() {
       )}
 
       <p className="text-[10px] text-slate-400 mt-3">
-        Status mapping &mdash; Production: <code className="font-mono">created</code> &middot;
-        Dry Room: <code className="font-mono">drying / awaiting_recheck / room_temp_drying</code> &middot;
-        Testing: <code className="font-mono">pending / inspecting / awaiting_group_result / hold / passed</code> &middot;
-        Released: <code className="font-mono">closed</code> &middot;
-        Packaged: <code className="font-mono">dispatched</code>
+        {t('productionDashboard.statusMapping')} &mdash; {t('productionDashboard.colProduction')}: <code className="font-mono">created</code> &middot;
+        {t('productionDashboard.colDryRoom')}: <code className="font-mono">drying / awaiting_recheck / room_temp_drying</code> &middot;
+        {t('productionDashboard.colTesting')}: <code className="font-mono">pending / inspecting / awaiting_group_result / hold / passed</code> &middot;
+        {t('productionDashboard.colReleased')}: <code className="font-mono">closed</code> &middot;
+        {t('productionDashboard.colPackaged')}: <code className="font-mono">dispatched</code>
       </p>
     </div>
   );

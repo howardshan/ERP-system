@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, PackageCheck, AlertTriangle } from 'lucide-react';
 import {
   releasePassedSubLotsGroup,
@@ -36,6 +37,7 @@ export function ReleaseDialog({
   onClose,
   onReleased,
 }: Props) {
+  const { t } = useTranslation('qc');
   const [phase, setPhase] = useState<Phase>('yield');
   const [yieldQty, setYieldQty] = useState('');
   const [busy, setBusy] = useState(false);
@@ -68,7 +70,7 @@ export function ReleaseDialog({
   const codeSummary =
     subLotCodes.length === 0 ? '—'
     : subLotCodes.length === 1 ? subLotCodes[0]
-    : `${subLotCodes[0]} 等 ${subLotCodes.length} 车`;
+    : t('releaseDialog.codeSummaryMulti', { code: subLotCodes[0], count: subLotCodes.length });
 
   // ── Phase: collect yield + submit release ────────────────────────────────
   const doRelease = async (qty: number) => {
@@ -84,7 +86,7 @@ export function ReleaseDialog({
         setMissingSkuId(e.skuId);
         setPhase('no_packaging');
       } else {
-        setError(e instanceof Error ? e.message : 'Release failed');
+        setError(e instanceof Error ? e.message : t('releaseDialog.errorReleaseFailed'));
       }
     } finally {
       setBusy(false);
@@ -95,7 +97,7 @@ export function ReleaseDialog({
     ev.preventDefault();
     const n = Number(yieldQty);
     if (!Number.isFinite(n) || n <= 0) {
-      setError('请输入大于 0 的产出数量');
+      setError(t('releaseDialog.errorYieldGtZero'));
       return;
     }
     void doRelease(n);
@@ -107,7 +109,7 @@ export function ReleaseDialog({
     try {
       const pl = await getProductionLotSku(productionLotId);
       if (!pl.sku_id) {
-        setError('找不到该生产卡片的 SKU,无法继续');
+        setError(t('releaseDialog.errorSkuNotFound'));
         return;
       }
       const linksMap = await listProductItemLinks();
@@ -125,7 +127,7 @@ export function ReleaseDialog({
       setChosenItemId(choices[0]?.id ?? null);
       setPhase('pick_packaging');
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载包装选项失败');
+      setError(e instanceof Error ? e.message : t('releaseDialog.errorLoadPackagingFailed'));
     }
   };
 
@@ -133,12 +135,12 @@ export function ReleaseDialog({
   const onPickerSubmit = async (ev: FormEvent) => {
     ev.preventDefault();
     if (!pendingProductionLotId || !chosenItemId) {
-      setError('请选择包装规格');
+      setError(t('releaseDialog.errorSelectPackaging'));
       return;
     }
     const qty = Number(yieldQty);
     if (!Number.isFinite(qty) || qty <= 0) {
-      setError('产出数量无效,请返回上一步重填');
+      setError(t('releaseDialog.errorYieldInvalid'));
       return;
     }
     setBusy(true);
@@ -156,7 +158,7 @@ export function ReleaseDialog({
       // PackagingRequiredError and flip us back to pick_packaging for that one.
       await doRelease(qty);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存包装失败');
+      setError(e instanceof Error ? e.message : t('releaseDialog.errorSavePackagingFailed'));
       setBusy(false);
     }
   };
@@ -167,7 +169,7 @@ export function ReleaseDialog({
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
             <PackageCheck size={18} className="text-emerald-600" />
-            放行到库存
+            {t('releaseDialog.title')}
           </h2>
           <button
             type="button"
@@ -181,10 +183,10 @@ export function ReleaseDialog({
 
         <div className="p-4 space-y-3">
           <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-1">
-            <div><span className="text-slate-500">车次:</span> <span className="font-medium">{codeSummary}</span></div>
-            {skuName && <div><span className="text-slate-500">产品:</span> <span className="font-medium">{skuName}</span></div>}
-            {lotNumber && <div><span className="text-slate-500">批号:</span> <span className="font-medium">{lotNumber}</span></div>}
-            <div><span className="text-slate-500">车数:</span> <span className="font-medium">{totalCarts}</span></div>
+            <div><span className="text-slate-500">{t('releaseDialog.labelCarts')}</span> <span className="font-medium">{codeSummary}</span></div>
+            {skuName && <div><span className="text-slate-500">{t('releaseDialog.labelProduct')}</span> <span className="font-medium">{skuName}</span></div>}
+            {lotNumber && <div><span className="text-slate-500">{t('releaseDialog.labelLot')}</span> <span className="font-medium">{lotNumber}</span></div>}
+            <div><span className="text-slate-500">{t('releaseDialog.labelCartCount')}</span> <span className="font-medium">{totalCarts}</span></div>
           </div>
 
           {error && (
@@ -197,7 +199,7 @@ export function ReleaseDialog({
             <form onSubmit={onYieldSubmit} className="space-y-3">
               <label className="block">
                 <span className="text-sm font-medium text-slate-700">
-                  每车实际产出 <span className="text-rose-600">*</span>
+                  {t('releaseDialog.yieldLabel')} <span className="text-rose-600">*</span>
                 </span>
                 <input
                   type="number"
@@ -208,10 +210,10 @@ export function ReleaseDialog({
                   autoFocus
                   disabled={busy}
                   className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100"
-                  placeholder="例如 50"
+                  placeholder={t('releaseDialog.yieldPlaceholder')}
                 />
                 <span className="text-xs text-slate-500 mt-1 block">
-                  按物料基础单位录入。{totalCarts > 1 && `每车同样数量 × ${totalCarts} 车。`}
+                  {t('releaseDialog.yieldHint')}{totalCarts > 1 && t('releaseDialog.yieldHintMulti', { count: totalCarts })}
                 </span>
               </label>
               <div className="flex gap-2 pt-1">
@@ -221,14 +223,14 @@ export function ReleaseDialog({
                   disabled={busy}
                   className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  取消
+                  {t('releaseDialog.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={busy}
                   className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
                 >
-                  {busy ? '放行中…' : '放行'}
+                  {busy ? t('releaseDialog.releasing') : t('releaseDialog.release')}
                 </button>
               </div>
             </form>
@@ -237,11 +239,11 @@ export function ReleaseDialog({
           {phase === 'pick_packaging' && (
             <form onSubmit={onPickerSubmit} className="space-y-3">
               <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded-lg">
-                历史车次缺少包装规格。请为 SKU <span className="font-medium">{pendingSkuCode ?? '?'}</span> 选择本次放行对应的包装。
+                {t('releaseDialog.pickPackagingNoticePrefix')} <span className="font-medium">{pendingSkuCode ?? '?'}</span> {t('releaseDialog.pickPackagingNoticeSuffix')}
               </div>
               <label className="block">
                 <span className="text-sm font-medium text-slate-700">
-                  包装规格 <span className="text-rose-600">*</span>
+                  {t('releaseDialog.packagingSpecLabel')} <span className="text-rose-600">*</span>
                 </span>
                 <select
                   value={chosenItemId ?? ''}
@@ -249,7 +251,7 @@ export function ReleaseDialog({
                   disabled={busy}
                   className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100"
                 >
-                  <option value="">— 选择包装 —</option>
+                  <option value="">{t('releaseDialog.selectPackagingOption')}</option>
                   {pendingItemChoices.map(it => (
                     <option key={it.id} value={it.id}>{it.sku} — {it.name}</option>
                   ))}
@@ -262,14 +264,14 @@ export function ReleaseDialog({
                   disabled={busy}
                   className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
-                  返回
+                  {t('releaseDialog.back')}
                 </button>
                 <button
                   type="submit"
                   disabled={busy || !chosenItemId}
                   className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
                 >
-                  {busy ? '保存并放行…' : '保存并放行'}
+                  {busy ? t('releaseDialog.savingAndReleasing') : t('releaseDialog.saveAndRelease')}
                 </button>
               </div>
             </form>
@@ -278,15 +280,15 @@ export function ReleaseDialog({
           {phase === 'no_packaging' && (
             <div className="space-y-3">
               <p className="text-sm text-rose-800 bg-rose-50 border border-rose-200 p-3 rounded-lg">
-                此 SKU 尚未配置任何包装规格,无法放行到库存。请到 <span className="font-medium">产品管理</span> 为 SKU
-                <span className="font-mono"> {missingSkuId} </span> 配置至少一项关联的成品/包装,然后重试。
+                {t('releaseDialog.noPackagingPrefix')} <span className="font-medium">{t('releaseDialog.productManagement')}</span> {t('releaseDialog.noPackagingMiddle')}
+                <span className="font-mono"> {missingSkuId} </span> {t('releaseDialog.noPackagingSuffix')}
               </p>
               <button
                 type="button"
                 onClick={onClose}
                 className="w-full px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800"
               >
-                关闭
+                {t('releaseDialog.close')}
               </button>
             </div>
           )}

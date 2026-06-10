@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { CheckCircle2, XCircle, FlaskConical, History, RotateCcw, Hourglass, Users, LayoutDashboard, ListChecks } from 'lucide-react';
 import TestingDashboard from './TestingDashboard';
 import {
@@ -24,6 +25,7 @@ interface Props {
 type Phase = 'idle' | 'sample' | 'measure' | 'done';
 
 export default function TestingPage({ onOpenHistory }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'testing', 'view_status');
   const canViewDashboard = can('qc', 'testing', 'view_dashboard');
@@ -50,14 +52,14 @@ export default function TestingPage({ onOpenHistory }: Props) {
   const selected = useMemo(() => pending.find(s => s.id === selectedId) ?? null, [pending, selectedId]);
 
   if (!canView) {
-    return <PermissionDenied permission="qc.testing.view_status" feature="Testing" />;
+    return <PermissionDenied permission="qc.testing.view_status" feature={t('testingPage.featureTesting')} />;
   }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Testing</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('testingPage.title')}</h1>
       <p className="text-xs text-slate-500 mb-4">
-        Sub-lots checked out of the dryer · take a sample → enter WA (system suggests Pass/Fail) → operator decides + optional remark (BR-Q1)
+        {t('testingPage.subtitle')}
       </p>
 
       {/* Tab toggle — Dashboard tab only shown when user has view_dashboard. */}
@@ -71,7 +73,7 @@ export default function TestingPage({ onOpenHistory }: Props) {
               activeTab === 'queue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
             )}
           >
-            <ListChecks size={12} /> Queue
+            <ListChecks size={12} /> {t('testingPage.tabQueue')}
           </button>
           <button
             type="button"
@@ -81,7 +83,7 @@ export default function TestingPage({ onOpenHistory }: Props) {
               activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
             )}
           >
-            <LayoutDashboard size={12} /> Dashboard
+            <LayoutDashboard size={12} /> {t('testingPage.tabDashboard')}
           </button>
         </div>
       )}
@@ -101,10 +103,10 @@ export default function TestingPage({ onOpenHistory }: Props) {
         {/* ── Left: pending queue ─────────────────────────────────────── */}
         <aside className="bg-white border rounded-xl p-3">
           <h2 className="font-semibold text-slate-900 text-sm mb-2 px-1">
-            Pending sub-lots <span className="text-slate-400 font-normal">({pending.length})</span>
+            {t('testingPage.pendingSubLots')} <span className="text-slate-400 font-normal">({pending.length})</span>
           </h2>
           {pending.length === 0 ? (
-            <p className="text-xs text-slate-500 px-1">Nothing to test. Check carts out of the dryer first.</p>
+            <p className="text-xs text-slate-500 px-1">{t('testingPage.nothingToTest')}</p>
           ) : (
             <ul className="space-y-1.5 max-h-[700px] overflow-auto">
               {pending.map(s => {
@@ -130,23 +132,23 @@ export default function TestingPage({ onOpenHistory }: Props) {
                             {s.is_test_champion && s.test_group_member_count && s.test_group_member_count > 1 && (
                               <span
                                 className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200"
-                                title={`Champion · ${s.test_group_member_count - 1} sibling(s) waiting`}
+                                title={t('testingPage.championSiblingsWaiting', { count: s.test_group_member_count - 1 })}
                               >
                                 <Users size={8} /> ×{s.test_group_member_count}
                               </span>
                             )}
                           </div>
                           <div className="text-[10px] text-slate-500 mt-0.5">
-                            {s.sku_name ?? '—'} · checked out {formatQcDateTime(s.out_time)}
+                            {s.sku_name ?? '—'} · {t('testingPage.checkedOut', { time: formatQcDateTime(s.out_time) })}
                           </div>
                           {!awaitingSample && s.latest_pending_sample_id && (
                             <div className="text-[10px] text-blue-700 font-mono mt-0.5">
-                              Sample {s.latest_pending_sample_id} · awaiting WA
+                              {t('testingPage.sampleAwaitingWa', { id: s.latest_pending_sample_id })}
                             </div>
                           )}
                           {s.wait_minutes != null && (
                             <div className={cn('text-[10px] mt-0.5', overdue ? 'text-amber-700 font-bold' : 'text-slate-500')}>
-                              Waiting {s.wait_minutes}m
+                              {t('testingPage.waitingMinutes', { minutes: s.wait_minutes })}
                             </div>
                           )}
                         </div>
@@ -158,8 +160,8 @@ export default function TestingPage({ onOpenHistory }: Props) {
                             : 'bg-blue-100 text-blue-800 border-blue-300',
                         )}>
                           {awaitingSample
-                            ? <span className="flex items-center gap-1"><Hourglass size={9} /> No sample</span>
-                            : <span className="flex items-center gap-1"><FlaskConical size={9} /> Awaiting WA</span>
+                            ? <span className="flex items-center gap-1"><Hourglass size={9} /> {t('testingPage.badgeNoSample')}</span>
+                            : <span className="flex items-center gap-1"><FlaskConical size={9} /> {t('testingPage.badgeAwaitingWa')}</span>
                           }
                         </span>
                       </div>
@@ -175,7 +177,7 @@ export default function TestingPage({ onOpenHistory }: Props) {
         <section>
           {!selected ? (
             <div className="bg-white border rounded-xl p-10 text-center text-sm text-slate-500">
-              Select a sub-lot from the left to begin testing.
+              {t('testingPage.selectSubLotPrompt')}
             </div>
           ) : (
             <TestWorkflow
@@ -186,7 +188,7 @@ export default function TestingPage({ onOpenHistory }: Props) {
               canSupervise={canSupervise}
               onOpenHistory={() => onOpenHistory(selected.id)}
               onSampleTaken={load}
-              onDone={() => { setMsg('Test completed'); setSelectedId(null); load(); }}
+              onDone={() => { setMsg(t('testingPage.testCompleted')); setSelectedId(null); load(); }}
               onError={(m) => setError(m)}
             />
           )}
@@ -211,6 +213,7 @@ function TestWorkflow({
   onDone: () => void;
   onError: (m: string) => void;
 }) {
+  const { t } = useTranslation('qc');
   const [phase, setPhase] = useState<Phase>('idle');
   const [activeSample, setActiveSample] = useState<Sample | null>(null);
   const [allSamples, setAllSamples] = useState<Sample[]>([]);
@@ -296,7 +299,7 @@ function TestWorkflow({
       // Immediately refresh the sidebar list so the badge updates without waiting for the poll interval
       onSampleTaken();
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Take sample failed');
+      onError(e instanceof Error ? e.message : t('testingPage.takeSampleFailed'));
     }
     setBusy(false);
   };
@@ -317,7 +320,7 @@ function TestWorkflow({
       setFinalResult(res.result as 'pass' | 'fail');
       setPhase('done');
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Confirm failed');
+      onError(e instanceof Error ? e.message : t('testingPage.confirmFailed'));
     }
     setBusy(false);
   };
@@ -327,16 +330,16 @@ function TestWorkflow({
       {/* Header */}
       <div className="bg-white border rounded-xl p-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Testing</p>
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('testingPage.headerTesting')}</p>
           <h2 className="text-xl font-mono font-bold text-slate-900">{subLot.sub_lot_code}</h2>
           <p className="text-xs text-slate-500 mt-0.5">{subLot.sku_name ?? ''}</p>
           {(subLot.produced_at || subLot.out_time) && (
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 text-[11px] text-slate-500">
               {subLot.produced_at && (
-                <span>Produced <span className="font-medium text-slate-700">{formatQcDateTime(subLot.produced_at)}</span></span>
+                <span>{t('testingPage.producedLabel')} <span className="font-medium text-slate-700">{formatQcDateTime(subLot.produced_at)}</span></span>
               )}
               {subLot.out_time && (
-                <span>Drying done <span className="font-medium text-slate-700">{formatQcDateTime(subLot.out_time)}</span></span>
+                <span>{t('testingPage.dryingDoneLabel')} <span className="font-medium text-slate-700">{formatQcDateTime(subLot.out_time)}</span></span>
               )}
             </div>
           )}
@@ -346,7 +349,7 @@ function TestWorkflow({
           onClick={onOpenHistory}
           className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700"
         >
-          <History size={12} /> Full history
+          <History size={12} /> {t('testingPage.fullHistory')}
         </button>
       </div>
 
@@ -357,10 +360,18 @@ function TestWorkflow({
             <Users size={18} className="text-purple-700 shrink-0 mt-0.5" />
             <div className="text-xs">
               <p className="font-bold text-purple-900">
-                Sampling group #{subLot.test_group_sequence ?? '—'} · {subLot.test_group_member_count} cart{subLot.test_group_member_count === 1 ? '' : 's'}
+                {t('testingPage.samplingGroupHeader', {
+                  seq: subLot.test_group_sequence ?? '—',
+                  count: subLot.test_group_member_count,
+                })}
               </p>
               <p className="text-purple-700 mt-0.5">
-                This cart is the <strong>random champion</strong>. PASS releases all {subLot.test_group_member_count} cart{subLot.test_group_member_count === 1 ? '' : 's'}; FAIL puts all {subLot.test_group_member_count} carts on hold. Choosing <em>Retest</em> on a fail re-rolls a new champion within the same group.
+                <Trans
+                  i18nKey="testingPage.championBanner"
+                  t={t}
+                  values={{ count: subLot.test_group_member_count }}
+                  components={{ strong: <strong />, em: <em /> }}
+                />
               </p>
             </div>
           </div>
@@ -375,7 +386,7 @@ function TestWorkflow({
                       ? 'bg-purple-700 text-white border-purple-700'          // this cart (champion)
                       : 'bg-white text-purple-800 border-purple-300',          // sibling carts
                   )}
-                  title={m.is_test_champion ? 'Champion' : `Status: ${m.status}`}
+                  title={m.is_test_champion ? t('testingPage.championTitle') : t('testingPage.statusTitle', { status: m.status })}
                 >
                   {m.sub_lot_code}
                   {m.is_test_champion && ' ★'}
@@ -398,17 +409,17 @@ function TestWorkflow({
             ? `${subLot.sub_lot_code}R`
             : `${subLot.sub_lot_code}R${priorCount}`;
         return (
-          <Step number={1} title={isRetest ? `Take retest sample #${priorCount}` : 'Take sample'}>
+          <Step number={1} title={isRetest ? t('testingPage.takeRetestSample', { count: priorCount }) : t('testingPage.takeSample')}>
             <p className="text-xs text-slate-500 mb-3">
-              Sample ID is auto-generated from the cart code{isRetest ? ' (with R suffix for retests)' : ''}.
+              {isRetest ? t('testingPage.sampleIdAutoGenRetest') : t('testingPage.sampleIdAutoGen')}
             </p>
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex-1 min-w-[200px] rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-3 py-2.5">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Sample ID</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('testingPage.sampleId')}</p>
                 <code className="text-base font-mono font-bold text-slate-900">{previewId}</code>
                 {isRetest && (
                   <span className="ml-2 text-[10px] uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">
-                    retest #{priorCount}
+                    {t('testingPage.retestBadge', { count: priorCount })}
                   </span>
                 )}
               </div>
@@ -418,7 +429,7 @@ function TestWorkflow({
                 disabled={busy || !canSample}
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
               >
-                <FlaskConical size={13} /> Take sample
+                <FlaskConical size={13} /> {t('testingPage.takeSampleBtn')}
               </button>
             </div>
           </Step>
@@ -427,19 +438,19 @@ function TestWorkflow({
 
       {/* Step 2: enter reading → system suggests → operator decides + remark */}
       {phase === 'measure' && activeSample && (
-        <Step number={2} title={`Measure ${limits?.item_name ?? 'water activity'}`} active>
+        <Step number={2} title={t('testingPage.measureTitle', { item: limits?.item_name ?? t('testingPage.waterActivity') })} active>
           <div className="flex items-center gap-3 mb-3 flex-wrap">
-            <span className="text-[11px] text-slate-500">Sample</span>
+            <span className="text-[11px] text-slate-500">{t('testingPage.sample')}</span>
             <code className="text-xs font-mono font-bold text-slate-900">{activeSample.sample_id}</code>
             {limits && (
               <>
                 <span className="text-[11px] text-slate-400">·</span>
                 <span className="text-[11px] text-slate-500">
-                  Hard <code className="font-mono text-emerald-700">[{limits.lower_limit}, {limits.upper_limit}]</code>
+                  {t('testingPage.hard')} <code className="font-mono text-emerald-700">[{limits.lower_limit}, {limits.upper_limit}]</code>
                 </span>
                 {(limits.soft_lower_limit < limits.lower_limit || limits.soft_upper_limit > limits.upper_limit) && (
                   <span className="text-[11px] text-slate-500">
-                    Soft <code className="font-mono text-amber-700">[{limits.soft_lower_limit}, {limits.soft_upper_limit}]</code>
+                    {t('testingPage.soft')} <code className="font-mono text-amber-700">[{limits.soft_lower_limit}, {limits.soft_upper_limit}]</code>
                   </span>
                 )}
                 {band && (
@@ -449,9 +460,9 @@ function TestWorkflow({
                       : band === 'soft' ? 'bg-amber-100 text-amber-800'
                       : 'bg-red-100 text-red-700',
                   )}>
-                    {band === 'hard' ? 'in hard range'
-                      : band === 'soft' ? 'soft — supervisor'
-                      : 'outside tolerance'}
+                    {band === 'hard' ? t('testingPage.bandInHardRange')
+                      : band === 'soft' ? t('testingPage.bandSoftSupervisor')
+                      : t('testingPage.bandOutsideTolerance')}
                   </span>
                 )}
               </>
@@ -465,7 +476,7 @@ function TestWorkflow({
               : decision === 'fail' ? 'border-red-400 bg-red-50'
               : 'border-slate-200 bg-white',
           )}>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{limits?.item_name ?? 'Aw'}</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{limits?.item_name ?? t('testingPage.awShort')}</p>
             <p className={cn(
               'text-5xl font-bold tabular-nums my-2',
               decision === 'pass' ? 'text-emerald-700' : decision === 'fail' ? 'text-red-700' : 'text-slate-900',
@@ -474,11 +485,11 @@ function TestWorkflow({
             </p>
             {judged && (
               <p className="text-[11px] text-slate-500">
-                System suggests{' '}
+                {t('testingPage.systemSuggests')}{' '}
                 <span className={cn('font-bold', judged === 'pass' ? 'text-emerald-700' : 'text-red-700')}>
-                  {judged === 'pass' ? 'PASS' : 'FAIL'}
+                  {judged === 'pass' ? t('testingPage.pass') : t('testingPage.fail')}
                 </span>
-                {decision && decision !== judged && <span className="text-amber-600 font-medium"> · overridden</span>}
+                {decision && decision !== judged && <span className="text-amber-600 font-medium"> {t('testingPage.overridden')}</span>}
               </p>
             )}
           </div>
@@ -504,43 +515,43 @@ function TestWorkflow({
             const failDisabled = !aw || (hasTmpl && !canSupervise && band !== 'out');
             return (
               <div className="mt-4">
-                <p className="text-xs font-bold text-slate-700 mb-1.5">Final judgment</p>
+                <p className="text-xs font-bold text-slate-700 mb-1.5">{t('testingPage.finalJudgment')}</p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setDecision('pass')}
                     disabled={passDisabled}
-                    title={hasTmpl && band === 'out' ? 'Reading outside soft tolerance — must FAIL'
-                      : hasTmpl && band === 'soft' && !canSupervise ? 'Supervisor permission required'
+                    title={hasTmpl && band === 'out' ? t('testingPage.titleMustFail')
+                      : hasTmpl && band === 'soft' && !canSupervise ? t('testingPage.titleSupervisorRequired')
                       : undefined}
                     className={cn(
                       'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
                       decision === 'pass' ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 text-slate-700 hover:border-emerald-400',
                     )}
                   >
-                    Pass
+                    {t('testingPage.passBtn')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setDecision('fail')}
                     disabled={failDisabled}
-                    title={hasTmpl && band !== 'out' && !canSupervise ? 'Supervisor permission required to override to FAIL' : undefined}
+                    title={hasTmpl && band !== 'out' && !canSupervise ? t('testingPage.titleSupervisorRequiredFail') : undefined}
                     className={cn(
                       'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
                       decision === 'fail' ? 'border-red-500 bg-red-600 text-white' : 'border-slate-200 text-slate-700 hover:border-red-400',
                     )}
                   >
-                    Fail
+                    {t('testingPage.failBtn')}
                   </button>
                 </div>
                 {hasTmpl && band === 'soft' && !canSupervise && (
                   <p className="mt-1.5 text-[11px] text-amber-700">
-                    Reading is in the supervisor-discretion band. Please ask a supervisor to submit.
+                    {t('testingPage.softBandHint')}
                   </p>
                 )}
                 {hasTmpl && band === 'out' && (
                   <p className="mt-1.5 text-[11px] text-red-700">
-                    Reading is outside soft tolerance — must FAIL (no one can override).
+                    {t('testingPage.outBandHint')}
                   </p>
                 )}
               </div>
@@ -550,12 +561,12 @@ function TestWorkflow({
           {/* Remark (optional) */}
           <div className="mt-3">
             <p className="text-xs font-bold text-slate-700 mb-1.5">
-              Remark <span className="font-normal text-slate-400">(optional)</span>
+              {t('testingPage.remark')} <span className="font-normal text-slate-400">{t('testingPage.optional')}</span>
             </p>
             <textarea
               value={remark}
               onChange={e => setRemark(e.target.value)}
-              placeholder="Notes supporting this judgment…"
+              placeholder={t('testingPage.remarkPlaceholder')}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm min-h-[56px] focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
@@ -567,7 +578,7 @@ function TestWorkflow({
               disabled={!aw || busy}
               className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-lg text-sm font-bold border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40"
             >
-              <RotateCcw size={13} /> Redo test
+              <RotateCcw size={13} /> {t('testingPage.redoTest')}
             </button>
             <button
               type="button"
@@ -583,10 +594,10 @@ function TestWorkflow({
               )}
             >
               {busy
-                ? 'Submitting…'
+                ? t('testingPage.submitting')
                 : decision
-                  ? `Confirm ${decision === 'pass' ? 'PASS' : 'FAIL'} & persist`
-                  : 'Choose Pass or Fail'}
+                  ? t('testingPage.confirmPersist', { verdict: decision === 'pass' ? t('testingPage.pass') : t('testingPage.fail') })
+                  : t('testingPage.choosePassOrFail')}
             </button>
           </div>
         </Step>
@@ -594,29 +605,29 @@ function TestWorkflow({
 
       {/* Step 3: result screen */}
       {phase === 'done' && finalResult === 'pass' && (
-        <Step number={3} title="Passed">
+        <Step number={3} title={t('testingPage.passedTitle')}>
           <div className="rounded-2xl bg-emerald-50 border-2 border-emerald-300 p-6 text-center">
             <CheckCircle2 size={32} className="text-emerald-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-emerald-800">Pass — released</p>
-            <p className="text-xs text-emerald-700 mt-1">Sub-lot status: passed · history preserved</p>
+            <p className="text-2xl font-bold text-emerald-800">{t('testingPage.passReleased')}</p>
+            <p className="text-xs text-emerald-700 mt-1">{t('testingPage.passStatusNote')}</p>
           </div>
           <button
             type="button"
             onClick={onDone}
             className="mt-3 w-full bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-lg text-sm font-bold"
           >
-            Done
+            {t('testingPage.done')}
           </button>
         </Step>
       )}
 
       {phase === 'done' && finalResult === 'fail' && (
-        <Step number={3} title="Failed">
+        <Step number={3} title={t('testingPage.failedTitle')}>
           <div className="rounded-2xl bg-red-50 border-2 border-red-300 p-6 text-center">
             <XCircle size={32} className="text-red-600 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-red-800">Failed — on hold</p>
+            <p className="text-2xl font-bold text-red-800">{t('testingPage.failedOnHold')}</p>
             <p className="text-xs text-red-700 mt-1">
-              Sub-lot is now <strong>on hold</strong>. Go to <strong>QC Home</strong> to choose the next action (re-dry, room temp, retest, or scrap).
+              <Trans i18nKey="testingPage.failedNote" t={t} components={{ strong: <strong /> }} />
             </p>
           </div>
           <button
@@ -624,7 +635,7 @@ function TestWorkflow({
             onClick={onDone}
             className="mt-3 w-full bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-lg text-sm font-bold"
           >
-            Done
+            {t('testingPage.done')}
           </button>
         </Step>
       )}
@@ -633,7 +644,7 @@ function TestWorkflow({
       {allSamples.length > 0 && (
         <section className="bg-white border rounded-xl p-3">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 px-1">
-            Samples for this sub-lot · click any sample_id to view full timeline
+            {t('testingPage.samplesHeading')}
           </h3>
           <ul className="space-y-1">
             {allSamples.map(sa => (
@@ -642,14 +653,14 @@ function TestWorkflow({
                   type="button"
                   onClick={onOpenHistory}
                   className="font-mono font-bold text-blue-700 hover:underline"
-                  title="View full sub-lot history"
+                  title={t('testingPage.viewFullHistoryTitle')}
                 >
                   {sa.sample_id}
                 </button>
                 <span className="text-slate-400">·</span>
                 <span className="text-slate-500">{formatQcDateTime(sa.taken_at)}</span>
                 <span className="flex-1" />
-                {sa.aw != null && <span className="font-mono text-slate-700">Aw {sa.aw}</span>}
+                {sa.aw != null && <span className="font-mono text-slate-700">{t('testingPage.awValue', { value: sa.aw })}</span>}
                 <SampleResultBadge status={sa.status} result={sa.result ?? null} />
               </li>
             ))}
@@ -679,10 +690,11 @@ function Step({ number, title, active, children }: { number: number; title: stri
 }
 
 function SampleResultBadge({ status, result }: { status: string; result: 'pass' | 'fail' | null }) {
-  if (status === 'voided') return <span className="text-[10px] font-bold text-slate-500">VOIDED</span>;
-  if (status === 'pending') return <span className="text-[10px] font-bold text-amber-700">PENDING</span>;
-  if (result === 'pass') return <span className="text-[10px] font-bold text-emerald-700">PASS</span>;
-  if (result === 'fail') return <span className="text-[10px] font-bold text-red-700">FAIL</span>;
+  const { t } = useTranslation('qc');
+  if (status === 'voided') return <span className="text-[10px] font-bold text-slate-500">{t('testingPage.statusVoided')}</span>;
+  if (status === 'pending') return <span className="text-[10px] font-bold text-amber-700">{t('testingPage.statusPending')}</span>;
+  if (result === 'pass') return <span className="text-[10px] font-bold text-emerald-700">{t('testingPage.statusPass')}</span>;
+  if (result === 'fail') return <span className="text-[10px] font-bold text-red-700">{t('testingPage.statusFail')}</span>;
   return null;
 }
 

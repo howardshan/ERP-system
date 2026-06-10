@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Plus, Target, TrendingUp } from 'lucide-react';
 import { getGoals, createGoal, updateGoalProgress, getReviewCycles } from '../../../services/hrApi';
 import type { Goal, ReviewCycle } from '../../../services/hrApi';
@@ -15,6 +16,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function Goals() {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canManage = can('hr', 'performance', 'manage');
 
@@ -74,13 +76,13 @@ export default function Goals() {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Performance</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('goals.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Goals & OKRs</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('goals.title')}</h1>
           {selectedEmp && (
             <button onClick={() => { setModal(true); setForm({ title: '', description: '', target: '', due_date: '', status: 'on_track' }); }}
               className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg">
-              <Plus size={14} /> New Goal
+              <Plus size={14} /> {t('goals.newGoal')}
             </button>
           )}
         </div>
@@ -90,19 +92,19 @@ export default function Goals() {
         <div className="flex gap-4 mb-6">
           {canManage && (
             <div className="max-w-xs flex-1">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Employee</label>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('goals.employee')}</label>
               <select value={selectedEmp} onChange={e => setSelectedEmp(e.target.value)}
                 className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                <option value="">Select employee</option>
+                <option value="">{t('goals.selectEmployee')}</option>
                 {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
               </select>
             </div>
           )}
           <div className="max-w-xs flex-1">
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Review Cycle</label>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('goals.reviewCycle')}</label>
             <select value={selectedCycle} onChange={e => setSelectedCycle(e.target.value)}
               className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-              <option value="">All cycles</option>
+              <option value="">{t('goals.allCycles')}</option>
               {cycles.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
@@ -113,28 +115,28 @@ export default function Goals() {
         ) : !selectedEmp ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
             <Target size={40} className="opacity-30" />
-            <p className="text-sm">Select an employee to view their goals</p>
+            <p className="text-sm">{t('goals.selectEmployeeHint')}</p>
           </div>
         ) : goals.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
             <Target size={40} className="opacity-30" />
-            <p className="text-sm">No goals set for this period</p>
+            <p className="text-sm">{t('goals.noGoals')}</p>
           </div>
         ) : (
           <div className="space-y-5">
             <div className="bg-white border border-slate-200 rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-slate-900">Progress Overview</h3>
-                <span className="text-sm font-bold text-teal-700">{completedPct}% completed</span>
+                <h3 className="text-sm font-bold text-slate-900">{t('goals.progressOverview')}</h3>
+                <span className="text-sm font-bold text-teal-700">{t('goals.percentCompleted', { pct: completedPct })}</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2.5">
                 <div className="bg-teal-500 h-2.5 rounded-full transition-all" style={{ width: `${completedPct}%` }} />
               </div>
               <div className="flex gap-4 mt-3 text-xs text-slate-400">
-                <span>On Track: <b className="text-emerald-600">{byStatus('on_track').length}</b></span>
-                <span>At Risk: <b className="text-amber-600">{byStatus('at_risk').length}</b></span>
-                <span>Completed: <b className="text-teal-600">{byStatus('completed').length}</b></span>
-                <span>Total: <b className="text-slate-700">{goals.length}</b></span>
+                <span>{t('goals.onTrackLabel')}: <b className="text-emerald-600">{byStatus('on_track').length}</b></span>
+                <span>{t('goals.atRiskLabel')}: <b className="text-amber-600">{byStatus('at_risk').length}</b></span>
+                <span>{t('goals.completedLabel')}: <b className="text-teal-600">{byStatus('completed').length}</b></span>
+                <span>{t('goals.totalLabel')}: <b className="text-slate-700">{goals.length}</b></span>
               </div>
             </div>
 
@@ -144,21 +146,21 @@ export default function Goals() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[g.status]}`}>{g.status.replace('_', ' ')}</span>
-                        {g.due_date && <span className="text-[10px] text-slate-400">Due: {g.due_date}</span>}
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[g.status]}`}>{t(`goals.status.${g.status}`)}</span>
+                        {g.due_date && <span className="text-[10px] text-slate-400">{t('goals.due', { date: g.due_date })}</span>}
                       </div>
                       <h4 className="text-sm font-bold text-slate-900">{g.title}</h4>
                       {g.description && <p className="text-xs text-slate-500 mt-0.5">{g.description}</p>}
-                      {g.target && <p className="text-xs text-slate-400 mt-1">Target: <span className="text-slate-600 font-medium">{g.target}</span></p>}
+                      {g.target && <p className="text-xs text-slate-400 mt-1">{t('goals.targetLabel')}: <span className="text-slate-600 font-medium">{g.target}</span></p>}
                     </div>
                     <button onClick={() => { setProgressModal(g); setProgress(g.progress); }}
                       className="ml-4 flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors">
-                      <TrendingUp size={12} /> Update
+                      <TrendingUp size={12} /> {t('goals.update')}
                     </button>
                   </div>
                   <div className="mt-3">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">Progress</span>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold">{t('goals.progress')}</span>
                       <span className="text-xs font-bold text-slate-700">{g.progress}%</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-1.5">
@@ -176,46 +178,46 @@ export default function Goals() {
       {modal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-5">New Goal</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-5">{t('goals.newGoal')}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Title *</label>
-                <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Increase customer retention by 15%"
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('goals.titleField')}</label>
+                <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder={t('goals.titlePlaceholder')}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Measurable Target</label>
-                <input value={form.target} onChange={e => setForm(p => ({ ...p, target: e.target.value }))} placeholder="e.g. NPS score ≥ 70, Churn rate < 5%"
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('goals.measurableTarget')}</label>
+                <input value={form.target} onChange={e => setForm(p => ({ ...p, target: e.target.value }))} placeholder={t('goals.targetPlaceholder')}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Description</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('goals.description')}</label>
                 <textarea rows={2} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Due Date</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('goals.dueDate')}</label>
                   <input type="date" value={form.due_date} onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Status</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('goals.statusLabel')}</label>
                   <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                    <option value="on_track">On Track</option>
-                    <option value="at_risk">At Risk</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="on_track">{t('goals.status.on_track')}</option>
+                    <option value="at_risk">{t('goals.status.at_risk')}</option>
+                    <option value="completed">{t('goals.status.completed')}</option>
+                    <option value="cancelled">{t('goals.status.cancelled')}</option>
                   </select>
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('goals.cancel')}</button>
               <button onClick={saveGoal} disabled={saving || !form.title}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Saving…' : 'Create Goal'}
+                {saving ? t('goals.saving') : t('goals.createGoal')}
               </button>
             </div>
           </div>
@@ -225,10 +227,10 @@ export default function Goals() {
       {progressModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-1">Update Progress</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">{t('goals.updateProgress')}</h2>
             <p className="text-xs text-slate-400 mb-5">{progressModal.title}</p>
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Progress: {progress}%</label>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">{t('goals.progressValue', { value: progress })}</label>
               <input type="range" min={0} max={100} step={5} value={progress} onChange={e => setProgress(Number(e.target.value))}
                 className="w-full accent-teal-500" />
               <div className="flex justify-between text-[10px] text-slate-400 mt-1">
@@ -236,10 +238,10 @@ export default function Goals() {
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setProgressModal(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setProgressModal(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('goals.cancel')}</button>
               <button onClick={saveProgress} disabled={saving}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Saving…' : 'Save'}
+                {saving ? t('goals.saving') : t('goals.save')}
               </button>
             </div>
           </div>

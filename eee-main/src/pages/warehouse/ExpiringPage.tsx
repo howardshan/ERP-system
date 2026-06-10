@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Zap } from 'lucide-react';
 import { listExpiring, expireLots, ExpiringLot } from '../../services/warehouseApi';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -21,14 +22,17 @@ function rowStyle(days: number, status: string): string {
   return '';
 }
 
-function dayLabel(days: number): { text: string; color: string } {
-  if (days < 0) return { text: `已过期 ${-days} 天`, color: 'text-rose-700 font-semibold' };
-  if (days === 0) return { text: '今日到期', color: 'text-rose-700 font-semibold' };
-  if (days <= 7) return { text: `${days} 天后过期`, color: 'text-amber-700 font-semibold' };
-  return { text: `${days} 天`, color: 'text-slate-700' };
+type DayLabel = { key: string; n: number; color: string };
+
+function dayLabel(days: number): DayLabel {
+  if (days < 0) return { key: 'expiringPage.dayLabel.overdue', n: -days, color: 'text-rose-700 font-semibold' };
+  if (days === 0) return { key: 'expiringPage.dayLabel.today', n: 0, color: 'text-rose-700 font-semibold' };
+  if (days <= 7) return { key: 'expiringPage.dayLabel.soon', n: days, color: 'text-amber-700 font-semibold' };
+  return { key: 'expiringPage.dayLabel.days', n: days, color: 'text-slate-700' };
 }
 
 export default function ExpiringPage({ onOpenLot }: { onOpenLot?: (lotId: number) => void }) {
+  const { t } = useTranslation('warehouse');
   const { can } = usePermissions();
   const canExpire = can('warehouse', 'lots', 'reject'); // sweep = destructive admin op, gate on reject
 
@@ -50,18 +54,18 @@ export default function ExpiringPage({ onOpenLot }: { onOpenLot?: (lotId: number
 
   const doExpireAll = async () => {
     if (overdueCount === 0) {
-      if (!confirm('当前无已过期且未标定的批次，仍要执行一次扫描吗？')) return;
-    } else if (!confirm(`确认将 ${overdueCount} 个已过期但未标定的批次状态改为 expired？标定后将被 BR-W4 自动拦截出库。`)) {
+      if (!confirm(t('expiringPage.confirmNoOverdue'))) return;
+    } else if (!confirm(t('expiringPage.confirmExpireAll', { count: overdueCount }))) {
       return;
     }
     setBusy(true);
     setError(''); setMsg('');
     try {
       const res = await expireLots();
-      setMsg(`已标定 ${res.expired_count} 个批次为 expired`);
+      setMsg(t('expiringPage.expiredResult', { count: res.expired_count }));
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '标定失败');
+      setError(e instanceof Error ? e.message : t('expiringPage.expireFailed'));
     }
     setBusy(false);
   };
@@ -70,17 +74,17 @@ export default function ExpiringPage({ onOpenLot }: { onOpenLot?: (lotId: number
     <div className="p-8 max-w-6xl mx-auto">
       <div className="flex items-center gap-2 mb-1">
         <AlertTriangle size={20} className="text-amber-600" />
-        <h1 className="text-2xl font-bold text-slate-900">Expiring Lots</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t('expiringPage.title')}</h1>
       </div>
       <p className="text-slate-600 mb-4 text-sm">
-        已过期或即将到期的批次。已过期且未标定的批次可一键改为 <code className="text-xs">expired</code>，之后 BR-W4 自动拦截后续出库。
+        {t('expiringPage.descBefore')} <code className="text-xs">expired</code>{t('expiringPage.descAfter')}
       </p>
 
       {error && <p className="text-red-600 mb-3 text-sm">{error}</p>}
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
 
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <label className="text-xs font-medium text-slate-700">显示未来</label>
+        <label className="text-xs font-medium text-slate-700">{t('expiringPage.showNext')}</label>
         <div className="flex gap-1">
           {THRESHOLDS.map((d) => (
             <button
@@ -94,12 +98,12 @@ export default function ExpiringPage({ onOpenLot }: { onOpenLot?: (lotId: number
                   : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50')
               }
             >
-              {d} 天
+              {t('expiringPage.daysUnit', { n: d })}
             </button>
           ))}
         </div>
         <span className="text-xs text-slate-500">
-          {rows.length} 个批次 · 其中 <span className="text-rose-600 font-semibold">{overdueCount}</span> 已过期未标定
+          {t('expiringPage.lotCount', { count: rows.length })} · {t('expiringPage.ofWhich')} <span className="text-rose-600 font-semibold">{overdueCount}</span> {t('expiringPage.overdueUnmarked')}
         </span>
         {canExpire && (
           <button
@@ -108,7 +112,7 @@ export default function ExpiringPage({ onOpenLot }: { onOpenLot?: (lotId: number
             disabled={busy}
             className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50"
           >
-            <Zap size={12} /> {busy ? '标定中…' : '一键标定过期'}
+            <Zap size={12} /> {busy ? t('expiringPage.marking') : t('expiringPage.expireAllBtn')}
           </button>
         )}
       </div>
@@ -117,13 +121,13 @@ export default function ExpiringPage({ onOpenLot }: { onOpenLot?: (lotId: number
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
             <tr>
-              <th className="text-left font-semibold px-4 py-2.5">批次</th>
-              <th className="text-left font-semibold px-4 py-2.5">物料</th>
-              <th className="text-right font-semibold px-4 py-2.5">在库总量</th>
-              <th className="text-left font-semibold px-4 py-2.5 pl-3">单位</th>
-              <th className="text-left font-semibold px-4 py-2.5">保质期</th>
-              <th className="text-left font-semibold px-4 py-2.5">剩余</th>
-              <th className="text-left font-semibold px-4 py-2.5">状态</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('expiringPage.colLot')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('expiringPage.colItem')}</th>
+              <th className="text-right font-semibold px-4 py-2.5">{t('expiringPage.colOnHand')}</th>
+              <th className="text-left font-semibold px-4 py-2.5 pl-3">{t('expiringPage.colUom')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('expiringPage.colExpiry')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('expiringPage.colRemaining')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('expiringPage.colStatus')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -148,7 +152,7 @@ export default function ExpiringPage({ onOpenLot }: { onOpenLot?: (lotId: number
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-900">{r.total_on_hand}</td>
                   <td className="px-4 py-2.5 pl-3 text-slate-600">{r.base_uom}</td>
                   <td className="px-4 py-2.5 text-slate-700">{r.expiry_date}</td>
-                  <td className={`px-4 py-2.5 ${dl.color}`}>{dl.text}</td>
+                  <td className={`px-4 py-2.5 ${dl.color}`}>{t(dl.key, { n: dl.n })}</td>
                   <td className="px-4 py-2.5">
                     <span className={`text-[11px] font-semibold px-2 py-0.5 rounded ${LOT_STATUS_BADGE[r.lot_status] ?? 'bg-slate-100 text-slate-600'}`}>
                       {r.lot_status}
@@ -159,11 +163,11 @@ export default function ExpiringPage({ onOpenLot }: { onOpenLot?: (lotId: number
             })}
             {!loading && rows.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">
-                未来 {threshold} 天内无到期批次
+                {t('expiringPage.empty', { n: threshold })}
               </td></tr>
             )}
             {loading && (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400">加载中…</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400">{t('expiringPage.loading')}</td></tr>
             )}
           </tbody>
         </table>

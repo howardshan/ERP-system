@@ -1,0 +1,162 @@
+{
+  "accountSettings": {
+    "backToHome": "Back to Home",
+    "title": "Account Settings",
+    "subtitle": "Manage your account and notification preferences",
+    "loading": "Loading…",
+    "noProfile": "No ERP profile is linked to your account.",
+    "account": "Account",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "department": "Department",
+    "notificationSettings": "Notification Settings",
+    "noNotifications": "You have no notification settings yet. Your administrator manages which notifications you receive.",
+    "managedByAdmin": "Managed by your administrator",
+    "on": "On",
+    "off": "Off",
+    "turnOff": "Turn off",
+    "turnOn": "Turn on"
+  },
+  "docsPage": {
+    "home": "Home",
+    "documentation": "Documentation",
+    "group": {
+      "overview": "Overview",
+      "modules": "Modules",
+      "database": "Database"
+    },
+    "nav": {
+      "overview": "Project Overview",
+      "gl": "General Ledger",
+      "approvals": "Approvals Workflow",
+      "apAr": "AP / AR",
+      "reports": "Reports & Periods",
+      "workflow": "Workflow Studio",
+      "schema": "Database Schema",
+      "rpc": "RPC Functions",
+      "migrations": "Migrations & Edge Functions"
+    }
+  },
+  "homePage": {
+    "moduleHub": "Module Hub",
+    "selectModule": "Select a module to get started",
+    "accountSettings": "Account settings",
+    "reloadPermissions": "Reload permissions",
+    "signOut": "Sign Out",
+    "active": "Active",
+    "comingSoon": "Coming Soon",
+    "openModule": "Open Module",
+    "inDevelopment": "In Development",
+    "modules": {
+      "finance": {
+        "label": "Financial Management",
+        "description": "General ledger, journal entries, AP/AR, trial balance, and multi-level approval workflows.",
+        "features": {
+          "0": "Chart of Accounts",
+          "1": "Journal Entries",
+          "2": "Approval Workflow",
+          "3": "Trial Balance"
+        }
+      },
+      "warehouse": {
+        "label": "Warehouse & Inventory",
+        "description": "Lot-tracked inventory, goods receipts, stock transfers, and real-time balance ledger.",
+        "features": {
+          "0": "Lot Traceability",
+          "1": "Goods Receipt",
+          "2": "Stock Transfer",
+          "3": "Inventory Balance"
+        }
+      },
+      "sales": {
+        "label": "Sales & Distribution",
+        "description": "Sales orders, shipment planning, customer invoicing, and AR integration.",
+        "features": {
+          "0": "Sales Orders",
+          "1": "Shipment Tracking",
+          "2": "AR Invoicing",
+          "3": "Customer Portal"
+        }
+      },
+      "production": {
+        "label": "Production & Manufacturing",
+        "description": "Per-SKU pipeline dashboard, work-order creation with cart stickers, batch trace, and product/template master data.",
+        "features": {
+          "0": "Pipeline Dashboard",
+          "1": "Work Orders + Stickers",
+          "2": "Batch Trace",
+          "3": "Products & Test Types"
+        }
+      },
+      "workflow": {
+        "label": "Workflow Studio",
+        "description": "Build custom automations by dragging nodes — connect data sources, apply logic, and trigger actions across all modules.",
+        "features": {
+          "0": "Drag & Drop Canvas",
+          "1": "Data Source Nodes",
+          "2": "Logic & Branching",
+          "3": "Action Automation"
+        }
+      },
+      "docs": {
+        "label": "Documentation",
+        "description": "Project architecture, module specs, database schema, RPC functions, migrations index, and design tokens.",
+        "features": {
+          "0": "Routing Structure",
+          "1": "Module Specs",
+          "2": "DB Schema & RPC",
+          "3": "Migrations Index"
+        }
+      },
+      "qc": {
+        "label": "Quality Control",
+        "description": "Post-dry inspection workflow: production lots, drying sub-lots, pending queue, hold disposition, and batch trace.",
+        "features": {
+          "0": "Sub-lot Check-in/out",
+          "1": "Pending Queue",
+          "2": "Hold Disposition",
+          "3": "Batch Trace"
+        }
+      },
+      "packaging": {
+        "label": "Packaging",
+        "description": "Dispatch released QC carts to packaging. FIFO-ordered cart selection, scan support, and days-in-stock tracking.",
+        "features": {
+          "0": "FIFO Dispatch",
+          "1": "Scan QR Code",
+          "2": "Days-in-Stock Alert",
+          "3": "Outbound Record"
+        }
+      },
+      "hr": {
+        "label": "Human Resources",
+        "description": "Employee directory, job titles, departments, reporting lines, and profile management.",
+        "features": {
+          "0": "Employee Directory",
+          "1": "Job Titles & Roles",
+          "2": "Department & Manager",
+          "3": "Profile Editing"
+        }
+      },
+      "auth": {
+        "label": "Users & Authentication",
+        "description": "User accounts, role-based access control, approval tier assignments, and audit logs.",
+        "features": {
+          "0": "User Management",
+          "1": "Role & Permissions",
+          "2": "Approval Tiers",
+          "3": "Audit Trail"
+        }
+      }
+    }
+  },
+  "loginPage": {
+    "subtitle": "Sign in to your account",
+    "email": "Email",
+    "password": "Password",
+    "signingIn": "Signing in…",
+    "signIn": "Sign In",
+    "contactAdmin": "Contact your administrator to get access."
+  }
+}

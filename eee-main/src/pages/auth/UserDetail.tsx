@@ -10,6 +10,7 @@ import {
 import { PERMISSION_STRUCTURE } from '../../lib/permissionStructure';
 import type { ErpUser, UserPermissionGrant, NotificationType, UserNotificationSetting } from '../../types/auth';
 import { usePermissions } from '../../contexts/PermissionContext';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   userId: string;
@@ -20,6 +21,7 @@ type LeftPanel = 'account' | string; // 'account' or a module id
 
 export default function UserDetail({ userId, onBack }: Props) {
   const { reload: reloadPermissions } = usePermissions();
+  const { t } = useTranslation('auth');
   const [user, setUser] = useState<ErpUser | null>(null);
   const [grants, setGrants] = useState<UserPermissionGrant[]>([]);
   const [selectedPanel, setSelectedPanel] = useState<LeftPanel>('account');
@@ -223,11 +225,11 @@ export default function UserDetail({ userId, onBack }: Props) {
       for (const s of ss) m[s.type_key] = s;
       setNotifSettings(m);
       setLocalNotif(new Map());
-      setSaveMsg({ type: 'ok', text: 'Saved' });
+      setSaveMsg({ type: 'ok', text: t('userDetail.saved') });
       setTimeout(() => setSaveMsg(null), 2500);
       await reloadPermissions();
     } catch (e: any) {
-      setSaveMsg({ type: 'err', text: e?.message ?? 'Error' });
+      setSaveMsg({ type: 'err', text: e?.message ?? t('userDetail.error') });
     }
     setSaving(false);
   }
@@ -259,9 +261,9 @@ export default function UserDetail({ userId, onBack }: Props) {
     try {
       await resetUserPassword(user.auth_user_id, newPassword);
       setNewPassword(''); setConfirmPassword('');
-      setResetMsg({ type: 'ok', text: 'Password updated successfully.' });
+      setResetMsg({ type: 'ok', text: t('userDetail.passwordUpdated') });
     } catch (err: any) {
-      setResetMsg({ type: 'err', text: err?.message ?? 'Failed' });
+      setResetMsg({ type: 'err', text: err?.message ?? t('userDetail.failed') });
     }
     setResetting(false);
     setTimeout(() => setResetMsg(null), 4000);
@@ -287,7 +289,7 @@ export default function UserDetail({ userId, onBack }: Props) {
       <div className="px-8 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="text-slate-500 hover:text-slate-900 text-xs font-bold transition-colors flex items-center gap-1.5">
-            <ArrowLeft size={14} /> All Users
+            <ArrowLeft size={14} /> {t('userDetail.allUsers')}
           </button>
           <div className="w-px h-5 bg-slate-200" />
           <div className="flex items-center gap-3">
@@ -301,7 +303,7 @@ export default function UserDetail({ userId, onBack }: Props) {
             <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
               user.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
             }`}>
-              {user.is_active ? 'Active' : 'Inactive'}
+              {user.is_active ? t('userDetail.active') : t('userDetail.inactive')}
             </span>
           </div>
         </div>
@@ -316,7 +318,7 @@ export default function UserDetail({ userId, onBack }: Props) {
             disabled={saving}
             className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors"
           >
-            <Save size={13} /> {saving ? 'Saving…' : 'Save Changes'}
+            <Save size={13} /> {saving ? t('userDetail.saving') : t('userDetail.saveChanges')}
           </button>
         </div>
       </div>
@@ -333,7 +335,7 @@ export default function UserDetail({ userId, onBack }: Props) {
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <ShieldCheck size={14} /> Account
+            <ShieldCheck size={14} /> {t('userDetail.account')}
           </button>
 
           {/* Notifications */}
@@ -345,13 +347,13 @@ export default function UserDetail({ userId, onBack }: Props) {
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
             }`}
           >
-            <Bell size={14} /> Notifications
+            <Bell size={14} /> {t('userDetail.notifications')}
           </button>
 
           <div className="mx-4 my-2 h-px bg-slate-200" />
 
           <div className="px-4 mb-2 flex items-center justify-between">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Module Access</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('userDetail.moduleAccess')}</p>
             <button
               type="button"
               onClick={() => {
@@ -365,7 +367,7 @@ export default function UserDetail({ userId, onBack }: Props) {
               }}
               className="text-[9px] font-bold px-2 py-0.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-500 uppercase tracking-widest transition-colors"
             >
-              {localModules.size === Object.keys(PERMISSION_STRUCTURE).length ? 'None' : 'All'}
+              {localModules.size === Object.keys(PERMISSION_STRUCTURE).length ? t('userDetail.none') : t('userDetail.all')}
             </button>
           </div>
           {Object.entries(PERMISSION_STRUCTURE).map(([modId, mod]) => {
@@ -407,11 +409,11 @@ export default function UserDetail({ userId, onBack }: Props) {
             <div className="max-w-lg space-y-6">
               {/* Account Status */}
               <div className="bg-white border border-slate-200 rounded-xl p-6">
-                <h3 className="text-sm font-bold text-slate-900 mb-1">Account Status</h3>
+                <h3 className="text-sm font-bold text-slate-900 mb-1">{t('userDetail.accountStatus')}</h3>
                 <p className="text-xs text-slate-500 mb-4">
                   {user.is_active
-                    ? 'This account is active. Deactivating will prevent the user from logging in.'
-                    : 'This account is inactive. Reactivating will restore login access.'}
+                    ? t('userDetail.accountActiveDesc')
+                    : t('userDetail.accountInactiveDesc')}
                 </p>
                 <button
                   onClick={handleToggleActive}
@@ -426,8 +428,8 @@ export default function UserDetail({ userId, onBack }: Props) {
                 >
                   {deactivating ? <Loader2 size={13} className="animate-spin" /> : null}
                   {user.is_active
-                    ? confirmDeactivate ? 'Confirm Deactivate' : 'Deactivate Account'
-                    : 'Reactivate Account'}
+                    ? confirmDeactivate ? t('userDetail.confirmDeactivate') : t('userDetail.deactivateAccount')
+                    : t('userDetail.reactivateAccount')}
                 </button>
               </div>
 
@@ -436,16 +438,16 @@ export default function UserDetail({ userId, onBack }: Props) {
                 <div className="bg-white border border-slate-200 rounded-xl p-6">
                   <div className="flex items-center gap-2 mb-1">
                     <KeyRound size={14} className="text-slate-500" />
-                    <h3 className="text-sm font-bold text-slate-900">Reset Password</h3>
+                    <h3 className="text-sm font-bold text-slate-900">{t('userDetail.resetPassword')}</h3>
                   </div>
-                  <p className="text-xs text-slate-500 mb-4">Set a new password for this user. They will need to use this password on their next login.</p>
+                  <p className="text-xs text-slate-500 mb-4">{t('userDetail.resetPasswordDesc')}</p>
                   <form onSubmit={handleResetPassword} className="space-y-3">
                     <div className="relative">
                       <input
                         type={showPw ? 'text' : 'password'}
                         value={newPassword}
                         onChange={e => setNewPassword(e.target.value)}
-                        placeholder="New password (min 6 chars)"
+                        placeholder={t('userDetail.newPasswordPlaceholder')}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 pr-10 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                       <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -456,12 +458,12 @@ export default function UserDetail({ userId, onBack }: Props) {
                       type={showPw ? 'text' : 'password'}
                       value={confirmPassword}
                       onChange={e => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
+                      placeholder={t('userDetail.confirmPasswordPlaceholder')}
                       className={`w-full bg-slate-50 border rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:border-transparent ${
                         pwMismatch ? 'border-red-300 focus:ring-red-400' : 'border-slate-200 focus:ring-blue-500'
                       }`}
                     />
-                    {pwMismatch && <p className="text-[11px] text-red-500">Passwords do not match</p>}
+                    {pwMismatch && <p className="text-[11px] text-red-500">{t('userDetail.passwordsDoNotMatch')}</p>}
                     {resetMsg && (
                       <div className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg ${
                         resetMsg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
@@ -476,14 +478,14 @@ export default function UserDetail({ userId, onBack }: Props) {
                       className="flex items-center gap-1.5 px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition-colors"
                     >
                       {resetting ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={13} />}
-                      {resetting ? 'Updating…' : 'Update Password'}
+                      {resetting ? t('userDetail.updating') : t('userDetail.updatePassword')}
                     </button>
                   </form>
                 </div>
               ) : (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
                   <p className="text-xs text-slate-400">
-                    This user has no linked Supabase Auth account. Password reset is not available.
+                    {t('userDetail.noAuthAccount')}
                   </p>
                 </div>
               )}
@@ -491,16 +493,14 @@ export default function UserDetail({ userId, onBack }: Props) {
           ) : selectedPanel === 'notifications' ? (
             <div className="max-w-3xl space-y-6">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Notification Settings</h3>
+                <h3 className="text-base font-bold text-slate-900">{t('userDetail.notificationSettings')}</h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  Control which emails this user receives. Enable <span className="font-semibold text-slate-700">Receive</span> to
-                  send it; enable <span className="font-semibold text-slate-700">User can self-manage</span> to let the user
-                  turn it on/off in their own Account Settings (otherwise it is enforced).
+                  {t('userDetail.notifIntro1')} <span className="font-semibold text-slate-700">{t('userDetail.receive')}</span> {t('userDetail.notifIntro2')} <span className="font-semibold text-slate-700">{t('userDetail.userSelfManage')}</span> {t('userDetail.notifIntro3')}
                 </p>
               </div>
               {notifTypes.length === 0 ? (
                 <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
-                  No notification types defined yet.
+                  {t('userDetail.noNotificationTypes')}
                 </div>
               ) : (
                 Object.entries(groupByModule(notifTypes)).map(([moduleId, modTypes]) => (
@@ -511,14 +511,14 @@ export default function UserDetail({ userId, onBack }: Props) {
                       </p>
                     </div>
                     <div className="divide-y divide-slate-100">
-                      {modTypes.map(t => {
-                        const n = getNotif(t.key);
+                      {modTypes.map(nt => {
+                        const n = getNotif(nt.key);
                         return (
-                          <div key={t.key} className="px-5 py-4 flex items-start gap-4">
+                          <div key={nt.key} className="px-5 py-4 flex items-start gap-4">
                             <div className="flex-1">
-                              <p className="text-sm font-medium text-slate-800">{t.label}</p>
-                              {t.description && (
-                                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{t.description}</p>
+                              <p className="text-sm font-medium text-slate-800">{nt.label}</p>
+                              {nt.description && (
+                                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{nt.description}</p>
                               )}
                             </div>
                             <div className="flex items-center gap-5 shrink-0 pt-0.5">
@@ -526,19 +526,19 @@ export default function UserDetail({ userId, onBack }: Props) {
                                 <input
                                   type="checkbox"
                                   checked={n.admin_enabled}
-                                  onChange={() => setNotif(t.key, { admin_enabled: !n.admin_enabled })}
+                                  onChange={() => setNotif(nt.key, { admin_enabled: !n.admin_enabled })}
                                   className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
                                 />
-                                <span className="text-xs text-slate-600">Receive</span>
+                                <span className="text-xs text-slate-600">{t('userDetail.receive')}</span>
                               </label>
                               <label className="flex items-center gap-2 cursor-pointer">
                                 <input
                                   type="checkbox"
                                   checked={n.user_overridable}
-                                  onChange={() => setNotif(t.key, { user_overridable: !n.user_overridable })}
+                                  onChange={() => setNotif(nt.key, { user_overridable: !n.user_overridable })}
                                   className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
                                 />
-                                <span className="text-xs text-slate-600">User can self-manage</span>
+                                <span className="text-xs text-slate-600">{t('userDetail.userSelfManage')}</span>
                               </label>
                             </div>
                           </div>
@@ -551,18 +551,18 @@ export default function UserDetail({ userId, onBack }: Props) {
             </div>
           ) : !moduleDef ? (
             <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
-              Enable a module on the left to configure permissions
+              {t('userDetail.enableModuleHint')}
             </div>
           ) : (
             <div className="max-w-3xl space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-slate-900">{moduleDef.label} Permissions</h3>
+                <h3 className="text-base font-bold text-slate-900">{t('userDetail.modulePermissions', { module: moduleDef.label })}</h3>
                 <button
                   type="button"
                   onClick={() => toggleAllInScope(moduleKeys(selectedPanel))}
                   className="text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700 transition-colors"
                 >
-                  {allKeysGranted(moduleKeys(selectedPanel)) ? 'Deselect all in module' : 'Select all in module'}
+                  {allKeysGranted(moduleKeys(selectedPanel)) ? t('userDetail.deselectAllInModule') : t('userDetail.selectAllInModule')}
                 </button>
               </div>
               {Object.entries(moduleDef.resources).map(([resId, resDef]) => (
@@ -574,7 +574,7 @@ export default function UserDetail({ userId, onBack }: Props) {
                       onClick={() => toggleAllInScope(resourceKeys(selectedPanel, resId))}
                       className="text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-500 uppercase tracking-wider transition-colors"
                     >
-                      {allKeysGranted(resourceKeys(selectedPanel, resId)) ? 'Deselect all' : 'Select all'}
+                      {allKeysGranted(resourceKeys(selectedPanel, resId)) ? t('userDetail.deselectAll') : t('userDetail.selectAll')}
                     </button>
                   </div>
                   <div className="divide-y divide-slate-100">
@@ -594,19 +594,19 @@ export default function UserDetail({ userId, onBack }: Props) {
                           <div className="flex-1">
                             <span className="text-sm font-medium text-slate-800">{permDef.label}</span>
                             {permDef.prereq && (
-                              <span className="ml-2 text-[10px] text-slate-400">requires {permDef.prereq}</span>
+                              <span className="ml-2 text-[10px] text-slate-400">{t('userDetail.requires', { prereq: permDef.prereq })}</span>
                             )}
                           </div>
                           {permDef.hasLimit && checked && (
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-500">Approval limit</span>
+                              <span className="text-xs text-slate-500">{t('userDetail.approvalLimit')}</span>
                               <div className="relative">
                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs">$</span>
                                 <input
                                   type="number" min={0}
                                   value={limit ?? ''}
                                   onChange={e => setApprovalLimit(selectedPanel, resId, permDef.id, e.target.value)}
-                                  placeholder="unlimited"
+                                  placeholder={t('userDetail.unlimited')}
                                   className="w-32 pl-6 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                               </div>

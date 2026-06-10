@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Plus, Shield } from 'lucide-react';
 import { getBenefitPlans, createBenefitPlan, getEmployeeBenefits, enrollBenefit } from '../../../services/hrApi';
 import type { BenefitPlan, EmployeeBenefit } from '../../../services/hrApi';
@@ -24,8 +25,10 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export default function BenefitsPlans() {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canManage = can('hr', 'benefits', 'manage');
+  const typeLabel = (type: string) => t(`benefitsPlans.type_${type}`, { defaultValue: TYPE_LABELS[type] });
 
   const [plans, setPlans] = useState<BenefitPlan[]>([]);
   const [employees, setEmployees] = useState<ErpUser[]>([]);
@@ -83,21 +86,21 @@ export default function BenefitsPlans() {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Benefits</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('benefitsPlans.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Benefits Plans</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('benefitsPlans.title')}</h1>
           {canManage && tab === 'plans' && (
             <button onClick={() => { setPlanModal(true); setForm({ name: '', type: 'social_insurance', provider: '', employee_contribution_rate: '', employer_contribution_rate: '', employee_fixed: '', employer_fixed: '', applies_to: 'all' }); }}
               className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg">
-              <Plus size={14} /> New Plan
+              <Plus size={14} /> {t('benefitsPlans.newPlan')}
             </button>
           )}
         </div>
         <div className="flex gap-1 mt-4">
-          {(['plans', 'enrollments'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === t ? 'bg-teal-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
-              {t === 'plans' ? 'Benefit Plans' : 'Employee Enrollments'}
+          {(['plans', 'enrollments'] as const).map(tabKey => (
+            <button key={tabKey} onClick={() => setTab(tabKey)}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === tabKey ? 'bg-teal-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+              {tabKey === 'plans' ? t('benefitsPlans.tabPlans') : t('benefitsPlans.tabEnrollments')}
             </button>
           ))}
         </div>
@@ -109,7 +112,7 @@ export default function BenefitsPlans() {
         ) : tab === 'plans' ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {plans.length === 0 && (
-              <div className="col-span-3 bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">No benefit plans configured</div>
+              <div className="col-span-3 bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">{t('benefitsPlans.emptyPlans')}</div>
             )}
             {plans.map(p => (
               <div key={p.id} className="bg-white border border-slate-200 rounded-xl p-5">
@@ -118,11 +121,11 @@ export default function BenefitsPlans() {
                     <h3 className="text-sm font-bold text-slate-900">{p.name}</h3>
                     {p.provider && <p className="text-xs text-slate-400 mt-0.5">{p.provider}</p>}
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TYPE_COLORS[p.type]}`}>{TYPE_LABELS[p.type]}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TYPE_COLORS[p.type]}`}>{typeLabel(p.type)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3 mt-4">
                   <div className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Employee</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">{t('benefitsPlans.employee')}</p>
                     {p.employee_contribution_rate != null
                       ? <p className="text-sm font-bold text-slate-900">{(p.employee_contribution_rate * 100).toFixed(1)}%</p>
                       : p.employee_fixed != null
@@ -130,7 +133,7 @@ export default function BenefitsPlans() {
                       : <p className="text-sm text-slate-400">—</p>}
                   </div>
                   <div className="bg-slate-50 rounded-lg p-3">
-                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Employer</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">{t('benefitsPlans.employer')}</p>
                     {p.employer_contribution_rate != null
                       ? <p className="text-sm font-bold text-teal-700">{(p.employer_contribution_rate * 100).toFixed(1)}%</p>
                       : p.employer_fixed != null
@@ -138,7 +141,7 @@ export default function BenefitsPlans() {
                       : <p className="text-sm text-slate-400">—</p>}
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-3 capitalize">Applies to: {p.applies_to?.replace('_', ' ') ?? 'all'}</p>
+                <p className="text-[10px] text-slate-400 mt-3 capitalize">{t('benefitsPlans.appliesToLabel')} {p.applies_to?.replace('_', ' ') ?? 'all'}</p>
               </div>
             ))}
           </div>
@@ -146,17 +149,17 @@ export default function BenefitsPlans() {
           <div>
             <div className="flex items-center gap-4 mb-6">
               <div className="max-w-xs flex-1">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Select Employee</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('benefitsPlans.selectEmployee')}</label>
                 <select value={selectedEmp} onChange={e => setSelectedEmp(e.target.value)}
                   className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                  <option value="">Select an employee</option>
+                  <option value="">{t('benefitsPlans.selectEmployeePlaceholder')}</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                 </select>
               </div>
               {selectedEmp && canManage && (
                 <button onClick={() => { setEnrollModal(true); setEnrollPlanId(null); }}
                   className="mt-5 flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg">
-                  <Plus size={14} /> Enroll in Plan
+                  <Plus size={14} /> {t('benefitsPlans.enrollInPlan')}
                 </button>
               )}
             </div>
@@ -164,32 +167,39 @@ export default function BenefitsPlans() {
             {!selectedEmp ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
                 <Shield size={40} className="opacity-30" />
-                <p className="text-sm">Select an employee to view their benefit enrollments</p>
+                <p className="text-sm">{t('benefitsPlans.selectEmployeeHint')}</p>
               </div>
             ) : enrollments.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">No benefit enrollments for this employee</div>
+              <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">{t('benefitsPlans.emptyEnrollments')}</div>
             ) : (
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <table className="w-full">
                   <thead><tr className="bg-slate-50 border-b border-slate-200">
-                    {['Plan','Type','Employee Contribution','Employer Contribution','Enrolled Date','Status'].map(h =>
-                      <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                    {[
+                      { key: 'plan', label: t('benefitsPlans.colPlan') },
+                      { key: 'type', label: t('benefitsPlans.colType') },
+                      { key: 'employeeContribution', label: t('benefitsPlans.colEmployeeContribution') },
+                      { key: 'employerContribution', label: t('benefitsPlans.colEmployerContribution') },
+                      { key: 'enrolledDate', label: t('benefitsPlans.colEnrolledDate') },
+                      { key: 'status', label: t('benefitsPlans.colStatus') },
+                    ].map(h =>
+                      <th key={h.key} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h.label}</th>)}
                   </tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {enrollments.map(e => {
                       const plan = plans.find(p => p.id === e.benefit_plan_id);
                       return (
                         <tr key={e.id} className="text-sm">
-                          <td className="px-5 py-3.5 font-semibold text-slate-900">{plan?.name ?? `Plan #${e.benefit_plan_id}`}</td>
+                          <td className="px-5 py-3.5 font-semibold text-slate-900">{plan?.name ?? t('benefitsPlans.planFallback', { id: e.benefit_plan_id })}</td>
                           <td className="px-5 py-3.5">
-                            {plan && <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TYPE_COLORS[plan.type]}`}>{TYPE_LABELS[plan.type]}</span>}
+                            {plan && <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TYPE_COLORS[plan.type]}`}>{typeLabel(plan.type)}</span>}
                           </td>
                           <td className="px-5 py-3.5 text-slate-700 font-mono">{e.employee_contribution != null ? `¥${e.employee_contribution.toLocaleString()}` : '—'}</td>
                           <td className="px-5 py-3.5 text-teal-700 font-mono">{e.employer_contribution != null ? `¥${e.employer_contribution.toLocaleString()}` : '—'}</td>
                           <td className="px-5 py-3.5 text-slate-500">{e.enrolled_at}</td>
                           <td className="px-5 py-3.5">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${e.ended_at ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700'}`}>
-                              {e.ended_at ? 'Ended' : 'Active'}
+                              {e.ended_at ? t('benefitsPlans.statusEnded') : t('benefitsPlans.statusActive')}
                             </span>
                           </td>
                         </tr>
@@ -206,57 +216,57 @@ export default function BenefitsPlans() {
       {planModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-5">New Benefit Plan</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-5">{t('benefitsPlans.newPlanTitle')}</h2>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Name *</label>
-                  <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Basic Social Insurance"
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('benefitsPlans.nameLabel')}</label>
+                  <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t('benefitsPlans.namePlaceholder')}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Type</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('benefitsPlans.typeLabel')}</label>
                   <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                    {Object.entries(TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    {Object.keys(TYPE_LABELS).map(v => <option key={v} value={v}>{typeLabel(v)}</option>)}
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Provider</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('benefitsPlans.providerLabel')}</label>
                   <input value={form.provider} onChange={e => setForm(p => ({ ...p, provider: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Applies To</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('benefitsPlans.appliesToFieldLabel')}</label>
                   <select value={form.applies_to} onChange={e => setForm(p => ({ ...p, applies_to: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                    <option value="all">All Employees</option>
-                    <option value="full_time">Full-time Only</option>
-                    <option value="management">Management</option>
+                    <option value="all">{t('benefitsPlans.appliesAll')}</option>
+                    <option value="full_time">{t('benefitsPlans.appliesFullTime')}</option>
+                    <option value="management">{t('benefitsPlans.appliesManagement')}</option>
                   </select>
                 </div>
               </div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contribution (rate as decimal, e.g. 0.105 = 10.5%)</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('benefitsPlans.contributionHint')}</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Employee Rate</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('benefitsPlans.employeeRate')}</label>
                   <input type="number" step="0.001" value={form.employee_contribution_rate} onChange={e => setForm(p => ({ ...p, employee_contribution_rate: e.target.value }))}
                     placeholder="0.105" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Employer Rate</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('benefitsPlans.employerRate')}</label>
                   <input type="number" step="0.001" value={form.employer_contribution_rate} onChange={e => setForm(p => ({ ...p, employer_contribution_rate: e.target.value }))}
                     placeholder="0.16" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setPlanModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setPlanModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('benefitsPlans.cancel')}</button>
               <button onClick={savePlan} disabled={saving || !form.name}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Saving…' : 'Create Plan'}
+                {saving ? t('benefitsPlans.saving') : t('benefitsPlans.createPlan')}
               </button>
             </div>
           </div>
@@ -266,20 +276,20 @@ export default function BenefitsPlans() {
       {enrollModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-5">Enroll in Benefit Plan</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-5">{t('benefitsPlans.enrollTitle')}</h2>
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Select Plan</label>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('benefitsPlans.selectPlan')}</label>
               <select value={enrollPlanId ?? ''} onChange={e => setEnrollPlanId(Number(e.target.value))}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                <option value="">Choose a plan</option>
+                <option value="">{t('benefitsPlans.choosePlan')}</option>
                 {plans.filter(p => !enrolledPlanIds.has(p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setEnrollModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setEnrollModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('benefitsPlans.cancel')}</button>
               <button onClick={enroll} disabled={saving || !enrollPlanId}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Enrolling…' : 'Enroll'}
+                {saving ? t('benefitsPlans.enrolling') : t('benefitsPlans.enroll')}
               </button>
             </div>
           </div>

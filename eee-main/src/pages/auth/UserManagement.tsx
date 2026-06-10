@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Users, Shield, Loader2, CheckCircle2, MonitorCog } from 'lucide-react';
 import { getUsers } from '../../services/authApi';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -15,6 +16,7 @@ interface Props {
 type View = 'users' | 'permissions' | 'it';
 
 export default function UserManagement({ onHome }: Props) {
+  const { t } = useTranslation('auth');
   const { can } = usePermissions();
   const [view, setView] = useState<View>('users');
   const [users, setUsers] = useState<ErpUser[]>([]);
@@ -34,7 +36,7 @@ export default function UserManagement({ onHome }: Props) {
       <div className="min-h-screen bg-[#faf8f5] flex flex-col">
         <div className="h-12 bg-white border-b border-slate-200 flex items-center px-5">
           <button onClick={onHome} className="text-slate-500 hover:text-slate-900 text-xs font-bold transition-colors">
-            ← All Modules
+            ← {t('userManagement.allModules')}
           </button>
         </div>
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -49,17 +51,17 @@ export default function UserManagement({ onHome }: Props) {
       {/* Top bar */}
       <div className="h-12 bg-white border-b border-slate-200 flex items-center px-5 gap-3 shrink-0">
         <button onClick={onHome} className="text-slate-500 hover:text-slate-900 text-xs font-bold transition-colors flex items-center gap-1.5">
-          <ArrowLeft size={14} /> All Modules
+          <ArrowLeft size={14} /> {t('userManagement.allModules')}
         </button>
         <div className="w-px h-5 bg-slate-200" />
-        <span className="text-sm font-bold text-slate-700">Users & Authentication</span>
+        <span className="text-sm font-bold text-slate-700">{t('userManagement.usersAndAuth')}</span>
       </div>
 
       {/* Page header */}
       <div className="px-10 pt-8 pb-5 flex items-end justify-between border-b border-slate-200 bg-white">
         <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Administration</p>
-          <h1 className="text-2xl font-bold text-slate-900">User Management</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('userManagement.administration')}</p>
+          <h1 className="text-2xl font-bold text-slate-900">{t('userManagement.title')}</h1>
         </div>
         <div className="flex items-center gap-3">
           {/* View toggle */}
@@ -70,7 +72,7 @@ export default function UserManagement({ onHome }: Props) {
                 view === 'users' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              <Users size={13} /> By User
+              <Users size={13} /> {t('userManagement.byUser')}
             </button>
             <button
               onClick={() => setView('permissions')}
@@ -78,7 +80,7 @@ export default function UserManagement({ onHome }: Props) {
                 view === 'permissions' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              <Shield size={13} /> By Permission
+              <Shield size={13} /> {t('userManagement.byPermission')}
             </button>
             <button
               onClick={() => setView('it')}
@@ -86,7 +88,7 @@ export default function UserManagement({ onHome }: Props) {
                 view === 'it' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              <MonitorCog size={13} /> IT
+              <MonitorCog size={13} /> {t('userManagement.it')}
             </button>
           </div>
           {view === 'users' && can('auth', 'users', 'create') && (
@@ -94,7 +96,7 @@ export default function UserManagement({ onHome }: Props) {
               onClick={() => setView('it')}
               className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
             >
-              <MonitorCog size={13} /> Add User (IT)
+              <MonitorCog size={13} /> {t('userManagement.addUserIt')}
             </button>
           )}
         </div>
@@ -113,17 +115,24 @@ export default function UserManagement({ onHome }: Props) {
           {/* User table */}
           {loading ? (
             <div className="flex items-center gap-2 text-slate-400 py-16 justify-center">
-              <Loader2 size={18} className="animate-spin" /> Loading users…
+              <Loader2 size={18} className="animate-spin" /> {t('userManagement.loadingUsers')}
             </div>
           ) : users.length === 0 ? (
-            <div className="py-20 text-center text-slate-400 text-sm">No users yet. Add the first one above.</div>
+            <div className="py-20 text-center text-slate-400 text-sm">{t('userManagement.noUsers')}</div>
           ) : (
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
               <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    {['Name', 'Role', 'Department', 'Manager', 'Module Access', 'Status'].map(h => (
-                      <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>
+                    {[
+                      { key: 'name', label: t('userManagement.colName') },
+                      { key: 'role', label: t('userManagement.colRole') },
+                      { key: 'department', label: t('userManagement.colDepartment') },
+                      { key: 'manager', label: t('userManagement.colManager') },
+                      { key: 'moduleAccess', label: t('userManagement.colModuleAccess') },
+                      { key: 'status', label: t('userManagement.colStatus') },
+                    ].map(h => (
+                      <th key={h.key} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h.label}</th>
                     ))}
                   </tr>
                 </thead>
@@ -141,7 +150,7 @@ export default function UserManagement({ onHome }: Props) {
                       <td className="px-5 py-3.5">
                         <div className="flex flex-wrap gap-1">
                           {(u.module_access ?? []).length === 0 ? (
-                            <span className="text-slate-400 text-xs">None</span>
+                            <span className="text-slate-400 text-xs">{t('userManagement.none')}</span>
                           ) : (u.module_access ?? []).map(m => (
                             <span key={m} className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">
                               {PERMISSION_STRUCTURE[m]?.label.split(' ')[0] ?? m}
@@ -152,10 +161,10 @@ export default function UserManagement({ onHome }: Props) {
                       <td className="px-5 py-3.5">
                         {u.is_active ? (
                           <span className="flex items-center gap-1 text-emerald-600 text-xs font-bold">
-                            <CheckCircle2 size={12} /> Active
+                            <CheckCircle2 size={12} /> {t('userManagement.active')}
                           </span>
                         ) : (
-                          <span className="text-slate-400 text-xs">Inactive</span>
+                          <span className="text-slate-400 text-xs">{t('userManagement.inactive')}</span>
                         )}
                       </td>
                     </tr>

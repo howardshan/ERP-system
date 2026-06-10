@@ -4,6 +4,7 @@ import { getWorkflows, deleteWorkflow, updateWorkflowStatus, createWorkflow } fr
 import type { WorkflowDefinition } from '../types/workflow';
 import { format } from 'date-fns';
 import { usePermissions } from '../contexts/PermissionContext';
+import { useTranslation } from 'react-i18next';
 
 const STATUS_STYLES: Record<WorkflowDefinition['status'], string> = {
   draft:    'bg-slate-100 text-slate-600 border-slate-200',
@@ -17,6 +18,7 @@ interface WorkflowListProps {
 }
 
 export default function WorkflowList({ onNavigate }: WorkflowListProps) {
+  const { t } = useTranslation('workflowBuilder');
   const { can } = usePermissions();
   const canCreate  = can('workflow', 'workflow', 'create');
   const canEdit    = can('workflow', 'workflow', 'edit');
@@ -76,11 +78,11 @@ export default function WorkflowList({ onNavigate }: WorkflowListProps) {
             onClick={() => onNavigate('home')}
             className="flex items-center gap-1.5 text-slate-400 hover:text-slate-700 text-[10px] uppercase tracking-widest font-bold mb-2 transition-colors"
           >
-            <ArrowLeft size={12} /> All Modules
+            <ArrowLeft size={12} /> {t('workflowList.allModules')}
           </button>
-          <h1 className="text-3xl font-bold text-slate-900">Workflows</h1>
+          <h1 className="text-3xl font-bold text-slate-900">{t('workflowList.title')}</h1>
           <p className="text-slate-500 text-sm mt-1.5">
-            Build custom automations by connecting data sources, logic, and actions.
+            {t('workflowList.subtitle')}
           </p>
         </div>
         {canCreate && (
@@ -89,7 +91,7 @@ export default function WorkflowList({ onNavigate }: WorkflowListProps) {
             disabled={creating}
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors"
           >
-            <Plus size={16} /> New Workflow
+            <Plus size={16} /> {t('workflowList.newWorkflow')}
           </button>
         )}
       </div>
@@ -99,19 +101,19 @@ export default function WorkflowList({ onNavigate }: WorkflowListProps) {
       {/* Content */}
       <main className="flex-1 px-10 pb-10">
         {loading ? (
-          <div className="flex items-center justify-center py-32 text-slate-400 text-sm">Loading…</div>
+          <div className="flex items-center justify-center py-32 text-slate-400 text-sm">{t('workflowList.loading')}</div>
         ) : workflows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 gap-4">
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
               <GitBranch size={28} className="text-slate-400" />
             </div>
-            <p className="text-slate-500 text-sm">No workflows yet</p>
+            <p className="text-slate-500 text-sm">{t('workflowList.empty')}</p>
             {canCreate && (
               <button
                 onClick={handleCreate}
                 className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl transition-colors"
               >
-                Create your first workflow
+                {t('workflowList.createFirst')}
               </button>
             )}
           </div>
@@ -142,7 +144,7 @@ export default function WorkflowList({ onNavigate }: WorkflowListProps) {
 
                 {/* Stats */}
                 <div className="flex items-center gap-4 text-[10px] text-slate-400 font-mono">
-                  <span>{nodeCount(wf)} nodes</span>
+                  <span>{t('workflowList.nodes', { count: nodeCount(wf) })}</span>
                   {wf.updated_at && (
                     <span className="flex items-center gap-1">
                       <Clock size={9} />
@@ -158,7 +160,7 @@ export default function WorkflowList({ onNavigate }: WorkflowListProps) {
                       onClick={() => onNavigate(`wf-builder:${wf.id}`)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                     >
-                      <Pencil size={11} /> Edit
+                      <Pencil size={11} /> {t('workflowList.edit')}
                     </button>
                   )}
                   {canExecute && (
@@ -167,9 +169,9 @@ export default function WorkflowList({ onNavigate }: WorkflowListProps) {
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
                     >
                       {wf.status === 'active' ? (
-                        <><Archive size={11} /> Pause</>
+                        <><Archive size={11} /> {t('workflowList.pause')}</>
                       ) : (
-                        <><Play size={11} /> Activate</>
+                        <><Play size={11} /> {t('workflowList.activate')}</>
                       )}
                     </button>
                   )}
@@ -183,7 +185,7 @@ export default function WorkflowList({ onNavigate }: WorkflowListProps) {
                       }`}
                     >
                       <Trash2 size={11} />
-                      {confirmDelete === wf.id && <span>Confirm?</span>}
+                      {confirmDelete === wf.id && <span>{t('workflowList.confirm')}</span>}
                     </button>
                   )}
                 </div>

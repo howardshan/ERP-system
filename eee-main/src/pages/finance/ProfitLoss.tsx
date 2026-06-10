@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Download, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card } from '../../components/ui/Cards';
 import { cn, formatCurrency } from '../../lib/utils';
@@ -24,6 +25,7 @@ function monthEndIso(d = new Date()): string {
 }
 
 export default function ProfitLoss({ onNavigate }: Props) {
+  const { t } = useTranslation('finance');
   const [periods, setPeriods] = useState<AccountingPeriod[]>([]);
   const [mode, setMode] = useState<RangeMode>('period');
   const [periodId, setPeriodId] = useState<number | null>(null);
@@ -96,9 +98,9 @@ export default function ProfitLoss({ onNavigate }: Props) {
     <div className="space-y-6">
       <div className="flex justify-between items-end gap-4 flex-wrap">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Profit &amp; Loss</h2>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('profitLoss.title')}</h2>
           <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">
-            Posted entries only · BR-F9 · period filter on entry_date · BR-F10
+            {t('profitLoss.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -116,10 +118,10 @@ export default function ProfitLoss({ onNavigate }: Props) {
           <button
             type="button"
             disabled
-            title="Export coming with P0 #4 (TB + P&L CSV/Excel export)"
+            title={t('profitLoss.exportComingTooltip')}
             className="px-4 py-2 text-xs font-bold bg-slate-900 text-white rounded shadow disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-wide flex items-center gap-2"
           >
-            <Download size={14} /> Export
+            <Download size={14} /> {t('profitLoss.export')}
           </button>
         </div>
       </div>
@@ -134,46 +136,46 @@ export default function ProfitLoss({ onNavigate }: Props) {
         {loading ? (
           <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
             <Loader2 size={20} className="animate-spin" />
-            <span className="text-sm">Computing P&amp;L for {range?.label ?? '—'}...</span>
+            <span className="text-sm">{t('profitLoss.computing', { label: range?.label ?? '—' })}</span>
           </div>
         ) : !range ? (
           <div className="flex items-center justify-center py-20 text-slate-400 text-sm">
-            Pick an accounting period or custom date range.
+            {t('profitLoss.pickRange')}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
-                  <th className="px-6 py-4 w-32">Code</th>
-                  <th className="px-6 py-4">Account</th>
+                  <th className="px-6 py-4 w-32">{t('profitLoss.code')}</th>
+                  <th className="px-6 py-4">{t('profitLoss.account')}</th>
                   <th className="px-6 py-4 text-right w-44">{range.label}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                <SectionHeader label="Revenue" />
+                <SectionHeader label={t('profitLoss.revenue')} />
                 {revenueRows.length === 0 && (
-                  <EmptySectionRow text="No posted revenue in this period." />
+                  <EmptySectionRow text={t('profitLoss.noRevenue')} />
                 )}
                 {revenueRows.map(r => (
                   <PnLRowDisplay key={r.id} row={r} onClick={() => openAccount(r)} />
                 ))}
-                <SubtotalRow label="Total Revenue" amount={totalRevenue} />
+                <SubtotalRow label={t('profitLoss.totalRevenue')} amount={totalRevenue} />
 
-                <SectionHeader label="Expense" />
+                <SectionHeader label={t('profitLoss.expense')} />
                 {expenseRows.length === 0 && (
-                  <EmptySectionRow text="No posted expense in this period." />
+                  <EmptySectionRow text={t('profitLoss.noExpense')} />
                 )}
                 {expenseRows.map(r => (
                   <PnLRowDisplay key={r.id} row={r} onClick={() => openAccount(r)} negative />
                 ))}
-                <SubtotalRow label="Total Expense" amount={totalExpense} negative />
+                <SubtotalRow label={t('profitLoss.totalExpense')} amount={totalExpense} negative />
               </tbody>
               <tfoot>
                 <tr className="bg-slate-900 text-white border-t-2 border-slate-700">
                   <td colSpan={2} className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-2">
                     {netIncome >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                    Net Income
+                    {t('profitLoss.netIncome')}
                   </td>
                   <td className={cn(
                     'px-6 py-4 text-right font-mono text-sm font-bold',
@@ -214,12 +216,13 @@ function EmptySectionRow({ text }: { text: string }) {
 }
 
 function PnLRowDisplay({ row, onClick, negative }: { row: PnLRow; onClick: () => void; negative?: boolean }) {
+  const { t } = useTranslation('finance');
   const value = Number(row.net_amount);
   return (
     <tr
       onClick={onClick}
       className="hover:bg-blue-50 cursor-pointer transition-colors"
-      title="View source journal lines (drill-down)"
+      title={t('profitLoss.drillDownTooltip')}
     >
       <td className="px-6 py-3 font-mono text-xs text-slate-500">{row.account_code}</td>
       <td className="px-6 py-3 text-sm font-semibold text-slate-700">{row.name}</td>
@@ -262,6 +265,7 @@ function PeriodSelector({
   setCustomStart: (s: string) => void;
   setCustomEnd: (s: string) => void;
 }) {
+  const { t } = useTranslation('finance');
   return (
     <div className="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1 shadow-sm">
       <Calendar size={14} className="text-slate-400" />
@@ -274,7 +278,7 @@ function PeriodSelector({
             mode === 'period' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100',
           )}
         >
-          Period
+          {t('profitLoss.period')}
         </button>
         <button
           type="button"
@@ -284,7 +288,7 @@ function PeriodSelector({
             mode === 'custom' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100',
           )}
         >
-          Custom
+          {t('profitLoss.custom')}
         </button>
       </div>
       {mode === 'period' ? (
@@ -293,7 +297,7 @@ function PeriodSelector({
           onChange={e => setPeriodId(e.target.value ? Number(e.target.value) : null)}
           className="text-xs border-l border-slate-200 pl-2 py-1 focus:outline-none bg-transparent min-w-[120px]"
         >
-          {periods.length === 0 && <option value="">No periods</option>}
+          {periods.length === 0 && <option value="">{t('profitLoss.noPeriods')}</option>}
           {periods.map(p => (
             <option key={p.id} value={p.id}>{p.name} · {p.status}</option>
           ))}

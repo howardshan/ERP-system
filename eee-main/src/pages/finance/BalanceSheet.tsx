@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Download, Calendar, Scale } from 'lucide-react';
 import { Card } from '../../components/ui/Cards';
 import { cn, formatCurrency } from '../../lib/utils';
@@ -20,6 +21,7 @@ function monthEndIso(d = new Date()): string {
 }
 
 export default function BalanceSheet({ onNavigate }: Props) {
+  const { t } = useTranslation('finance');
   const [periods, setPeriods] = useState<AccountingPeriod[]>([]);
   const [mode, setMode] = useState<DateMode>('period_end');
   const [periodId, setPeriodId] = useState<number | null>(null);
@@ -48,11 +50,11 @@ export default function BalanceSheet({ onNavigate }: Props) {
     if (mode === 'period_end') {
       const p = periods.find(x => x.id === periodId);
       if (!p) return null;
-      return { date: p.end_date, label: `End of ${p.name}` };
+      return { date: p.end_date, label: t('balanceSheet.endOf', { name: p.name }) };
     }
     if (!customDate) return null;
-    return { date: customDate, label: `As of ${customDate}` };
-  }, [mode, periodId, periods, customDate]);
+    return { date: customDate, label: t('balanceSheet.asOfDate', { date: customDate }) };
+  }, [mode, periodId, periods, customDate, t]);
 
   // Fetch both BS rows AND cumulative P&L for Retained Earnings (BR-F11)
   useEffect(() => {
@@ -108,9 +110,9 @@ export default function BalanceSheet({ onNavigate }: Props) {
     <div className="space-y-6">
       <div className="flex justify-between items-end gap-4 flex-wrap">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Balance Sheet</h2>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('balanceSheet.title')}</h2>
           <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">
-            Posted entries · cumulative through as-of date · BR-F9 / F11
+            {t('balanceSheet.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -128,16 +130,16 @@ export default function BalanceSheet({ onNavigate }: Props) {
               'px-3 py-1 text-xs font-bold rounded-full',
               balanced ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700',
             )}>
-              {balanced ? 'In Balance' : 'OUT OF BALANCE'}
+              {balanced ? t('balanceSheet.inBalance') : t('balanceSheet.outOfBalance')}
             </span>
           )}
           <button
             type="button"
             disabled
-            title="Export coming with P0 #4 (CSV/Excel)"
+            title={t('balanceSheet.exportTooltip')}
             className="px-4 py-2 text-xs font-bold bg-slate-900 text-white rounded shadow disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-wide flex items-center gap-2"
           >
-            <Download size={14} /> Export
+            <Download size={14} /> {t('balanceSheet.export')}
           </button>
         </div>
       </div>
@@ -150,38 +152,38 @@ export default function BalanceSheet({ onNavigate }: Props) {
         {loading ? (
           <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
             <Loader2 size={20} className="animate-spin" />
-            <span className="text-sm">Computing balance sheet for {asOf?.label ?? '—'}...</span>
+            <span className="text-sm">{t('balanceSheet.computing', { label: asOf?.label ?? '—' })}</span>
           </div>
         ) : !asOf ? (
           <div className="flex items-center justify-center py-20 text-slate-400 text-sm">
-            Pick a period end or custom date.
+            {t('balanceSheet.pickDate')}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
-                  <th className="px-6 py-4 w-32">Code</th>
-                  <th className="px-6 py-4">Account</th>
+                  <th className="px-6 py-4 w-32">{t('balanceSheet.colCode')}</th>
+                  <th className="px-6 py-4">{t('balanceSheet.colAccount')}</th>
                   <th className="px-6 py-4 text-right w-44">{asOf.label}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                <SectionHeader label="Assets" />
-                {assets.length === 0 && <EmptySectionRow text="No posted asset balances." />}
+                <SectionHeader label={t('balanceSheet.assets')} />
+                {assets.length === 0 && <EmptySectionRow text={t('balanceSheet.noAssets')} />}
                 {assets.map(r => (
                   <BSRowDisplay key={r.id} row={r} onClick={() => openAccount(r)} />
                 ))}
-                <SubtotalRow label="Total Assets" amount={totalAssets} accent="emerald" />
+                <SubtotalRow label={t('balanceSheet.totalAssets')} amount={totalAssets} accent="emerald" />
 
-                <SectionHeader label="Liabilities" />
-                {liabilities.length === 0 && <EmptySectionRow text="No posted liability balances." />}
+                <SectionHeader label={t('balanceSheet.liabilities')} />
+                {liabilities.length === 0 && <EmptySectionRow text={t('balanceSheet.noLiabilities')} />}
                 {liabilities.map(r => (
                   <BSRowDisplay key={r.id} row={r} onClick={() => openAccount(r)} />
                 ))}
-                <SubtotalRow label="Total Liabilities" amount={totalLiabilities} accent="rose" />
+                <SubtotalRow label={t('balanceSheet.totalLiabilities')} amount={totalLiabilities} accent="rose" />
 
-                <SectionHeader label="Equity" />
+                <SectionHeader label={t('balanceSheet.equity')} />
                 {equityAccounts.map(r => (
                   <BSRowDisplay key={r.id} row={r} onClick={() => openAccount(r)} />
                 ))}
@@ -189,11 +191,11 @@ export default function BalanceSheet({ onNavigate }: Props) {
                 <tr
                   className="hover:bg-blue-50 cursor-pointer transition-colors"
                   onClick={() => onNavigate?.(`pnl`)}
-                  title="Open P&L to see the source revenue/expense (cumulative)"
+                  title={t('balanceSheet.retainedEarningsTooltip')}
                 >
                   <td className="px-6 py-3 font-mono text-xs text-slate-400 italic">—</td>
                   <td className="px-6 py-3 text-sm font-semibold text-slate-700 italic">
-                    Retained Earnings <span className="text-[10px] text-slate-400 font-normal">(computed: cumulative net income)</span>
+                    {t('balanceSheet.retainedEarnings')} <span className="text-[10px] text-slate-400 font-normal">{t('balanceSheet.retainedEarningsNote')}</span>
                   </td>
                   <td className={cn(
                     'px-6 py-3 text-right font-mono text-sm italic',
@@ -203,13 +205,13 @@ export default function BalanceSheet({ onNavigate }: Props) {
                     {retainedEarnings === 0 ? '—' : formatCurrency(retainedEarnings)}
                   </td>
                 </tr>
-                <SubtotalRow label="Total Equity" amount={totalEquity} accent="emerald" />
+                <SubtotalRow label={t('balanceSheet.totalEquity')} amount={totalEquity} accent="emerald" />
               </tbody>
               <tfoot>
                 <tr className="bg-slate-900 text-white border-t-2 border-slate-700">
                   <td colSpan={2} className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-2">
                     <Scale size={14} />
-                    Liabilities + Equity {balanced ? '✓' : '⚠'}
+                    {t('balanceSheet.liabPlusEquity')} {balanced ? '✓' : '⚠'}
                   </td>
                   <td className="px-6 py-4 text-right font-mono text-sm font-bold">
                     {formatCurrency(liabPlusEquity)}
@@ -218,7 +220,7 @@ export default function BalanceSheet({ onNavigate }: Props) {
                 {!balanced && (
                   <tr className="bg-rose-100 text-rose-900">
                     <td colSpan={2} className="px-6 py-2 text-[11px] font-bold">
-                      Difference (Assets − Liab+Equity)
+                      {t('balanceSheet.difference')}
                     </td>
                     <td className="px-6 py-2 text-right font-mono text-xs font-bold">
                       {formatCurrency(totalAssets - liabPlusEquity)}
@@ -255,12 +257,13 @@ function EmptySectionRow({ text }: { text: string }) {
 }
 
 function BSRowDisplay({ row, onClick }: { row: BalanceSheetRow; onClick: () => void }) {
+  const { t } = useTranslation('finance');
   const value = Number(row.balance);
   return (
     <tr
       onClick={onClick}
       className="hover:bg-blue-50 cursor-pointer transition-colors"
-      title="View source journal lines (drill-down)"
+      title={t('balanceSheet.rowTooltip')}
     >
       <td className="px-6 py-3 font-mono text-xs text-slate-500">{row.account_code}</td>
       <td className="px-6 py-3 text-sm font-semibold text-slate-700">{row.name}</td>
@@ -303,6 +306,7 @@ function AsOfDateSelector({
   customDate: string;
   setCustomDate: (d: string) => void;
 }) {
+  const { t } = useTranslation('finance');
   return (
     <div className="flex items-center gap-2 bg-white border border-slate-200 rounded px-2 py-1 shadow-sm">
       <Calendar size={14} className="text-slate-400" />
@@ -315,7 +319,7 @@ function AsOfDateSelector({
             mode === 'period_end' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100',
           )}
         >
-          Period End
+          {t('balanceSheet.periodEnd')}
         </button>
         <button
           type="button"
@@ -325,7 +329,7 @@ function AsOfDateSelector({
             mode === 'custom' ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100',
           )}
         >
-          Custom
+          {t('balanceSheet.custom')}
         </button>
       </div>
       {mode === 'period_end' ? (
@@ -334,9 +338,9 @@ function AsOfDateSelector({
           onChange={e => setPeriodId(e.target.value ? Number(e.target.value) : null)}
           className="text-xs border-l border-slate-200 pl-2 py-1 focus:outline-none bg-transparent min-w-[140px]"
         >
-          {periods.length === 0 && <option value="">No periods</option>}
+          {periods.length === 0 && <option value="">{t('balanceSheet.noPeriods')}</option>}
           {periods.map(p => (
-            <option key={p.id} value={p.id}>{p.name} · end {p.end_date}</option>
+            <option key={p.id} value={p.id}>{t('balanceSheet.periodOption', { name: p.name, end: p.end_date })}</option>
           ))}
         </select>
       ) : (

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { Printer, X } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
@@ -315,6 +316,7 @@ async function postPrintPdfToBridge(pdfBase64: string, printer: string): Promise
 export function CartStickerSheet({
   carts, workOrderBarcode, skuCode, skuName, onClose,
 }: Props) {
+  const { t } = useTranslation('qc');
   const [printing, setPrinting] = useState(false);
   const [printStatus, setPrintStatus] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
@@ -332,7 +334,7 @@ export function CartStickerSheet({
       url = URL.createObjectURL(doc.output('blob'));
       setPdfUrl(url);
     } catch (e) {
-      setPrintStatus(`❌ 生成预览失败: ${e instanceof Error ? e.message : String(e)}`);
+      setPrintStatus(`❌ ${t('cartStickerSheet.previewFailed')}: ${e instanceof Error ? e.message : String(e)}`);
     }
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [carts, workOrderBarcode, skuCode, skuName]);
@@ -349,29 +351,29 @@ export function CartStickerSheet({
         const dpi = getSavedDpi();
         const { invoke } = await import('@tauri-apps/api/core');
         for (let i = 0; i < carts.length; i++) {
-          setPrintStatus(`正在打印 ${i + 1} / ${carts.length}…`);
+          setPrintStatus(t('cartStickerSheet.printingProgress', { current: i + 1, total: carts.length }));
           const pngBase64 = await renderPrintPng(carts[i], workOrderBarcode, skuCode, skuName, dpi);
           await invoke<string>('print_png', { pngBase64, printer });
         }
-        setPrintStatus(`✓ 已打印 ${carts.length} 张`);
+        setPrintStatus(`✓ ${t('cartStickerSheet.printed', { count: carts.length })}`);
         return;
       }
 
       // ── Web: silent bridge prints the vector PDF as one job ───────────────
       if (await checkPrintBridge()) {
-        if (!pdfB64Ref.current) throw new Error('PDF 尚未生成，请稍候重试');
-        setPrintStatus(`正在打印 ${carts.length} 张…`);
+        if (!pdfB64Ref.current) throw new Error(t('cartStickerSheet.pdfNotReady'));
+        setPrintStatus(t('cartStickerSheet.printingCount', { count: carts.length }));
         await postPrintPdfToBridge(pdfB64Ref.current, printer);
-        setPrintStatus(`✓ 已打印 ${carts.length} 张`);
+        setPrintStatus(`✓ ${t('cartStickerSheet.printed', { count: carts.length })}`);
         return;
       }
 
       // ── Fallback (no bridge): open the PDF so the user can print it ───────
       if (pdfUrl) window.open(pdfUrl, '_blank');
-      setPrintStatus('未检测到打印助手 — 已打开 PDF，请在浏览器里按 Cmd/Ctrl+P 打印');
+      setPrintStatus(t('cartStickerSheet.noBridgeFallback'));
 
     } catch (e) {
-      setPrintStatus(`❌ 打印失败: ${e instanceof Error ? e.message : String(e)}`);
+      setPrintStatus(`❌ ${t('cartStickerSheet.printFailed')}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setPrinting(false);
     }
@@ -383,7 +385,7 @@ export function CartStickerSheet({
       <div className="sticky top-0 z-10 bg-white border-b border-slate-200 shrink-0">
         <div className="px-5 py-3 flex items-center gap-3 flex-wrap">
           <h2 className="text-sm font-bold text-slate-900">
-            Print stickers · {carts.length} cart{carts.length === 1 ? '' : 's'}
+            {t('cartStickerSheet.title', { count: carts.length })}
           </h2>
           {printStatus ? (
             <span className={`text-xs font-medium ${printStatus.startsWith('❌') ? 'text-red-600' : printStatus.startsWith('✓') ? 'text-emerald-600' : 'text-blue-600'}`}>
@@ -391,7 +393,7 @@ export function CartStickerSheet({
             </span>
           ) : (
             <span className="text-xs text-slate-500">
-              {pdfUrl ? `${carts.length} 张标签，点击打印` : '生成预览中…'}
+              {pdfUrl ? t('cartStickerSheet.labelsClickToPrint', { count: carts.length }) : t('cartStickerSheet.generatingPreview')}
             </span>
           )}
           <div className="flex-1" />
@@ -409,14 +411,14 @@ export function CartStickerSheet({
             ) : (
               <Printer size={12} />
             )}
-            {printing ? '打印中…' : '打印标签'}
+            {printing ? t('cartStickerSheet.printingButton') : t('cartStickerSheet.printButton')}
           </button>
           <button
             type="button"
             onClick={onClose}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700"
           >
-            <X size={12} /> Close
+            <X size={12} /> {t('cartStickerSheet.close')}
           </button>
         </div>
       </div>
@@ -427,7 +429,7 @@ export function CartStickerSheet({
           <iframe title="labels" src={pdfUrl} className="w-full h-full rounded border border-slate-300 bg-white" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
-            生成预览中…
+            {t('cartStickerSheet.generatingPreview')}
           </div>
         )}
       </div>

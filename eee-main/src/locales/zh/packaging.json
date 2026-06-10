@@ -1,0 +1,35 @@
+{
+  "packagingModule": {
+    "moduleHub": "模块中心",
+    "tag": "包装",
+    "title": "包装",
+    "subtitle": "发运已放行的质检料车——先进先出顺序、扫码支持、库存天数追踪"
+  },
+  "packagingPage": {
+    "errLoadSkus": "加载产品失败",
+    "errLoadCarts": "加载料车失败",
+    "errDispatch": "出库失败",
+    "scanNotFound": "未找到料车“{{code}}”或该料车不可用",
+    "dispatchSuccess": "已出库 {{count}} 个料车（出库单 #{{outboundId}}）",
+    "feature": "包装",
+    "productsInStock": "在库产品",
+    "selectProductHint": "选择产品以查看可用料车",
+    "noReleasedCarts": "包装队列中没有已放行的料车。",
+    "cartsLabel": "料车",
+    "scanPlaceholder": "扫描料车二维码……",
+    "selectToBegin": "从左侧选择一个产品开始。",
+    "noProductSelected": "未选择产品",
+    "chooseProductHint": "在左侧选择产品以查看可用料车",
+    "noCartsAvailable": "无可用料车",
+    "noCartsAvailableHint": "该产品的所有料车均已出库，或尚无已放行的料车。",
+    "summaryCount": "{{woCount}} 个工单 · {{cartCount}} 个料车",
+    "noWorkOrder": "（无工单）",
+    "noPackagingAssigned": "未分配包装",
+    "cartCount": "{{count}} 个料车",
+    "cartsSelected": "已选择 {{count}} 个料车",
+    "notePlaceholder": "可选出库备注……",
+    "dispatchPermissionTitle": "缺少 packaging.outbound.dispatch 权限",
+    "dispatching": "出库中……",
+    "dispatch": "出库"
+  }
+}

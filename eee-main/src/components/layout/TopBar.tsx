@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Bell, Search, LogOut, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
+import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../../contexts/PermissionContext';
+import { LanguageSwitcher } from '../LanguageSwitcher';
 
 interface TopBarProps {
   userName: string;
@@ -11,6 +13,7 @@ interface TopBarProps {
 
 export function TopBar({ userName, userEmail, onLogout }: TopBarProps) {
   const { reload } = usePermissions();
+  const { t } = useTranslation();
   const [reloading, setReloading] = useState(false);
 
   async function handleReload() {
@@ -30,7 +33,7 @@ export function TopBar({ userName, userEmail, onLogout }: TopBarProps) {
     <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-30">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded text-blue-700 font-bold text-[11px] uppercase tracking-wider">
-          Period: OCT 2023 - OPEN
+          {t('period')}
         </div>
         <div className="h-6 w-px bg-slate-200" />
         <p className="text-xs text-slate-500 font-medium tracking-wide">
@@ -43,10 +46,11 @@ export function TopBar({ userName, userEmail, onLogout }: TopBarProps) {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search transactions..."
+            placeholder={t('search')}
             className="pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 w-64"
           />
         </div>
+        <LanguageSwitcher />
         <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors relative">
           <Bell size={18} />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
@@ -62,14 +66,14 @@ export function TopBar({ userName, userEmail, onLogout }: TopBarProps) {
           <button
             onClick={handleReload}
             disabled={reloading}
-            title="Reload permissions"
+            title={t('reloadPermissions')}
             className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors disabled:opacity-40"
           >
             <RefreshCw size={15} className={reloading ? 'animate-spin' : ''} />
           </button>
           <button
             onClick={onLogout}
-            title="Sign out"
+            title={t('signOut')}
             className="p-1.5 text-slate-400 hover:text-slate-700 transition-colors"
           >
             <LogOut size={15} />

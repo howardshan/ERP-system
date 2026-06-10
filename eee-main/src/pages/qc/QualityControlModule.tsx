@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ClipboardCheck,
   ListChecks,
@@ -56,6 +57,7 @@ function NavSection({ title }: { title: string }) {
 }
 
 export default function QualityControlModule({ onHome }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const [screen, setScreen] = useState('home');
   const [selectedLotId, setSelectedLotId] = useState<string | null>(null);
@@ -178,46 +180,46 @@ export default function QualityControlModule({ onHome }: Props) {
               <LayoutGrid size={14} className="text-white" />
             </div>
             <div>
-              <p className="text-white font-bold text-sm leading-none">Quality Control</p>
+              <p className="text-white font-bold text-sm leading-none">{t('qualityControlModule.title')}</p>
               <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mt-0.5 group-hover:text-slate-400 transition-colors">
-                ← All Modules
+                {t('qualityControlModule.allModules')}
               </p>
             </div>
           </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 pb-4">
-          <NavItem icon={ClipboardCheck} label="QC Home" isActive={isActive('home')} onClick={() => navigate('home')} />
+          <NavItem icon={ClipboardCheck} label={t('qualityControlModule.qcHome')} isActive={isActive('home')} onClick={() => navigate('home')} />
           {canViewAnalysis && (
-            <NavItem icon={BarChart3} label="Analysis"
+            <NavItem icon={BarChart3} label={t('qualityControlModule.analysis')}
                      isActive={isActive('analysis')}
                      onClick={() => navigate('analysis')} />
           )}
 
-          {(canViewDryRooms || canViewTesting) && <NavSection title="Floor" />}
+          {(canViewDryRooms || canViewTesting) && <NavSection title={t('qualityControlModule.floor')} />}
           {canViewDryRooms && (
-            <NavItem icon={Grid3X3} label="Dry Rooms"
+            <NavItem icon={Grid3X3} label={t('qualityControlModule.dryRooms')}
                      isActive={isActive('dry-rooms') || isActive('dry-room-detail')}
                      onClick={() => navigate('dry-rooms')} />
           )}
           {canViewTesting && (
-            <NavItem icon={ListChecks} label="Testing"
+            <NavItem icon={ListChecks} label={t('qualityControlModule.testing')}
                      isActive={isActive('testing') || isActive('pending') || isActive('inspect')}
                      onClick={() => navigate('testing')} />
           )}
           {/* Room Temp Dry is now managed inside Dry Rooms (card on DryRoomsList) — no separate sidebar entry */}
           {/* Production / Batch Trace / Products & Templates moved to the Production module (BR-Q51) */}
 
-          {canViewLocations && <NavSection title="Master Data" />}
+          {canViewLocations && <NavSection title={t('qualityControlModule.masterData')} />}
           {canViewLocations && (
-            <NavItem icon={MapPin} label="Dryer Locations" isActive={isActive('locations')} onClick={() => navigate('locations')} />
+            <NavItem icon={MapPin} label={t('qualityControlModule.dryerLocations')} isActive={isActive('locations')} onClick={() => navigate('locations')} />
           )}
         </nav>
 
         <div className="p-4 border-t border-white/5">
           <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
             <HelpCircle size={18} />
-            <span>Support</span>
+            <span>{t('qualityControlModule.support')}</span>
           </button>
         </div>
       </aside>
@@ -229,10 +231,10 @@ export default function QualityControlModule({ onHome }: Props) {
             onClick={onHome}
             className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
           >
-            <ArrowLeft size={14} /> Module Hub
+            <ArrowLeft size={14} /> {t('qualityControlModule.moduleHub')}
           </button>
           <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
-            Quality Control
+            {t('qualityControlModule.title')}
           </span>
         </header>
         <div className="flex-1">

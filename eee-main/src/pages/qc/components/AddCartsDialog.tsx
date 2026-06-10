@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Plus, CheckCircle2 } from 'lucide-react';
 import { addSubLotsToLot, AddSubLotsResult } from '../../../services/qcApi';
 
@@ -14,6 +15,7 @@ interface Props {
 export function AddCartsDialog({
   open, lotId, lotBarcode, existingMaxSeq, onClose, onSuccess,
 }: Props) {
+  const { t } = useTranslation('qc');
   const defaultStart = (existingMaxSeq || 0) + 1;
   const [startSeq, setStartSeq] = useState<string>(String(defaultStart));
   const [endSeq, setEndSeq] = useState<string>(String(defaultStart));
@@ -46,7 +48,7 @@ export function AddCartsDialog({
       });
       onSuccess(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Add carts failed');
+      setError(e instanceof Error ? e.message : t('addCartsDialog.addFailed'));
       setBusy(false);
     }
   };
@@ -57,7 +59,7 @@ export function AddCartsDialog({
         type="button"
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t('addCartsDialog.close')}
       />
       <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl">
         <header className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -66,25 +68,25 @@ export function AddCartsDialog({
               <Plus size={18} />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Add carts</p>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('addCartsDialog.addCarts')}</p>
               <h2 className="text-base font-bold text-slate-900 font-mono">{lotBarcode}</h2>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100" aria-label="Close">
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100" aria-label={t('addCartsDialog.close')}>
             <X size={16} />
           </button>
         </header>
 
         <div className="px-5 py-4 space-y-4">
           <p className="text-xs text-slate-500">
-            Continue the cart sequence in this work order. Codes auto-format as{' '}
-            <code className="font-mono">{`${lotBarcode}-NNN`}</code>. Highest existing:{' '}
+            {t('addCartsDialog.continueSequence')}{' '}
+            <code className="font-mono">{`${lotBarcode}-NNN`}</code>. {t('addCartsDialog.highestExisting')}{' '}
             <strong>{existingMaxSeq > 0 ? String(existingMaxSeq).padStart(3, '0') : '—'}</strong>
           </p>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">First cart number</span>
+              <span className="text-xs font-medium text-slate-700">{t('addCartsDialog.firstCartNumber')}</span>
               <input
                 type="number"
                 min={1}
@@ -95,7 +97,7 @@ export function AddCartsDialog({
               />
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Last cart number</span>
+              <span className="text-xs font-medium text-slate-700">{t('addCartsDialog.lastCartNumber')}</span>
               <input
                 type="number"
                 min={startN}
@@ -109,7 +111,7 @@ export function AddCartsDialog({
 
           {count > 0 && (
             <div className="text-xs bg-blue-50 border border-blue-100 text-blue-900 rounded p-2">
-              Will create <strong>{count}</strong> cart(s):{' '}
+              {t('addCartsDialog.willCreate')} <strong>{count}</strong> {t('addCartsDialog.cartsColon')}{' '}
               <code className="font-mono">{`${lotBarcode}-${String(startN).padStart(3, '0')}`}</code>
               {' … '}
               <code className="font-mono">{`${lotBarcode}-${String(endN).padStart(3, '0')}`}</code>
@@ -127,7 +129,7 @@ export function AddCartsDialog({
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-xs font-bold border border-slate-300 text-slate-700 hover:bg-white"
           >
-            Cancel
+            {t('addCartsDialog.cancel')}
           </button>
           <button
             type="button"
@@ -136,7 +138,7 @@ export function AddCartsDialog({
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <CheckCircle2 size={13} />
-            {busy ? 'Adding…' : `Add ${count} cart(s)`}
+            {busy ? t('addCartsDialog.adding') : t('addCartsDialog.addCount', { count })}
           </button>
         </footer>
       </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Plus, BookOpen, CheckCircle2 } from 'lucide-react';
 import { getTrainingCourses, getEnrollments, enrollInCourse, updateEnrollment } from '../../../services/hrApi';
 import type { TrainingCourse, TrainingEnrollment } from '../../../services/hrApi';
@@ -23,6 +24,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function TrainingCatalog() {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canManage = can('hr', 'training', 'manage');
 
@@ -79,15 +81,15 @@ export default function TrainingCatalog() {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Training</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('trainingCatalog.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Training Catalog</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('trainingCatalog.title')}</h1>
         </div>
         <div className="flex gap-1 mt-4">
-          {(['catalog', 'enrollments'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === t ? 'bg-teal-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
-              {t === 'catalog' ? 'Course Catalog' : 'My Enrollments'}
+          {(['catalog', 'enrollments'] as const).map(tabKey => (
+            <button key={tabKey} onClick={() => setTab(tabKey)}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === tabKey ? 'bg-teal-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+              {tabKey === 'catalog' ? t('trainingCatalog.tabCatalog') : t('trainingCatalog.tabEnrollments')}
             </button>
           ))}
         </div>
@@ -99,7 +101,7 @@ export default function TrainingCatalog() {
         ) : tab === 'catalog' ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {courses.length === 0 && (
-              <div className="col-span-3 bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">No courses available</div>
+              <div className="col-span-3 bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">{t('trainingCatalog.noCourses')}</div>
             )}
             {courses.map(c => {
               const alreadyEnrolled = enrolledCourseIds.has(c.id);
@@ -114,7 +116,7 @@ export default function TrainingCatalog() {
                           </span>
                         )}
                         {c.is_mandatory && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600">Mandatory</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600">{t('trainingCatalog.mandatory')}</span>
                         )}
                       </div>
                       <h3 className="text-sm font-bold text-slate-900">{c.title}</h3>
@@ -125,11 +127,11 @@ export default function TrainingCatalog() {
                   <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100">
                     <span className="text-xs text-slate-400">{c.duration_hours ? `${c.duration_hours}h` : '—'}</span>
                     {alreadyEnrolled ? (
-                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-600"><CheckCircle2 size={13} /> Enrolled</span>
+                      <span className="flex items-center gap-1 text-xs font-bold text-emerald-600"><CheckCircle2 size={13} /> {t('trainingCatalog.enrolled')}</span>
                     ) : (
                       <button onClick={() => { setEnrollModal(c); setEnrollTargetEmp(currentErpId); }}
                         className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg">
-                        <Plus size={12} /> Enroll
+                        <Plus size={12} /> {t('trainingCatalog.enroll')}
                       </button>
                     )}
                   </div>
@@ -141,10 +143,10 @@ export default function TrainingCatalog() {
           <div>
             {canManage && (
               <div className="mb-6 max-w-xs">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">View Employee</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('trainingCatalog.viewEmployee')}</label>
                 <select value={selectedEmp} onChange={e => setSelectedEmp(e.target.value)}
                   className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                  <option value="">Select employee</option>
+                  <option value="">{t('trainingCatalog.selectEmployee')}</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                 </select>
               </div>
@@ -153,19 +155,19 @@ export default function TrainingCatalog() {
             {!selectedEmp ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
                 <BookOpen size={40} className="opacity-30" />
-                <p className="text-sm">Select an employee to view their enrollments</p>
+                <p className="text-sm">{t('trainingCatalog.selectEmployeePrompt')}</p>
               </div>
             ) : enrollments.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
                 <BookOpen size={40} className="opacity-30" />
-                <p className="text-sm">No course enrollments</p>
+                <p className="text-sm">{t('trainingCatalog.noEnrollments')}</p>
               </div>
             ) : (
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <table className="w-full">
                   <thead><tr className="bg-slate-50 border-b border-slate-200">
-                    {['Course','Category','Duration','Enrolled','Status','Score','Actions'].map(h =>
-                      <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                    {['course','category','duration','enrolledAt','status','score','actions'].map(h =>
+                      <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{t(`trainingCatalog.col.${h}`)}</th>)}
                   </tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {enrollments.map(e => {
@@ -189,10 +191,10 @@ export default function TrainingCatalog() {
                           <td className="px-5 py-3.5">
                             <div className="flex gap-1">
                               {e.status === 'enrolled' && (
-                                <button onClick={() => markInProgress(e.id)} className="text-xs font-bold text-blue-600 hover:underline">Start</button>
+                                <button onClick={() => markInProgress(e.id)} className="text-xs font-bold text-blue-600 hover:underline">{t('trainingCatalog.start')}</button>
                               )}
                               {(e.status === 'enrolled' || e.status === 'in_progress') && (
-                                <button onClick={() => markComplete(e.id)} className="text-xs font-bold text-emerald-600 hover:underline ml-2">Complete</button>
+                                <button onClick={() => markComplete(e.id)} className="text-xs font-bold text-emerald-600 hover:underline ml-2">{t('trainingCatalog.complete')}</button>
                               )}
                             </div>
                           </td>
@@ -210,23 +212,23 @@ export default function TrainingCatalog() {
       {enrollModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-1">Enroll in Course</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">{t('trainingCatalog.enrollInCourse')}</h2>
             <p className="text-sm text-slate-500 mb-5">{enrollModal.title}</p>
             {canManage && (
               <div className="mb-4">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Enroll Employee</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('trainingCatalog.enrollEmployee')}</label>
                 <select value={enrollTargetEmp} onChange={e => setEnrollTargetEmp(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                  <option value="">Select employee</option>
+                  <option value="">{t('trainingCatalog.selectEmployee')}</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                 </select>
               </div>
             )}
             <div className="flex justify-end gap-3 mt-4">
-              <button onClick={() => setEnrollModal(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setEnrollModal(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('trainingCatalog.cancel')}</button>
               <button onClick={enroll} disabled={saving || !enrollTargetEmp}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Enrolling…' : 'Confirm Enrollment'}
+                {saving ? t('trainingCatalog.enrolling') : t('trainingCatalog.confirmEnrollment')}
               </button>
             </div>
           </div>

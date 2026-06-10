@@ -1,0 +1,52 @@
+{
+  "cards": {
+    "vsLastPeriod": "v last period"
+  },
+  "printerSettingsPopover": {
+    "downloadWindows": "Download Windows Print Helper",
+    "downloadMacos": "Download macOS Print Helper",
+    "howToInstall": "How to install?",
+    "warnWin": "When SmartScreen warns, click \"More info\" → \"Run anyway\"",
+    "warnMac": "If you see \"cannot verify developer\": right-click the file → \"Open\" → click \"Open\" again",
+    "settingsPathWin": "Settings - Printers & scanners",
+    "settingsPathMac": "System Settings - Printers & Scanners",
+    "step1Prefix": "Click the download link above, ",
+    "step1Bold": "extract",
+    "step1Suffix": " the downloaded archive",
+    "step2Prefix": "Double-click ",
+    "step2Open": " (",
+    "step2Close": ")",
+    "step3Prefix": "Go to \"{{path}}\" and set the label printer's default paper to ",
+    "step3Bold": "4×3 inches",
+    "step4": "Return to this window, click \"Search printer\", and select your printer",
+    "step5Prefix": "Once done ✓, printing will ",
+    "step5Bold": "feed silently",
+    "step5Suffix": " with no dialog",
+    "notInstalledYet": "Print helper not installed yet? ",
+    "downloadPrefix": "Download ",
+    "installHintSuffix": ". Double-click to install and you can print silently.",
+    "noPrintersCups": "No printers found. Please check whether CUPS is installed",
+    "foundPrinters": "Found {{count}} printer(s)",
+    "searchFailed": "Search failed: {{error}}",
+    "bridgeNotRunning": "Print helper is not running",
+    "noPrintersQueue": "No printers found. Please check the system print queue",
+    "searchFailedBridge": "Search failed: {{error}}. Please install the print helper first (see download link below)",
+    "saved": "Saved ✓",
+    "cleared": "Cleared",
+    "dpiSet": "Resolution {{dpi}} dpi ✓",
+    "triggerTitle": "Label printer settings",
+    "noPrinterSet": "No printer set",
+    "title": "Label printer",
+    "notConfigured": "Not configured yet",
+    "searching": "Searching…",
+    "searchPrinter": "Search printer",
+    "manualPlaceholder": "Enter queue name manually…",
+    "save": "Save",
+    "resolutionLabel": "Printer resolution (dpi)",
+    "resolutionHint": "Choose the resolution matching this printer for the sharpest labels (most thermal printers are 203, some 300/600).",
+    "clearSaved": "Clear saved printer"
+  },
+  "helpPopover": {
+    "triggerAriaLabel": "What does this mean?"
+  }
+}

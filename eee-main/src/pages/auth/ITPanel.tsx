@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UserPlus, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, ShieldOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -9,6 +10,7 @@ interface CreateResult {
 }
 
 export default function ITPanel() {
+  const { t } = useTranslation('auth');
   const { can } = usePermissions();
   const canCreate = can('auth', 'users', 'create');
 
@@ -53,7 +55,7 @@ export default function ITPanel() {
       if (json.error) {
         setResult({ type: 'error', message: json.error });
       } else {
-        setResult({ type: 'success', message: `Account created for ${form.email}. They can now sign in.` });
+        setResult({ type: 'success', message: t('iTPanel.successMessage', { email: form.email }) });
         setForm({ full_name: '', email: '', password: '', confirm: '' });
       }
     } catch (err) {
@@ -66,8 +68,8 @@ export default function ITPanel() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
         <ShieldOff size={32} className="text-slate-300" />
-        <p className="text-sm font-medium">You don't have permission to create users.</p>
-        <p className="text-xs">Required: Users & Authentication → User Accounts → Create User</p>
+        <p className="text-sm font-medium">{t('iTPanel.noPermission')}</p>
+        <p className="text-xs">{t('iTPanel.noPermissionRequired')}</p>
       </div>
     );
   }
@@ -82,12 +84,12 @@ export default function ITPanel() {
               <UserPlus size={18} className="text-violet-600" />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">IT Administration</p>
-              <h2 className="text-lg font-bold text-slate-900">Create New Account</h2>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('iTPanel.itAdministration')}</p>
+              <h2 className="text-lg font-bold text-slate-900">{t('iTPanel.createNewAccount')}</h2>
             </div>
           </div>
           <p className="text-sm text-slate-500 mt-3">
-            New accounts can only be created here by an IT administrator. Users cannot self-register.
+            {t('iTPanel.headerDescription')}
           </p>
         </div>
 
@@ -96,25 +98,25 @@ export default function ITPanel() {
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                Full Name
+                {t('iTPanel.fullName')}
               </label>
               <input
                 value={form.full_name}
                 onChange={e => setField('full_name', e.target.value)}
-                placeholder="Jane Smith"
+                placeholder={t('iTPanel.fullNamePlaceholder')}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
               />
             </div>
 
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                Email Address <span className="text-red-500">*</span>
+                {t('iTPanel.emailAddress')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 value={form.email}
                 onChange={e => setField('email', e.target.value)}
-                placeholder="jane@company.com"
+                placeholder={t('iTPanel.emailPlaceholder')}
                 required
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
               />
@@ -122,14 +124,14 @@ export default function ITPanel() {
 
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                Password <span className="text-red-500">*</span>
+                {t('iTPanel.password')} <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={form.password}
                   onChange={e => setField('password', e.target.value)}
-                  placeholder="Minimum 6 characters"
+                  placeholder={t('iTPanel.passwordPlaceholder')}
                   required
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 pr-10 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition"
                 />
@@ -142,26 +144,26 @@ export default function ITPanel() {
                 </button>
               </div>
               {form.password && form.password.length < 6 && (
-                <p className="text-[11px] text-amber-600 mt-1">At least 6 characters required</p>
+                <p className="text-[11px] text-amber-600 mt-1">{t('iTPanel.minLengthHint')}</p>
               )}
             </div>
 
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                Confirm Password <span className="text-red-500">*</span>
+                {t('iTPanel.confirmPassword')} <span className="text-red-500">*</span>
               </label>
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={form.confirm}
                 onChange={e => setField('confirm', e.target.value)}
-                placeholder="Re-enter password"
+                placeholder={t('iTPanel.confirmPasswordPlaceholder')}
                 required
                 className={`w-full bg-slate-50 border rounded-lg px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:border-transparent transition ${
                   passwordMismatch ? 'border-red-300 focus:ring-red-400' : 'border-slate-200 focus:ring-violet-500'
                 }`}
               />
               {passwordMismatch && (
-                <p className="text-[11px] text-red-500 mt-1">Passwords do not match</p>
+                <p className="text-[11px] text-red-500 mt-1">{t('iTPanel.passwordsMismatch')}</p>
               )}
             </div>
 
@@ -185,15 +187,15 @@ export default function ITPanel() {
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-lg transition-colors mt-2"
             >
               {creating
-                ? <><Loader2 size={15} className="animate-spin" /> Creating Account…</>
-                : <><UserPlus size={15} /> Create Account</>}
+                ? <><Loader2 size={15} className="animate-spin" /> {t('iTPanel.creatingAccount')}</>
+                : <><UserPlus size={15} /> {t('iTPanel.createAccount')}</>}
             </button>
           </form>
         </div>
 
         <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
           <p className="text-xs text-amber-700 font-medium">
-            <strong>Note:</strong> After creating the account, go to the <strong>By User</strong> tab to assign module access and permissions to the new user.
+            <strong>{t('iTPanel.noteLabel')}</strong> {t('iTPanel.notePart1')}<strong>{t('iTPanel.byUserTab')}</strong>{t('iTPanel.notePart2')}
           </p>
         </div>
       </div>

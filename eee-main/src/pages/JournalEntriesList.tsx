@@ -5,6 +5,7 @@ import { formatCurrency } from '../lib/utils';
 import { JournalEntry } from '../types';
 import { getJournalEntries } from '../services/api';
 import { usePermissions } from '../contexts/PermissionContext';
+import { useTranslation } from 'react-i18next';
 
 const PAGE_SIZE = 20;
 
@@ -15,6 +16,7 @@ const statusColor: Record<string, 'positive' | 'neutral' | 'negative' | 'warning
 };
 
 export default function JournalEntriesList({ onNavigate }: { onNavigate?: (screen: string) => void }) {
+  const { t } = useTranslation('finance');
   const { can } = usePermissions();
   const canCreate = can('finance', 'journal_entry', 'create');
   const canEdit   = can('finance', 'journal_entry', 'edit');
@@ -53,15 +55,15 @@ export default function JournalEntriesList({ onNavigate }: { onNavigate?: (scree
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Journal Entries</h2>
-          <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">{total} records total</p>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('journalEntriesList.title')}</h2>
+          <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">{t('journalEntriesList.recordsTotal', { count: total })}</p>
         </div>
         {canCreate && (
           <button
             onClick={() => onNavigate?.('je-create')}
             className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 flex items-center gap-2 uppercase tracking-wide"
           >
-            <Plus size={14} /> New Entry
+            <Plus size={14} /> {t('journalEntriesList.newEntry')}
           </button>
         )}
       </div>
@@ -72,7 +74,7 @@ export default function JournalEntriesList({ onNavigate }: { onNavigate?: (scree
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by entry # or description..."
+              placeholder={t('journalEntriesList.searchPlaceholder')}
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(0); }}
               className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -83,10 +85,10 @@ export default function JournalEntriesList({ onNavigate }: { onNavigate?: (scree
             onChange={e => { setStatusFilter(e.target.value); setPage(0); }}
             className="bg-white border border-slate-200 rounded px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-600"
           >
-            <option value="">All Statuses</option>
-            <option value="posted">Posted</option>
-            <option value="draft">Draft</option>
-            <option value="reversed">Reversed</option>
+            <option value="">{t('journalEntriesList.allStatuses')}</option>
+            <option value="posted">{t('journalEntriesList.statusPosted')}</option>
+            <option value="draft">{t('journalEntriesList.statusDraft')}</option>
+            <option value="reversed">{t('journalEntriesList.statusReversed')}</option>
           </select>
         </div>
 
@@ -94,22 +96,22 @@ export default function JournalEntriesList({ onNavigate }: { onNavigate?: (scree
           {loading ? (
             <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
               <Loader2 size={20} className="animate-spin" />
-              <span className="text-sm">Loading...</span>
+              <span className="text-sm">{t('journalEntriesList.loading')}</span>
             </div>
           ) : entries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-              <p className="text-sm">No entries found.</p>
+              <p className="text-sm">{t('journalEntriesList.noEntries')}</p>
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
-                  <th className="px-6 py-4">Entry #</th>
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Description</th>
-                  <th className="px-6 py-4 text-right">Amount</th>
-                  <th className="px-6 py-4">Period</th>
-                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">{t('journalEntriesList.colEntryNumber')}</th>
+                  <th className="px-6 py-4">{t('journalEntriesList.colDate')}</th>
+                  <th className="px-6 py-4">{t('journalEntriesList.colDescription')}</th>
+                  <th className="px-6 py-4 text-right">{t('journalEntriesList.colAmount')}</th>
+                  <th className="px-6 py-4">{t('journalEntriesList.colPeriod')}</th>
+                  <th className="px-6 py-4">{t('journalEntriesList.colStatus')}</th>
                   <th className="px-6 py-4 w-16" />
                 </tr>
               </thead>
@@ -148,7 +150,7 @@ export default function JournalEntriesList({ onNavigate }: { onNavigate?: (scree
         </div>
 
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-[10px] font-bold uppercase text-slate-500 tracking-widest">
-          <span>Showing {Math.min(page * PAGE_SIZE + 1, total)}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}</span>
+          <span>{t('journalEntriesList.showingRange', { from: Math.min(page * PAGE_SIZE + 1, total), to: Math.min((page + 1) * PAGE_SIZE, total), total })}</span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage(p => p - 1)}

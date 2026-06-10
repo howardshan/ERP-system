@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2 } from 'lucide-react';
 import {
   listGoodsReceipts,
@@ -34,6 +35,7 @@ const emptyLine = (): FormLine => ({
 });
 
 export default function GoodsReceiptPage() {
+  const { t } = useTranslation('warehouse');
   const { can } = usePermissions();
   const canCreate = can('warehouse', 'goods_receipt', 'create');
   const canCancel = can('warehouse', 'goods_receipt', 'cancel');
@@ -51,14 +53,14 @@ export default function GoodsReceiptPage() {
   const load = () => listGoodsReceipts().then(setReceipts).catch((e) => setError(e.message));
 
   const doCancel = async (r: GoodsReceiptRow) => {
-    if (!confirm(`冲销收货单 ${r.grn_number}？将写入反向流水并把状态置为 cancelled。`)) return;
+    if (!confirm(t('goodsReceiptPage.confirmCancel', { grn: r.grn_number }))) return;
     setError(''); setMsg('');
     try {
       const res = await cancelGrn(r.id);
-      setMsg(`已冲销 ${res.grn_number}（反冲 ${res.lines_reversed} 行）`);
+      setMsg(t('goodsReceiptPage.cancelled', { grn: res.grn_number, lines: res.lines_reversed }));
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '冲销失败');
+      setError(err instanceof Error ? err.message : t('goodsReceiptPage.cancelFailed'));
     }
   };
 
@@ -96,9 +98,9 @@ export default function GoodsReceiptPage() {
     const payload: ReceiptLineInput[] = [];
     for (const [i, l] of lines.entries()) {
       if (l.item_id === '' || l.uom_id === '' || l.location_id === '' || !l.quantity) {
-        setError(`第 ${i + 1} 行：物料、数量、单位、库位为必填`); return;
+        setError(t('goodsReceiptPage.lineRequiredFields', { n: i + 1 })); return;
       }
-      if (Number(l.quantity) <= 0) { setError(`第 ${i + 1} 行：数量必须为正`); return; }
+      if (Number(l.quantity) <= 0) { setError(t('goodsReceiptPage.lineQtyPositive', { n: i + 1 })); return; }
       payload.push({
         item_id: Number(l.item_id),
         quantity: Number(l.quantity),
@@ -113,19 +115,19 @@ export default function GoodsReceiptPage() {
     setBusy(true);
     try {
       const res = await postReceipt({ lines: payload });
-      setMsg(`收货单 ${res.grn_number} 已过账（${res.line_count} 行）`);
+      setMsg(t('goodsReceiptPage.posted', { grn: res.grn_number, lines: res.line_count }));
       cancel();
       load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '过账失败');
+      setError(err instanceof Error ? err.message : t('goodsReceiptPage.postFailed'));
     }
     setBusy(false);
   };
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Goods Receipt</h1>
-      <p className="text-slate-600 mb-4 text-sm">无 PO 直接收货（direct）。过账即写入只增流水并更新余额。</p>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('goodsReceiptPage.title')}</h1>
+      <p className="text-slate-600 mb-4 text-sm">{t('goodsReceiptPage.subtitle')}</p>
 
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
       {error && <p className="text-red-600 mb-3 text-sm">{error}</p>}
@@ -140,7 +142,7 @@ export default function GoodsReceiptPage() {
               creating ? 'bg-slate-200 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-500 text-white',
             )}
           >
-            <Plus size={13} /> {creating ? '取消' : '新建收货单'}
+            <Plus size={13} /> {creating ? t('goodsReceiptPage.cancel') : t('goodsReceiptPage.newReceipt')}
           </button>
         </div>
       )}
@@ -148,31 +150,31 @@ export default function GoodsReceiptPage() {
       {creating && (
         <form onSubmit={submit} className="bg-white border-2 border-emerald-400 rounded-xl p-4 mb-6 space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-emerald-800 text-sm">新建直接收货单</h2>
-            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-amber-100 text-amber-700">DIRECT · 无 PO</span>
+            <h2 className="font-semibold text-emerald-800 text-sm">{t('goodsReceiptPage.newDirectReceipt')}</h2>
+            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-amber-100 text-amber-700">{t('goodsReceiptPage.directNoPo')}</span>
           </div>
 
           {lines.map((l, idx) => (
             <div key={idx} className="grid grid-cols-12 gap-2 items-end border-b border-slate-100 pb-3">
               <label className="col-span-3 block">
-                <span className="text-[11px] font-medium text-slate-600">物料</span>
+                <span className="text-[11px] font-medium text-slate-600">{t('goodsReceiptPage.item')}</span>
                 <select
                   className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm bg-white"
                   value={l.item_id}
                   onChange={(e) => onPickItem(idx, Number(e.target.value))}
                   required
                 >
-                  <option value="" disabled>选择…</option>
+                  <option value="" disabled>{t('goodsReceiptPage.selectPlaceholder')}</option>
                   {items.map((it) => <option key={it.id} value={it.id}>{it.sku} · {it.name}</option>)}
                 </select>
               </label>
               <label className="col-span-1 block">
-                <span className="text-[11px] font-medium text-slate-600">数量</span>
+                <span className="text-[11px] font-medium text-slate-600">{t('goodsReceiptPage.quantity')}</span>
                 <input type="number" min={0} step="0.0001" className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
                   value={l.quantity} onChange={(e) => setLine(idx, { quantity: e.target.value })} required />
               </label>
               <label className="col-span-2 block">
-                <span className="text-[11px] font-medium text-slate-600">单位</span>
+                <span className="text-[11px] font-medium text-slate-600">{t('goodsReceiptPage.uom')}</span>
                 <select className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm bg-white"
                   value={l.uom_id} onChange={(e) => setLine(idx, { uom_id: Number(e.target.value) })} required>
                   <option value="" disabled>—</option>
@@ -180,7 +182,7 @@ export default function GoodsReceiptPage() {
                 </select>
               </label>
               <label className="col-span-2 block">
-                <span className="text-[11px] font-medium text-slate-600">库位</span>
+                <span className="text-[11px] font-medium text-slate-600">{t('goodsReceiptPage.location')}</span>
                 <select className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm bg-white"
                   value={l.location_id} onChange={(e) => setLine(idx, { location_id: Number(e.target.value) })} required>
                   <option value="" disabled>—</option>
@@ -188,7 +190,7 @@ export default function GoodsReceiptPage() {
                 </select>
               </label>
               <label className="col-span-2 block">
-                <span className="text-[11px] font-medium text-slate-600">批次状态</span>
+                <span className="text-[11px] font-medium text-slate-600">{t('goodsReceiptPage.lotStatus')}</span>
                 <select className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm bg-white"
                   value={l.lot_status} onChange={(e) => setLine(idx, { lot_status: e.target.value as LotStatus })}>
                   <option value="available">available</option>
@@ -197,12 +199,12 @@ export default function GoodsReceiptPage() {
               </label>
               <div className="col-span-2 flex items-center gap-1">
                 <label className="block flex-1">
-                  <span className="text-[11px] font-medium text-slate-600">保质期(可空)</span>
+                  <span className="text-[11px] font-medium text-slate-600">{t('goodsReceiptPage.expiryDate')}</span>
                   <input type="date" className="mt-1 w-full border rounded-lg px-2 py-1.5 text-sm"
                     value={l.expiry_date} onChange={(e) => setLine(idx, { expiry_date: e.target.value })} />
                 </label>
                 {lines.length > 1 && (
-                  <button type="button" onClick={() => removeLine(idx)} className="text-red-500 hover:text-red-600 mb-1.5" title="删除行">
+                  <button type="button" onClick={() => removeLine(idx)} className="text-red-500 hover:text-red-600 mb-1.5" title={t('goodsReceiptPage.removeLine')}>
                     <Trash2 size={15} />
                   </button>
                 )}
@@ -212,16 +214,16 @@ export default function GoodsReceiptPage() {
 
           <div className="flex items-center justify-between pt-1">
             <button type="button" onClick={addLine} className="text-emerald-700 hover:text-emerald-800 text-xs font-bold flex items-center gap-1">
-              <Plus size={12} /> 添加行
+              <Plus size={12} /> {t('goodsReceiptPage.addLine')}
             </button>
             <div className="flex gap-2">
-              <button type="button" onClick={cancel} className="px-4 py-2 rounded-lg border text-sm">取消</button>
+              <button type="button" onClick={cancel} className="px-4 py-2 rounded-lg border text-sm">{t('goodsReceiptPage.cancel')}</button>
               <button type="submit" disabled={busy} className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50">
-                {busy ? '过账中…' : '过账收货'}
+                {busy ? t('goodsReceiptPage.posting') : t('goodsReceiptPage.postReceipt')}
               </button>
             </div>
           </div>
-          <p className="text-[10px] text-slate-500">提示：批次号留空将自动生成（RM-日期-序号）；单位默认物料基础单位，非基础单位需已配置换算。</p>
+          <p className="text-[10px] text-slate-500">{t('goodsReceiptPage.hint')}</p>
         </form>
       )}
 
@@ -229,11 +231,11 @@ export default function GoodsReceiptPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
             <tr>
-              <th className="text-left font-semibold px-4 py-2.5">收货单号</th>
-              <th className="text-left font-semibold px-4 py-2.5">类型</th>
-              <th className="text-left font-semibold px-4 py-2.5">日期</th>
-              <th className="text-left font-semibold px-4 py-2.5">状态</th>
-              <th className="text-right font-semibold px-4 py-2.5">操作</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('goodsReceiptPage.colGrnNumber')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('goodsReceiptPage.colType')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('goodsReceiptPage.colDate')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('goodsReceiptPage.colStatus')}</th>
+              <th className="text-right font-semibold px-4 py-2.5">{t('goodsReceiptPage.colActions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -253,14 +255,14 @@ export default function GoodsReceiptPage() {
                   {canCancel && r.status === 'posted' && (
                     <button type="button" onClick={() => doCancel(r)}
                       className="text-rose-600 hover:text-rose-700 text-xs font-bold px-2 py-1">
-                      冲销
+                      {t('goodsReceiptPage.reverse')}
                     </button>
                   )}
                 </td>
               </tr>
             ))}
             {receipts.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">暂无收货单</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">{t('goodsReceiptPage.empty')}</td></tr>
             )}
           </tbody>
         </table>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 
 interface CardProps {
@@ -35,6 +36,7 @@ interface MetricCardProps {
 }
 
 export function MetricCard({ label, value, icon: Icon, trend, className }: MetricCardProps) {
+  const { t } = useTranslation('ui');
   return (
     <div className={cn("bg-white p-6 border border-slate-200 rounded-lg shadow-sm flex items-start justify-between", className)}>
       <div>
@@ -45,7 +47,7 @@ export function MetricCard({ label, value, icon: Icon, trend, className }: Metri
             "text-[10px] font-bold mt-2",
             trend.isPositive ? "text-emerald-600" : "text-rose-600"
           )}>
-            {trend.isPositive ? '↑' : '↓'} {trend.value} <span className="text-slate-400 font-normal">v last period</span>
+            {trend.isPositive ? '↑' : '↓'} {trend.value} <span className="text-slate-400 font-normal">{t('cards.vsLastPeriod')}</span>
           </p>
         )}
       </div>

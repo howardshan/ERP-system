@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Save, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getUser, getUsers, updateUser } from '../../../services/authApi';
 import { getSalaryHistory, getLeaveBalances } from '../../../services/hrApi';
@@ -15,8 +16,16 @@ interface Props {
 }
 
 export default function EmployeeProfile({ employeeId, onBack }: Props) {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canEdit = can('hr', 'employees', 'edit');
+
+  const tabLabels: Record<Tab, string> = {
+    Profile: t('employeeProfile.tabProfile'),
+    Employment: t('employeeProfile.tabEmployment'),
+    Compensation: t('employeeProfile.tabCompensation'),
+    'Leave Balances': t('employeeProfile.tabLeaveBalances'),
+  };
 
   const [user, setUser]     = useState<ErpUser | null>(null);
   const [allUsers, setAllUsers] = useState<ErpUser[]>([]);
@@ -70,10 +79,10 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
       });
       const u = await getUser(employeeId);
       setUser(u);
-      setSaveMsg({ type: 'ok', text: 'Saved' });
+      setSaveMsg({ type: 'ok', text: t('employeeProfile.saved') });
       setTimeout(() => setSaveMsg(null), 2500);
     } catch (e: any) {
-      setSaveMsg({ type: 'err', text: e?.message ?? 'Error' });
+      setSaveMsg({ type: 'err', text: e?.message ?? t('employeeProfile.error') });
     }
     setSaving(false);
   }
@@ -89,7 +98,7 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
       <div className="px-8 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
           <button onClick={onBack} className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 text-xs font-bold transition-colors">
-            <ArrowLeft size={14} /> All Employees
+            <ArrowLeft size={14} /> {t('employeeProfile.allEmployees')}
           </button>
           <div className="w-px h-5 bg-slate-200" />
           <div className="flex items-center gap-3">
@@ -112,7 +121,7 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
           )}
           {canEdit && (
             <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors">
-              <Save size={13} /> {saving ? 'Saving…' : 'Save Changes'}
+              <Save size={13} /> {saving ? t('employeeProfile.saving') : t('employeeProfile.saveChanges')}
             </button>
           )}
         </div>
@@ -126,7 +135,7 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
             onClick={() => setTab(t)}
             className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${tab === t ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
           >
-            {t}
+            {tabLabels[t]}
           </button>
         ))}
       </div>
@@ -135,12 +144,12 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
         {tab === 'Profile' && (
           <div className="max-w-lg">
             <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">Profile Information</h3>
+              <h3 className="text-sm font-bold text-slate-900 mb-2">{t('employeeProfile.profileInformation')}</h3>
               {[
-                { label: 'Full Name', key: 'full_name', placeholder: 'Full name' },
-                { label: 'Role / Job Title', key: 'role', placeholder: 'e.g. Financial Controller' },
-                { label: 'Department', key: 'department', placeholder: 'e.g. Finance' },
-                { label: 'Work Location', key: 'work_location', placeholder: 'e.g. Shanghai HQ' },
+                { label: t('employeeProfile.fullName'), key: 'full_name', placeholder: t('employeeProfile.fullNamePlaceholder') },
+                { label: t('employeeProfile.roleJobTitle'), key: 'role', placeholder: t('employeeProfile.rolePlaceholder') },
+                { label: t('employeeProfile.department'), key: 'department', placeholder: t('employeeProfile.departmentPlaceholder') },
+                { label: t('employeeProfile.workLocation'), key: 'work_location', placeholder: t('employeeProfile.workLocationPlaceholder') },
               ].map(f => (
                 <div key={f.key}>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{f.label}</label>
@@ -154,14 +163,14 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
                 </div>
               ))}
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Email</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('employeeProfile.email')}</label>
                 <input value={user.email} disabled className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-400 cursor-not-allowed" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Manager</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('employeeProfile.manager')}</label>
                 <select value={edits.manager_id} onChange={e => setEdits(p => ({ ...p, manager_id: e.target.value }))} disabled={!canEdit}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-60 disabled:cursor-not-allowed">
-                  <option value="">No manager</option>
+                  <option value="">{t('employeeProfile.noManager')}</option>
                   {allUsers.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
                 </select>
               </div>
@@ -172,21 +181,21 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
         {tab === 'Employment' && (
           <div className="max-w-lg">
             <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">Employment Details</h3>
+              <h3 className="text-sm font-bold text-slate-900 mb-2">{t('employeeProfile.employmentDetails')}</h3>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Employment Type</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('employeeProfile.employmentType')}</label>
                 <select value={edits.employment_type} onChange={e => setEdits(p => ({ ...p, employment_type: e.target.value }))} disabled={!canEdit}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-60 disabled:cursor-not-allowed">
-                  <option value="">Select type</option>
-                  <option value="full_time">Full-time</option>
-                  <option value="part_time">Part-time</option>
-                  <option value="contractor">Contractor</option>
-                  <option value="intern">Intern</option>
+                  <option value="">{t('employeeProfile.selectType')}</option>
+                  <option value="full_time">{t('employeeProfile.fullTime')}</option>
+                  <option value="part_time">{t('employeeProfile.partTime')}</option>
+                  <option value="contractor">{t('employeeProfile.contractor')}</option>
+                  <option value="intern">{t('employeeProfile.intern')}</option>
                 </select>
               </div>
               {[
-                { label: 'Start Date', key: 'start_date', type: 'date' },
-                { label: 'End Date (if terminated)', key: 'end_date', type: 'date' },
+                { label: t('employeeProfile.startDate'), key: 'start_date', type: 'date' },
+                { label: t('employeeProfile.endDate'), key: 'end_date', type: 'date' },
               ].map(f => (
                 <div key={f.key}>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{f.label}</label>
@@ -202,14 +211,14 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
           <div className="max-w-2xl space-y-6">
             {currentSalary ? (
               <div className="bg-white border border-slate-200 rounded-xl p-6">
-                <h3 className="text-sm font-bold text-slate-900 mb-4">Current Salary</h3>
+                <h3 className="text-sm font-bold text-slate-900 mb-4">{t('employeeProfile.currentSalary')}</h3>
                 <div className="grid grid-cols-3 gap-4">
                   {[
-                    { label: 'Salary', value: `${currentSalary.currency} ${currentSalary.salary.toLocaleString()}` },
-                    { label: 'Frequency', value: currentSalary.pay_frequency },
-                    { label: 'Pay Grade', value: currentSalary.pay_grade ?? '—' },
-                    { label: 'Effective Date', value: currentSalary.effective_date },
-                    { label: 'Reason', value: currentSalary.reason ?? '—' },
+                    { label: t('employeeProfile.salary'), value: `${currentSalary.currency} ${currentSalary.salary.toLocaleString()}` },
+                    { label: t('employeeProfile.frequency'), value: currentSalary.pay_frequency },
+                    { label: t('employeeProfile.payGrade'), value: currentSalary.pay_grade ?? '—' },
+                    { label: t('employeeProfile.effectiveDate'), value: currentSalary.effective_date },
+                    { label: t('employeeProfile.reason'), value: currentSalary.reason ?? '—' },
                   ].map(i => (
                     <div key={i.label}>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{i.label}</p>
@@ -219,16 +228,16 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
                 </div>
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">No salary records yet</div>
+              <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">{t('employeeProfile.noSalaryRecords')}</div>
             )}
             {salaryHistory.length > 0 && (
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-200">
-                  <h3 className="text-sm font-bold text-slate-900">Salary History</h3>
+                  <h3 className="text-sm font-bold text-slate-900">{t('employeeProfile.salaryHistory')}</h3>
                 </div>
                 <table className="w-full">
                   <thead><tr className="bg-slate-50 border-b border-slate-200">
-                    {['Effective Date','Salary','Frequency','Grade','Reason'].map(h => <th key={h} className="px-5 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                    {[t('employeeProfile.effectiveDate'),t('employeeProfile.salary'),t('employeeProfile.frequency'),t('employeeProfile.grade'),t('employeeProfile.reason')].map(h => <th key={h} className="px-5 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
                   </tr></thead>
                   <tbody className="divide-y divide-slate-100">
                     {salaryHistory.map(s => (
@@ -258,16 +267,16 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     {[
-                      { label: 'Accrued',    value: b.accrued,    color: 'text-emerald-700' },
-                      { label: 'Available',  value: b.available,  color: 'text-teal-700 font-bold text-sm' },
-                      { label: 'Used',       value: b.used,       color: 'text-slate-600' },
-                      { label: 'Pending',    value: b.pending,    color: 'text-amber-600' },
-                      { label: 'Carry Over', value: b.carry_over, color: 'text-blue-600' },
-                      { label: 'Adjusted',   value: b.adjusted,   color: 'text-purple-600' },
+                      { label: t('employeeProfile.accrued'),    value: b.accrued,    color: 'text-emerald-700' },
+                      { label: t('employeeProfile.available'),  value: b.available,  color: 'text-teal-700 font-bold text-sm' },
+                      { label: t('employeeProfile.used'),       value: b.used,       color: 'text-slate-600' },
+                      { label: t('employeeProfile.pending'),    value: b.pending,    color: 'text-amber-600' },
+                      { label: t('employeeProfile.carryOver'), value: b.carry_over, color: 'text-blue-600' },
+                      { label: t('employeeProfile.adjusted'),   value: b.adjusted,   color: 'text-purple-600' },
                     ].map(i => (
                       <div key={i.label}>
                         <p className="text-slate-400 text-[10px] uppercase tracking-widest font-bold">{i.label}</p>
-                        <p className={`mt-0.5 ${i.color}`}>{i.value} day{i.value !== 1 ? 's' : ''}</p>
+                        <p className={`mt-0.5 ${i.color}`}>{t('employeeProfile.days', { count: i.value })}</p>
                       </div>
                     ))}
                   </div>
@@ -275,7 +284,7 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
               ))}
               {leaveBalances.length === 0 && (
                 <div className="col-span-2 bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-400 text-sm">
-                  No leave balances found for {new Date().getFullYear()}
+                  {t('employeeProfile.noLeaveBalances', { year: new Date().getFullYear() })}
                 </div>
               )}
             </div>

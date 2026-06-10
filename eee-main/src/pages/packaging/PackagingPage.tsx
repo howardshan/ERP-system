@@ -17,6 +17,7 @@ import {
   PkgCart,
   PkgSku,
 } from '../../services/pkgApi';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { PermissionDenied } from '../qc/components/PermissionDenied';
@@ -57,6 +58,7 @@ function formatDate(iso: string): string {
 }
 
 export default function PackagingPage() {
+  const { t } = useTranslation('packaging');
   const { can } = usePermissions();
   const canView = can('packaging', 'outbound', 'view');
   const canDispatch = can('packaging', 'outbound', 'dispatch');
@@ -83,7 +85,7 @@ export default function PackagingPage() {
       const data = await getSkusWithStock();
       setSkus(data);
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : 'Failed to load SKUs');
+      setErrorMsg(e instanceof Error ? e.message : t('packagingPage.errLoadSkus'));
     }
     setSkusLoading(false);
   };
@@ -96,7 +98,7 @@ export default function PackagingPage() {
       const data = await getAvailableCarts(skuId);
       setCarts(data);
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : 'Failed to load carts');
+      setErrorMsg(e instanceof Error ? e.message : t('packagingPage.errLoadCarts'));
     }
     setCartsLoading(false);
   };
@@ -147,7 +149,7 @@ export default function PackagingPage() {
 
     const cart = carts.find(c => c.sub_lot_code === code);
     if (!cart) {
-      setScanError(`Cart "${code}" not found or not available`);
+      setScanError(t('packagingPage.scanNotFound', { code }));
       return;
     }
     setScanError('');
@@ -166,13 +168,13 @@ export default function PackagingPage() {
     try {
       const result = await dispatchCarts(Array.from(selectedIds), note || undefined);
       setSuccessMsg(
-        `Dispatched ${result.cart_count} cart${result.cart_count !== 1 ? 's' : ''} (outbound #${result.outbound_id})`
+        t('packagingPage.dispatchSuccess', { count: result.cart_count, outboundId: result.outbound_id })
       );
       setNote('');
       setSelectedIds(new Set());
       await Promise.all([loadSkus(), selectedSkuId ? loadCarts(selectedSkuId) : Promise.resolve()]);
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : 'Dispatch failed');
+      setErrorMsg(e instanceof Error ? e.message : t('packagingPage.errDispatch'));
     }
     setDispatching(false);
   };
@@ -221,7 +223,7 @@ export default function PackagingPage() {
   const someSelected = selectedIds.size > 0 && selectedIds.size < carts.length;
 
   if (!canView) {
-    return <PermissionDenied permission="packaging.outbound.view" feature="Packaging" />;
+    return <PermissionDenied permission="packaging.outbound.view" feature={t('packagingPage.feature')} />;
   }
 
   return (
@@ -230,7 +232,7 @@ export default function PackagingPage() {
       <aside className="w-80 shrink-0 border-r border-slate-200 bg-white flex flex-col">
         <div className="p-4 border-b border-slate-100">
           <div className="flex items-center justify-between mb-0.5">
-            <h2 className="text-sm font-bold text-slate-900">Products in Stock</h2>
+            <h2 className="text-sm font-bold text-slate-900">{t('packagingPage.productsInStock')}</h2>
             <button
               onClick={loadSkus}
               disabled={skusLoading}
@@ -239,7 +241,7 @@ export default function PackagingPage() {
               <RefreshCw size={13} className={skusLoading ? 'animate-spin' : ''} />
             </button>
           </div>
-          <p className="text-[11px] text-slate-400">Select a product to view available carts</p>
+          <p className="text-[11px] text-slate-400">{t('packagingPage.selectProductHint')}</p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -251,7 +253,7 @@ export default function PackagingPage() {
           {!skusLoading && skus.length === 0 && (
             <div className="text-center py-10">
               <Package size={28} className="text-slate-300 mx-auto mb-2" />
-              <p className="text-xs text-slate-500">No released carts in packaging queue.</p>
+              <p className="text-xs text-slate-500">{t('packagingPage.noReleasedCarts')}</p>
             </div>
           )}
           {skus.map(sku => {
@@ -281,7 +283,7 @@ export default function PackagingPage() {
                     )}>
                       {sku.cart_count}
                     </p>
-                    <p className="text-[10px] text-slate-400">carts</p>
+                    <p className="text-[10px] text-slate-400">{t('packagingPage.cartsLabel')}</p>
                   </div>
                 </div>
               </button>
@@ -304,7 +306,7 @@ export default function PackagingPage() {
                   value={scanInput}
                   onChange={e => { setScanInput(e.target.value); setScanError(''); }}
                   onKeyDown={handleScanKeyDown}
-                  placeholder="Scan cart QR code..."
+                  placeholder={t('packagingPage.scanPlaceholder')}
                   className="w-full pl-9 pr-4 py-2 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white"
                 />
               </div>
@@ -317,7 +319,7 @@ export default function PackagingPage() {
             </div>
           ) : (
             <div className="h-9 flex items-center">
-              <p className="text-sm text-slate-400">Select a product from the left to begin.</p>
+              <p className="text-sm text-slate-400">{t('packagingPage.selectToBegin')}</p>
             </div>
           )}
         </div>
@@ -343,8 +345,8 @@ export default function PackagingPage() {
           {!selectedSkuId && (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <Package size={40} className="text-slate-300 mb-3" />
-              <p className="text-slate-500 font-medium">No product selected</p>
-              <p className="text-xs text-slate-400 mt-1">Choose a product on the left to view available carts</p>
+              <p className="text-slate-500 font-medium">{t('packagingPage.noProductSelected')}</p>
+              <p className="text-xs text-slate-400 mt-1">{t('packagingPage.chooseProductHint')}</p>
             </div>
           )}
 
@@ -357,9 +359,9 @@ export default function PackagingPage() {
           {selectedSkuId && !cartsLoading && carts.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Package size={36} className="text-slate-300 mb-3" />
-              <p className="text-slate-500 font-medium">No carts available</p>
+              <p className="text-slate-500 font-medium">{t('packagingPage.noCartsAvailable')}</p>
               <p className="text-xs text-slate-400 mt-1">
-                All carts for this product have been dispatched or none are released yet.
+                {t('packagingPage.noCartsAvailableHint')}
               </p>
             </div>
           )}
@@ -378,7 +380,7 @@ export default function PackagingPage() {
                   )}
                 </button>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  {groupedByWorkOrder.length} work order{groupedByWorkOrder.length === 1 ? '' : 's'} · {carts.length} cart{carts.length === 1 ? '' : 's'}
+                  {t('packagingPage.summaryCount', { woCount: groupedByWorkOrder.length, cartCount: carts.length })}
                 </span>
               </div>
 
@@ -404,7 +406,7 @@ export default function PackagingPage() {
                           <Square size={16} className="text-slate-300 shrink-0" />
                         )}
                         <div className="font-mono font-bold text-sm text-slate-900">
-                          {group.workOrder ?? '(no work order)'}
+                          {group.workOrder ?? t('packagingPage.noWorkOrder')}
                         </div>
                         <Package size={12} className="text-slate-400 shrink-0 ml-2" />
                         <span
@@ -413,14 +415,14 @@ export default function PackagingPage() {
                             group.packagingName ? 'text-slate-700' : 'text-slate-400 italic',
                           )}
                         >
-                          {group.packagingName ?? 'No packaging assigned'}
+                          {group.packagingName ?? t('packagingPage.noPackagingAssigned')}
                         </span>
                         {group.packagingSku && (
                           <span className="text-[10px] font-mono text-slate-400">{group.packagingSku}</span>
                         )}
                         <span className="flex-1" />
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {group.carts.length} cart{group.carts.length === 1 ? '' : 's'}
+                          {t('packagingPage.cartCount', { count: group.carts.length })}
                         </span>
                       </div>
 
@@ -471,25 +473,25 @@ export default function PackagingPage() {
         {selectedSkuId && !cartsLoading && carts.length > 0 && (
           <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center gap-4">
             <p className="text-sm font-bold text-slate-700 shrink-0">
-              {selectedIds.size} cart{selectedIds.size !== 1 ? 's' : ''} selected
+              {t('packagingPage.cartsSelected', { count: selectedIds.size })}
             </p>
             <input
               type="text"
               value={note}
               onChange={e => setNote(e.target.value)}
-              placeholder="Optional dispatch note..."
+              placeholder={t('packagingPage.notePlaceholder')}
               className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-orange-400"
             />
             <button
               onClick={handleDispatch}
               disabled={selectedIds.size === 0 || dispatching || !canDispatch}
-              title={canDispatch ? undefined : 'Missing packaging.outbound.dispatch permission'}
+              title={canDispatch ? undefined : t('packagingPage.dispatchPermissionTitle')}
               className="flex items-center gap-2 px-5 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors shrink-0"
             >
               {dispatching ? (
-                <><Loader2 size={14} className="animate-spin" /> Dispatching…</>
+                <><Loader2 size={14} className="animate-spin" /> {t('packagingPage.dispatching')}</>
               ) : (
-                <><SendHorizonal size={14} /> Dispatch</>
+                <><SendHorizonal size={14} /> {t('packagingPage.dispatch')}</>
               )}
             </button>
           </div>

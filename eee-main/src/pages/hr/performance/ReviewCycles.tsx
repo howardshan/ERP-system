@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Plus, ChevronRight, Star } from 'lucide-react';
 import { getReviewCycles, createReviewCycle, getReviews, submitSelfReview, submitManagerReview } from '../../../services/hrApi';
 import type { ReviewCycle, Review } from '../../../services/hrApi';
@@ -35,6 +36,7 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
 }
 
 export default function ReviewCycles() {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canManage = can('hr', 'performance', 'manage');
 
@@ -99,13 +101,13 @@ export default function ReviewCycles() {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Performance</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('reviewCycles.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Review Cycles</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('reviewCycles.title')}</h1>
           {canManage && (
             <button onClick={() => { setCycleModal(true); setForm({ name: '', period_start: '', period_end: '' }); }}
               className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg">
-              <Plus size={14} /> New Cycle
+              <Plus size={14} /> {t('reviewCycles.newCycle')}
             </button>
           )}
         </div>
@@ -118,7 +120,7 @@ export default function ReviewCycles() {
           <div className="flex gap-6">
             <div className="w-72 flex-shrink-0 space-y-2">
               {cycles.length === 0 && (
-                <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">No review cycles</div>
+                <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">{t('reviewCycles.empty')}</div>
               )}
               {cycles.map(c => (
                 <button key={c.id} onClick={() => selectCycle(c)}
@@ -139,12 +141,12 @@ export default function ReviewCycles() {
               <div className="flex-1 space-y-5">
                 {myReviews.length > 0 && (
                   <div>
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">My Reviews</h3>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{t('reviewCycles.myReviews')}</h3>
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full">
                         <thead><tr className="bg-slate-50 border-b border-slate-200">
-                          {['Reviewer','Self Rating','Manager Rating','Final','Status',''].map(h =>
-                            <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                          {[t('reviewCycles.colReviewer'),t('reviewCycles.colSelfRating'),t('reviewCycles.colManagerRating'),t('reviewCycles.colFinal'),t('reviewCycles.colStatus'),''].map((h, i) =>
+                            <th key={i} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
                         </tr></thead>
                         <tbody className="divide-y divide-slate-100">
                           {myReviews.map(r => (
@@ -157,7 +159,7 @@ export default function ReviewCycles() {
                               <td className="px-5 py-3.5">
                                 {r.status === 'pending' && r.employee_id === currentErpId && (
                                   <button onClick={() => { setReviewPanel(r); setReviewForm({ rating: 0, summary: '', goals_met: '' }); }}
-                                    className="text-xs font-bold text-teal-600 hover:underline">Self Review</button>
+                                    className="text-xs font-bold text-teal-600 hover:underline">{t('reviewCycles.selfReview')}</button>
                                 )}
                               </td>
                             </tr>
@@ -170,24 +172,24 @@ export default function ReviewCycles() {
 
                 {managerReviews.length > 0 && (
                   <div>
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Reviews I Need to Complete</h3>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{t('reviewCycles.reviewsToComplete')}</h3>
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full">
                         <thead><tr className="bg-slate-50 border-b border-slate-200">
-                          {['Employee','Self Rating','Manager Rating','Status',''].map(h =>
-                            <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                          {[t('reviewCycles.colEmployee'),t('reviewCycles.colSelfRating'),t('reviewCycles.colManagerRating'),t('reviewCycles.colStatus'),''].map((h, i) =>
+                            <th key={i} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
                         </tr></thead>
                         <tbody className="divide-y divide-slate-100">
                           {managerReviews.map(r => (
                             <tr key={r.id} className="text-sm">
                               <td className="px-5 py-3.5 font-semibold text-slate-900">{r.employee_name ?? r.employee_id}</td>
-                              <td className="px-5 py-3.5">{r.self_rating ? <StarRating value={r.self_rating} /> : <span className="text-slate-400 text-xs">Pending self-review</span>}</td>
+                              <td className="px-5 py-3.5">{r.self_rating ? <StarRating value={r.self_rating} /> : <span className="text-slate-400 text-xs">{t('reviewCycles.pendingSelfReview')}</span>}</td>
                               <td className="px-5 py-3.5">{r.manager_rating ? <StarRating value={r.manager_rating} /> : <span className="text-slate-400 text-xs">—</span>}</td>
                               <td className="px-5 py-3.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${REVIEW_STATUS_COLORS[r.status]}`}>{r.status.replace('_', ' ')}</span></td>
                               <td className="px-5 py-3.5">
                                 {r.status === 'self_complete' && (
                                   <button onClick={() => { setReviewPanel(r); setMgrForm({ rating: 0, summary: '', strengths: '', improvements: '' }); }}
-                                    className="text-xs font-bold text-teal-600 hover:underline">Submit Review</button>
+                                    className="text-xs font-bold text-teal-600 hover:underline">{t('reviewCycles.submitReview')}</button>
                                 )}
                               </td>
                             </tr>
@@ -200,12 +202,12 @@ export default function ReviewCycles() {
 
                 {canManage && (
                   <div>
-                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">All Reviews ({reviews.length})</h3>
+                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{t('reviewCycles.allReviews', { count: reviews.length })}</h3>
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                       <table className="w-full">
                         <thead><tr className="bg-slate-50 border-b border-slate-200">
-                          {['Employee','Reviewer','Self','Manager','Final','Status'].map(h =>
-                            <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
+                          {[t('reviewCycles.colEmployee'),t('reviewCycles.colReviewer'),t('reviewCycles.colSelf'),t('reviewCycles.colManager'),t('reviewCycles.colFinal'),t('reviewCycles.colStatus')].map((h, i) =>
+                            <th key={i} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
                         </tr></thead>
                         <tbody className="divide-y divide-slate-100">
                           {reviews.map(r => (
@@ -232,31 +234,31 @@ export default function ReviewCycles() {
       {cycleModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-5">New Review Cycle</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-5">{t('reviewCycles.newCycleTitle')}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Name *</label>
-                <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. 2026 H1 Performance Review"
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('reviewCycles.nameLabel')}</label>
+                <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t('reviewCycles.namePlaceholder')}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Period Start</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('reviewCycles.periodStart')}</label>
                   <input type="date" value={form.period_start} onChange={e => setForm(p => ({ ...p, period_start: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Period End</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('reviewCycles.periodEnd')}</label>
                   <input type="date" value={form.period_end} onChange={e => setForm(p => ({ ...p, period_end: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setCycleModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setCycleModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('reviewCycles.cancel')}</button>
               <button onClick={saveCycle} disabled={saving || !form.name}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Creating…' : 'Create'}
+                {saving ? t('reviewCycles.creating') : t('reviewCycles.create')}
               </button>
             </div>
           </div>
@@ -266,31 +268,31 @@ export default function ReviewCycles() {
       {reviewPanel && reviewPanel.employee_id === currentErpId && reviewPanel.status === 'pending' && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-1">Self Review</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">{t('reviewCycles.selfReviewTitle')}</h2>
             <p className="text-xs text-slate-400 mb-5">{selectedCycle?.name}</p>
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Overall Rating *</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{t('reviewCycles.overallRating')}</label>
                 <StarRating value={reviewForm.rating} onChange={v => setReviewForm(p => ({ ...p, rating: v }))} />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Summary</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('reviewCycles.summary')}</label>
                 <textarea rows={3} value={reviewForm.summary} onChange={e => setReviewForm(p => ({ ...p, summary: e.target.value }))}
-                  placeholder="What did you accomplish this period?"
+                  placeholder={t('reviewCycles.summaryPlaceholder')}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Goals Met</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('reviewCycles.goalsMet')}</label>
                 <textarea rows={2} value={reviewForm.goals_met} onChange={e => setReviewForm(p => ({ ...p, goals_met: e.target.value }))}
-                  placeholder="Which goals did you achieve?"
+                  placeholder={t('reviewCycles.goalsMetPlaceholder')}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setReviewPanel(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setReviewPanel(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('reviewCycles.cancel')}</button>
               <button onClick={saveSelfReview} disabled={saving || !reviewForm.rating}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Submitting…' : 'Submit Self Review'}
+                {saving ? t('reviewCycles.submitting') : t('reviewCycles.submitSelfReview')}
               </button>
             </div>
           </div>
@@ -300,42 +302,42 @@ export default function ReviewCycles() {
       {reviewPanel && reviewPanel.reviewer_id === currentErpId && reviewPanel.status === 'self_complete' && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-1">Manager Review</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-1">{t('reviewCycles.managerReviewTitle')}</h2>
             <p className="text-xs text-slate-400 mb-5">{reviewPanel.employee_name} — {selectedCycle?.name}</p>
             {reviewPanel.self_summary && (
               <div className="bg-slate-50 rounded-lg p-4 mb-4">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Employee Self-Summary</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('reviewCycles.employeeSelfSummary')}</p>
                 <p className="text-sm text-slate-700">{reviewPanel.self_summary}</p>
               </div>
             )}
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Overall Rating *</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">{t('reviewCycles.overallRating')}</label>
                 <StarRating value={mgrForm.rating} onChange={v => setMgrForm(p => ({ ...p, rating: v }))} />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Summary</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('reviewCycles.summary')}</label>
                 <textarea rows={3} value={mgrForm.summary} onChange={e => setMgrForm(p => ({ ...p, summary: e.target.value }))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Strengths</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('reviewCycles.strengths')}</label>
                   <textarea rows={3} value={mgrForm.strengths} onChange={e => setMgrForm(p => ({ ...p, strengths: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Areas to Improve</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('reviewCycles.areasToImprove')}</label>
                   <textarea rows={3} value={mgrForm.improvements} onChange={e => setMgrForm(p => ({ ...p, improvements: e.target.value }))}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
                 </div>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setReviewPanel(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setReviewPanel(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('reviewCycles.cancel')}</button>
               <button onClick={saveMgrReview} disabled={saving || !mgrForm.rating}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Submitting…' : 'Submit Review'}
+                {saving ? t('reviewCycles.submitting') : t('reviewCycles.submitReview')}
               </button>
             </div>
           </div>

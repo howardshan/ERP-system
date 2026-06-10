@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Plus, X, Loader2, Pencil, ChevronDown, ChevronRight } from 'lucide-react';
 import { Card, Badge } from '../components/ui/Cards';
 import { cn, formatCurrency } from '../lib/utils';
@@ -7,14 +8,6 @@ import { getAccounts, createAccount, updateAccount } from '../services/api';
 import { usePermissions } from '../contexts/PermissionContext';
 
 const ACCOUNT_TYPES: GlAccount['account_type'][] = ['asset', 'liability', 'equity', 'revenue', 'expense'];
-
-const TYPE_LABELS: Record<string, string> = {
-  asset: 'Assets',
-  liability: 'Liabilities',
-  equity: 'Equity',
-  revenue: 'Revenue',
-  expense: 'Expenses',
-};
 
 const TYPE_COLORS: Record<string, string> = {
   asset:     'bg-blue-50 border-blue-200 text-blue-800',
@@ -41,6 +34,7 @@ function AccountModal({
   onClose: () => void;
   onSave: (data: Omit<GlAccount, 'id' | 'balance' | 'total_debit' | 'total_credit' | 'children'>) => Promise<void>;
 }) {
+  const { t } = useTranslation('finance');
   const [form, setForm] = useState({
     account_code: initial.account_code ?? '',
     name: initial.name ?? '',
@@ -59,7 +53,7 @@ function AccountModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.account_code.trim() || !form.name.trim()) {
-      setError('Account code and name are required.');
+      setError(t('chartOfAccounts.errorRequired'));
       return;
     }
     setSaving(true);
@@ -90,34 +84,34 @@ function AccountModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Account Code</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('chartOfAccounts.accountCode')}</label>
               <input
                 type="text"
-                placeholder="e.g. 1110"
+                placeholder={t('chartOfAccounts.accountCodePlaceholder')}
                 value={form.account_code}
                 onChange={e => setForm({ ...form, account_code: e.target.value })}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Type</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('chartOfAccounts.type')}</label>
               <select
                 value={form.account_type}
                 onChange={e => setForm({ ...form, account_type: e.target.value as GlAccount['account_type'], parent_id: '' })}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {ACCOUNT_TYPES.map(t => (
-                  <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                {ACCOUNT_TYPES.map(opt => (
+                  <option key={opt} value={opt}>{t(`chartOfAccounts.typeLabels.${opt}`)}</option>
                 ))}
               </select>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Account Name</label>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('chartOfAccounts.accountName')}</label>
             <input
               type="text"
-              placeholder="e.g. Operating Cash"
+              placeholder={t('chartOfAccounts.accountNamePlaceholder')}
               value={form.name}
               onChange={e => setForm({ ...form, name: e.target.value })}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -126,14 +120,14 @@ function AccountModal({
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-              Parent Account <span className="normal-case font-normal text-slate-400">(optional)</span>
+              {t('chartOfAccounts.parentAccount')} <span className="normal-case font-normal text-slate-400">{t('chartOfAccounts.optional')}</span>
             </label>
             <select
               value={form.parent_id}
               onChange={e => setForm({ ...form, parent_id: e.target.value })}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">— None (top-level) —</option>
+              <option value="">{t('chartOfAccounts.noneTopLevel')}</option>
               {parentOptions.map(a => (
                 <option key={a.id} value={a.id}>
                   {a.account_code} · {a.name}
@@ -141,7 +135,7 @@ function AccountModal({
               ))}
             </select>
             {parentOptions.length === 0 && (
-              <p className="text-[11px] text-slate-400">No other {TYPE_LABELS[form.account_type]} accounts yet.</p>
+              <p className="text-[11px] text-slate-400">{t('chartOfAccounts.noOtherAccounts', { type: t(`chartOfAccounts.typeLabels.${form.account_type}`) })}</p>
             )}
           </div>
 
@@ -154,7 +148,7 @@ function AccountModal({
               className="rounded border-slate-300 accent-blue-600"
             />
             <label htmlFor="is_postable_modal" className="text-sm text-slate-700">
-              Postable — journal lines can be posted to this account
+              {t('chartOfAccounts.postableHelp')}
             </label>
           </div>
 
@@ -166,7 +160,7 @@ function AccountModal({
               onClick={onClose}
               className="flex-1 px-4 py-2 text-sm font-bold border border-slate-200 rounded-lg hover:bg-slate-50"
             >
-              Cancel
+              {t('chartOfAccounts.cancel')}
             </button>
             <button
               type="submit"
@@ -174,7 +168,7 @@ function AccountModal({
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >
               {saving && <Loader2 size={14} className="animate-spin" />}
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? t('chartOfAccounts.saving') : t('chartOfAccounts.save')}
             </button>
           </div>
         </form>
@@ -195,6 +189,7 @@ interface AccountRowProps {
 }
 
 function AccountRow({ account, depth, onEdit, canEdit }: AccountRowProps) {
+  const { t } = useTranslation('finance');
   const [open, setOpen] = useState(true);
   const hasChildren = (account.children?.length ?? 0) > 0;
 
@@ -223,7 +218,7 @@ function AccountRow({ account, depth, onEdit, canEdit }: AccountRowProps) {
         </td>
         <td className="px-5 py-3">
           <Badge type={account.is_postable ? 'info' : 'neutral'}>
-            {account.is_postable ? 'Postable' : 'Roll-up'}
+            {account.is_postable ? t('chartOfAccounts.postable') : t('chartOfAccounts.rollUp')}
           </Badge>
         </td>
         <td className="px-5 py-3 text-right">
@@ -234,7 +229,7 @@ function AccountRow({ account, depth, onEdit, canEdit }: AccountRowProps) {
             <button
               onClick={() => onEdit(account)}
               className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-blue-600 p-1 rounded"
-              title="Edit account"
+              title={t('chartOfAccounts.editAccount')}
             >
               <Pencil size={14} />
             </button>
@@ -263,6 +258,7 @@ function TypeSection({
   onEdit: (a: GlAccount) => void;
   canEdit: boolean;
 }) {
+  const { t } = useTranslation('finance');
   const [open, setOpen] = useState(true);
   const total = accounts.reduce((s, a) => s + (a.balance ?? 0), 0);
 
@@ -290,8 +286,8 @@ function TypeSection({
         <td colSpan={3} className="px-5 py-3">
           <div className="flex items-center gap-2">
             {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-            <span className="text-xs font-bold uppercase tracking-widest">{TYPE_LABELS[type]}</span>
-            <span className="text-xs opacity-60">{accounts.length} account{accounts.length !== 1 ? 's' : ''}</span>
+            <span className="text-xs font-bold uppercase tracking-widest">{t(`chartOfAccounts.typeLabels.${type}`)}</span>
+            <span className="text-xs opacity-60">{t('chartOfAccounts.accountCount', { count: accounts.length })}</span>
           </div>
         </td>
         <td className="px-5 py-3 text-right">
@@ -313,6 +309,7 @@ function TypeSection({
 // ---------------------------------------------------------------
 
 export default function ChartOfAccounts() {
+  const { t } = useTranslation('finance');
   const { can } = usePermissions();
   const canCreate = can('finance', 'chart_of_accounts', 'create');
   const canEdit   = can('finance', 'chart_of_accounts', 'edit');
@@ -352,9 +349,9 @@ export default function ChartOfAccounts() {
       {/* Header */}
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Chart of Accounts</h2>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('chartOfAccounts.title')}</h2>
           <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">
-            {allAccounts.length} accounts · balances from posted entries
+            {t('chartOfAccounts.subtitle', { count: allAccounts.length })}
           </p>
         </div>
         {canCreate && (
@@ -362,7 +359,7 @@ export default function ChartOfAccounts() {
             onClick={() => setShowCreate(true)}
             className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition-colors uppercase tracking-wide flex items-center gap-2"
           >
-            <Plus size={14} /> Create Account
+            <Plus size={14} /> {t('chartOfAccounts.createAccount')}
           </button>
         )}
       </div>
@@ -373,7 +370,7 @@ export default function ChartOfAccounts() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by code or name..."
+            placeholder={t('chartOfAccounts.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -384,8 +381,8 @@ export default function ChartOfAccounts() {
           onChange={e => setTypeFilter(e.target.value)}
           className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600"
         >
-          <option value="">All Types</option>
-          {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
+          <option value="">{t('chartOfAccounts.allTypes')}</option>
+          {ACCOUNT_TYPES.map(opt => <option key={opt} value={opt}>{t(`chartOfAccounts.typeLabels.${opt}`)}</option>)}
         </select>
       </div>
 
@@ -394,14 +391,14 @@ export default function ChartOfAccounts() {
         {loading ? (
           <div className="flex items-center justify-center py-20 text-slate-400 gap-3">
             <Loader2 size={20} className="animate-spin" />
-            <span className="text-sm font-medium">Loading accounts...</span>
+            <span className="text-sm font-medium">{t('chartOfAccounts.loading')}</span>
           </div>
         ) : allAccounts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
-            <p className="text-sm">No accounts yet.</p>
+            <p className="text-sm">{t('chartOfAccounts.empty')}</p>
             {canCreate && (
               <button onClick={() => setShowCreate(true)} className="text-sm font-bold text-blue-600 hover:underline">
-                Create your first account →
+                {t('chartOfAccounts.createFirst')}
               </button>
             )}
           </div>
@@ -410,10 +407,10 @@ export default function ChartOfAccounts() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
-                  <th className="px-5 py-3 w-40">Code</th>
-                  <th className="px-5 py-3">Account Name</th>
-                  <th className="px-5 py-3 w-28">Status</th>
-                  <th className="px-5 py-3 text-right w-36">Balance</th>
+                  <th className="px-5 py-3 w-40">{t('chartOfAccounts.colCode')}</th>
+                  <th className="px-5 py-3">{t('chartOfAccounts.colName')}</th>
+                  <th className="px-5 py-3 w-28">{t('chartOfAccounts.colStatus')}</th>
+                  <th className="px-5 py-3 text-right w-36">{t('chartOfAccounts.colBalance')}</th>
                   <th className="px-5 py-3 w-12" />
                 </tr>
               </thead>
@@ -436,7 +433,7 @@ export default function ChartOfAccounts() {
       {/* Create modal */}
       {showCreate && canCreate && (
         <AccountModal
-          title="Create Account"
+          title={t('chartOfAccounts.createAccount')}
           initial={{ account_type: 'asset', is_postable: true }}
           allAccounts={allAccounts}
           onClose={() => setShowCreate(false)}
@@ -451,7 +448,7 @@ export default function ChartOfAccounts() {
       {/* Edit modal */}
       {editing && canEdit && (
         <AccountModal
-          title={`Edit · ${editing.account_code} ${editing.name}`}
+          title={t('chartOfAccounts.editTitle', { code: editing.account_code, name: editing.name })}
           initial={editing}
           allAccounts={allAccounts}
           onClose={() => setEditing(null)}

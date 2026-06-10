@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Plus, Loader2 } from 'lucide-react';
 import { getCandidates, createCandidate, updateCandidateStatus } from '../../../services/hrApi';
 import type { Candidate } from '../../../services/hrApi';
@@ -18,6 +19,7 @@ const STAGE_COLORS: Record<string, string> = {
 interface Props { requisitionId: number; onBack: () => void; }
 
 export default function CandidatePipeline({ requisitionId, onBack }: Props) {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const canCreate = can('hr', 'recruitment', 'create');
   const canEdit   = can('hr', 'recruitment', 'edit');
@@ -53,14 +55,14 @@ export default function CandidatePipeline({ requisitionId, onBack }: Props) {
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       <div className="px-10 pt-8 pb-5 border-b border-slate-200 bg-white">
         <button onClick={onBack} className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 text-xs font-bold mb-3 transition-colors">
-          <ArrowLeft size={14} /> All Requisitions
+          <ArrowLeft size={14} /> {t('candidatePipeline.allRequisitions')}
         </button>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">HR / Recruitment</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('candidatePipeline.breadcrumb')}</p>
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-slate-900">Candidate Pipeline</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('candidatePipeline.title')}</h1>
           {canCreate && (
             <button onClick={() => setModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg transition-colors">
-              <Plus size={14} /> Add Candidate
+              <Plus size={14} /> {t('candidatePipeline.addCandidate')}
             </button>
           )}
         </div>
@@ -68,13 +70,13 @@ export default function CandidatePipeline({ requisitionId, onBack }: Props) {
 
       <main className="flex-1 overflow-x-auto px-10 py-7">
         {loading ? (
-          <div className="flex items-center gap-2 text-slate-400 py-16 justify-center"><Loader2 size={18} className="animate-spin" /> Loading…</div>
+          <div className="flex items-center gap-2 text-slate-400 py-16 justify-center"><Loader2 size={18} className="animate-spin" /> {t('candidatePipeline.loading')}</div>
         ) : (
           <div className="flex gap-4 min-w-max">
             {STAGES.filter(s => s !== 'rejected' && s !== 'withdrawn').map(stage => (
               <div key={stage} className="w-56 flex flex-col">
                 <div className={`px-3 py-2 rounded-t-lg font-bold text-[11px] uppercase tracking-wider ${STAGE_COLORS[stage]}`}>
-                  {stage} <span className="ml-1 opacity-60">({byStage(stage).length})</span>
+                  {t(`candidatePipeline.stage.${stage}`)} <span className="ml-1 opacity-60">({byStage(stage).length})</span>
                 </div>
                 <div className="flex-1 bg-slate-100 rounded-b-lg p-2 space-y-2 min-h-[200px]">
                   {byStage(stage).map(c => (
@@ -100,17 +102,17 @@ export default function CandidatePipeline({ requisitionId, onBack }: Props) {
         <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setSelected(null)}>
           <div className="absolute right-0 top-0 bottom-0 w-96 bg-white shadow-2xl overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-slate-200">
-              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-700 text-xs mb-3">✕ Close</button>
+              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-700 text-xs mb-3">✕ {t('candidatePipeline.close')}</button>
               <h3 className="text-lg font-bold text-slate-900">{selected.full_name}</h3>
               <p className="text-sm text-slate-500">{selected.email}</p>
-              <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${STAGE_COLORS[selected.status]}`}>{selected.status}</span>
+              <span className={`inline-block mt-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${STAGE_COLORS[selected.status]}`}>{t(`candidatePipeline.stage.${selected.status}`)}</span>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-xs">
                 {[
-                  { label: 'Phone', value: selected.phone ?? '—' },
-                  { label: 'Source', value: selected.source ?? '—' },
-                  { label: 'Applied', value: new Date(selected.applied_at).toLocaleDateString() },
+                  { label: t('candidatePipeline.phone'), value: selected.phone ?? '—' },
+                  { label: t('candidatePipeline.source'), value: selected.source ?? '—' },
+                  { label: t('candidatePipeline.applied'), value: new Date(selected.applied_at).toLocaleDateString() },
                 ].map(i => (
                   <div key={i.label}>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{i.label}</p>
@@ -120,18 +122,18 @@ export default function CandidatePipeline({ requisitionId, onBack }: Props) {
               </div>
               {selected.notes && (
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Notes</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('candidatePipeline.notes')}</p>
                   <p className="text-sm text-slate-700 whitespace-pre-wrap">{selected.notes}</p>
                 </div>
               )}
               {canEdit && (
                 <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Move to Stage</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t('candidatePipeline.moveToStage')}</p>
                   <div className="flex flex-wrap gap-2">
                     {STAGES.filter(s => s !== selected.status).map(s => (
                       <button key={s} onClick={() => { moveCandidate(selected, s); setSelected(null); }}
                         className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${STAGE_COLORS[s]} hover:opacity-80 transition-opacity`}>
-                        {s}
+                        {t(`candidatePipeline.stage.${s}`)}
                       </button>
                     ))}
                   </div>
@@ -145,12 +147,12 @@ export default function CandidatePipeline({ requisitionId, onBack }: Props) {
       {modal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-5">Add Candidate</h2>
+            <h2 className="text-lg font-bold text-slate-900 mb-5">{t('candidatePipeline.addCandidate')}</h2>
             <div className="space-y-4">
               {[
-                { label: 'Full Name *', key: 'full_name', placeholder: 'Candidate name' },
-                { label: 'Email', key: 'email', placeholder: 'email@example.com' },
-                { label: 'Phone', key: 'phone', placeholder: '+86 130 0000 0000' },
+                { label: t('candidatePipeline.fullNameRequired'), key: 'full_name', placeholder: t('candidatePipeline.candidateNamePlaceholder') },
+                { label: t('candidatePipeline.email'), key: 'email', placeholder: 'email@example.com' },
+                { label: t('candidatePipeline.phone'), key: 'phone', placeholder: '+86 130 0000 0000' },
               ].map(f => (
                 <div key={f.key}>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{f.label}</label>
@@ -160,18 +162,18 @@ export default function CandidatePipeline({ requisitionId, onBack }: Props) {
                 </div>
               ))}
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Source</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">{t('candidatePipeline.source')}</label>
                 <select value={newCand.source} onChange={e => setNewCand(p => ({ ...p, source: e.target.value }))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
-                  {['direct','linkedin','referral','agency','job_board','other'].map(s => <option key={s} value={s}>{s}</option>)}
+                  {['direct','linkedin','referral','agency','job_board','other'].map(s => <option key={s} value={s}>{t(`candidatePipeline.sourceOption.${s}`)}</option>)}
                 </select>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+              <button onClick={() => setModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">{t('candidatePipeline.cancel')}</button>
               <button onClick={addCandidate} disabled={saving || !newCand.full_name}
                 className="px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white text-sm font-bold rounded-lg">
-                {saving ? 'Adding…' : 'Add Candidate'}
+                {saving ? t('candidatePipeline.adding') : t('candidatePipeline.addCandidate')}
               </button>
             </div>
           </div>
