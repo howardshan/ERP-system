@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft } from 'lucide-react';
 import {
   inspectionTemplateForSubLot,
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function InspectPage({ subLotId, onBack }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canSubmit = can('qc', 'testing', 'submit_inspection');
   const [subCode, setSubCode] = useState('');
@@ -45,30 +47,30 @@ export default function InspectPage({ subLotId, onBack }: Props) {
       setResult(res.result);
       setStatus(res.new_status);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submit failed');
+      setError(e instanceof Error ? e.message : t('inspectPage.submitFailed'));
     } finally {
       setSubmitting(false);
     }
   };
 
   if (!canSubmit) {
-    return <PermissionDenied permission="qc.testing.submit_inspection" feature="Inspection submission" />;
+    return <PermissionDenied permission="qc.testing.submit_inspection" feature={t('inspectPage.featureInspectionSubmission')} />;
   }
 
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <button onClick={onBack} className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 mb-4">
-        <ArrowLeft size={14} /> Back to queue
+        <ArrowLeft size={14} /> {t('inspectPage.backToQueue')}
       </button>
 
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold text-slate-900">{subCode || 'Inspection'}</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{subCode || t('inspectPage.inspection')}</h1>
         {status && <QcStatusBadge status={status} />}
       </div>
 
       {limits && (
         <p className="text-sm text-slate-600 mb-4">
-          Water Activity (Aw) acceptable range: [{limits[0]}, {limits[1]}]
+          {t('inspectPage.acceptableRange', { lower: limits[0], upper: limits[1] })}
         </p>
       )}
 
@@ -76,19 +78,19 @@ export default function InspectPage({ subLotId, onBack }: Props) {
         <div className={`rounded-2xl p-8 text-center mb-6 ${
           result === 'pass' ? 'bg-emerald-100 text-emerald-900' : 'bg-red-100 text-red-900'
         }`}>
-          <p className="text-3xl font-bold">{result === 'pass' ? 'Passed' : 'Failed · On Hold'}</p>
+          <p className="text-3xl font-bold">{result === 'pass' ? t('inspectPage.passed') : t('inspectPage.failedOnHold')}</p>
           <button
             type="button"
             className="mt-6 w-full bg-slate-800 text-white py-3 rounded-xl text-sm font-bold"
             onClick={onBack}
           >
-            Back to pending queue
+            {t('inspectPage.backToPendingQueue')}
           </button>
         </div>
       ) : (
         <>
           <div className="bg-white rounded-2xl border-2 p-6 mb-6 text-center">
-            <p className="text-xs text-slate-500 mb-2">Water Activity (Aw)</p>
+            <p className="text-xs text-slate-500 mb-2">{t('inspectPage.waterActivity')}</p>
             <p className="text-5xl font-bold tabular-nums text-slate-900">{aw || '—'}</p>
           </div>
           <NumericKeypad value={aw} onChange={setAw} />
@@ -99,7 +101,7 @@ export default function InspectPage({ subLotId, onBack }: Props) {
             onClick={submit}
             className="mt-6 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-base font-semibold py-3 rounded-xl"
           >
-            {submitting ? 'Submitting…' : 'Submit inspection'}
+            {submitting ? t('inspectPage.submitting') : t('inspectPage.submitInspection')}
           </button>
         </>
       )}

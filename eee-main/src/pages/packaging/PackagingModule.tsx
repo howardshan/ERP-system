@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Package } from 'lucide-react';
 import PackagingPage from './PackagingPage';
 
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function PackagingModule({ onHome }: Props) {
+  const { t } = useTranslation('packaging');
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       {/* Top action bar */}
@@ -15,10 +17,10 @@ export default function PackagingModule({ onHome }: Props) {
           onClick={onHome}
           className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
         >
-          <ArrowLeft size={14} /> Module Hub
+          <ArrowLeft size={14} /> {t('packagingModule.moduleHub')}
         </button>
         <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
-          Packaging
+          {t('packagingModule.tag')}
         </span>
       </header>
 
@@ -29,9 +31,9 @@ export default function PackagingModule({ onHome }: Props) {
             <Package size={20} className="text-orange-700" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">Packaging</h1>
+            <h1 className="text-xl font-bold text-slate-900">{t('packagingModule.title')}</h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Dispatch released QC carts — FIFO order, scan support, days-in-stock tracking
+              {t('packagingModule.subtitle')}
             </p>
           </div>
         </div>

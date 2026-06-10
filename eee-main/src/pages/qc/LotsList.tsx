@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2, Plus } from 'lucide-react';
 import {
   listProductionLots,
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default function LotsList({ onSelectLot }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canCreate = can('qc', 'batches', 'create');
   const canDelete = can('qc', 'batches', 'delete');
@@ -69,10 +71,10 @@ export default function LotsList({ onSelectLot }: Props) {
       setShowForm(false);
       setLotBarcode('');
       setWoBarcode('');
-      setMsg('Dry room created');
+      setMsg(t('lotsList.createdMsg'));
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Create failed');
+      setError(e instanceof Error ? e.message : t('lotsList.createFailed'));
     }
   };
 
@@ -100,12 +102,12 @@ export default function LotsList({ onSelectLot }: Props) {
     setError('');
     try {
       await deleteProductionLots([...selected]);
-      setMsg(`Deleted ${selected.size} dry room(s)`);
+      setMsg(t('lotsList.deletedMsg', { count: selected.size }));
       setSelected(new Set());
       setConfirmBulkDelete(false);
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setError(e instanceof Error ? e.message : t('lotsList.deleteFailed'));
     }
     setBusy(false);
   };
@@ -113,14 +115,14 @@ export default function LotsList({ onSelectLot }: Props) {
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-slate-900">Dry Rooms</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t('lotsList.title')}</h1>
         {canCreate && (
           <button
             type="button"
             onClick={() => setShowForm(v => !v)}
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg"
           >
-            <Plus size={13} /> {showForm ? 'Cancel' : 'New Dry Room'}
+            <Plus size={13} /> {showForm ? t('lotsList.cancel') : t('lotsList.newDryRoom')}
           </button>
         )}
       </div>
@@ -131,29 +133,29 @@ export default function LotsList({ onSelectLot }: Props) {
       {showForm && canCreate && (
         <div className="bg-white rounded-xl border p-4 mb-4 space-y-3">
           <button type="button" onClick={fillDemo} className="text-xs text-blue-600 underline">
-            Fill DEMO barcodes (simulate scan)
+            {t('lotsList.fillDemo')}
           </button>
           <input
-            placeholder="Lot barcode"
+            placeholder={t('lotsList.lotBarcode')}
             className="w-full border rounded-lg px-3 py-2.5 text-sm"
             value={lotBarcode}
             onChange={(e) => setLotBarcode(e.target.value)}
           />
           <input
-            placeholder="Work order barcode"
+            placeholder={t('lotsList.workOrderBarcode')}
             className="w-full border rounded-lg px-3 py-2.5 text-sm"
             value={woBarcode}
             onChange={(e) => setWoBarcode(e.target.value)}
           />
           <select className="w-full border rounded-lg px-3 py-2.5 text-sm" value={skuId} onChange={(e) => setSkuId(e.target.value)}>
-            <option value="">— Select SKU —</option>
+            <option value="">{t('lotsList.selectSku')}</option>
             {skus.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
           <button type="button" onClick={create} disabled={!lotBarcode || !woBarcode || !skuId}
                   className="w-full bg-emerald-600 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium">
-            Save
+            {t('lotsList.save')}
           </button>
         </div>
       )}
@@ -173,7 +175,7 @@ export default function LotsList({ onSelectLot }: Props) {
             )}
           >
             <Trash2 size={12} />
-            {confirmBulkDelete ? `Confirm delete (${selected.size})` : `Delete ${selected.size}`}
+            {confirmBulkDelete ? t('lotsList.confirmDelete', { count: selected.size }) : t('lotsList.delete', { count: selected.size })}
           </button>
         )}
       </div>
@@ -200,7 +202,7 @@ export default function LotsList({ onSelectLot }: Props) {
             </li>
           );
         })}
-        {lots.length === 0 && <p className="text-slate-500 text-sm">No dry rooms</p>}
+        {lots.length === 0 && <p className="text-slate-500 text-sm">{t('lotsList.empty')}</p>}
       </ul>
     </div>
   );

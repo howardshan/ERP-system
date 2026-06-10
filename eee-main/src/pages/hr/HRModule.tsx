@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import {
   Users,
@@ -67,6 +68,7 @@ function NavSection({ title }: { title: string }) {
 }
 
 export default function HRModule({ onHome }: Props) {
+  const { t } = useTranslation('hr');
   const { can } = usePermissions();
   const [screen, setScreen] = useState('employees');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
@@ -142,86 +144,86 @@ export default function HRModule({ onHome }: Props) {
               <LayoutGrid size={14} className="text-white" />
             </div>
             <div>
-              <p className="text-white font-bold text-sm leading-none">Human Resources</p>
+              <p className="text-white font-bold text-sm leading-none">{t('hRModule.humanResources')}</p>
               <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mt-0.5 group-hover:text-slate-400 transition-colors">
-                ← All Modules
+                {t('hRModule.allModules')}
               </p>
             </div>
           </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 pb-4">
-          {(canViewEmployees || canViewDepts) && <NavSection title="People" />}
+          {(canViewEmployees || canViewDepts) && <NavSection title={t('hRModule.sectionPeople')} />}
           {canViewEmployees && (
             <>
-              <NavItem icon={Users}    label="Employee Directory" isActive={isActive('employees') || isActive('employee-profile')} onClick={() => navigate('employees')} />
-              <NavItem icon={Network}  label="Org Chart"          isActive={isActive('org-chart')}    onClick={() => navigate('org-chart')} />
+              <NavItem icon={Users}    label={t('hRModule.employeeDirectory')} isActive={isActive('employees') || isActive('employee-profile')} onClick={() => navigate('employees')} />
+              <NavItem icon={Network}  label={t('hRModule.orgChart')}          isActive={isActive('org-chart')}    onClick={() => navigate('org-chart')} />
             </>
           )}
           {canViewDepts && (
-            <NavItem icon={Building2} label="Departments" isActive={isActive('departments')} onClick={() => navigate('departments')} />
+            <NavItem icon={Building2} label={t('hRModule.departments')} isActive={isActive('departments')} onClick={() => navigate('departments')} />
           )}
 
-          {canViewRecruit && <NavSection title="Recruitment" />}
+          {canViewRecruit && <NavSection title={t('hRModule.sectionRecruitment')} />}
           {canViewRecruit && (
             <>
-              <NavItem icon={Briefcase}   label="Job Requisitions" isActive={isActive('requisitions') || isActive('candidates')} onClick={() => navigate('requisitions')} />
-              <NavItem icon={UserCheck}   label="Interviews"          isActive={isActive('interviews')}          onClick={() => navigate('interviews')} />
-              <NavItem icon={CalendarDays} label="Interview Calendar" isActive={isActive('interview-calendar')} onClick={() => navigate('interview-calendar')} />
+              <NavItem icon={Briefcase}   label={t('hRModule.jobRequisitions')} isActive={isActive('requisitions') || isActive('candidates')} onClick={() => navigate('requisitions')} />
+              <NavItem icon={UserCheck}   label={t('hRModule.interviews')}          isActive={isActive('interviews')}          onClick={() => navigate('interviews')} />
+              <NavItem icon={CalendarDays} label={t('hRModule.interviewCalendar')} isActive={isActive('interview-calendar')} onClick={() => navigate('interview-calendar')} />
             </>
           )}
 
-          {canViewOnboarding && <NavSection title="Onboarding" />}
+          {canViewOnboarding && <NavSection title={t('hRModule.sectionOnboarding')} />}
           {canViewOnboarding && (
-            <NavItem icon={ClipboardList} label="Onboarding Tasks" isActive={isActive('onboarding')} onClick={() => navigate('onboarding')} />
+            <NavItem icon={ClipboardList} label={t('hRModule.onboardingTasks')} isActive={isActive('onboarding')} onClick={() => navigate('onboarding')} />
           )}
 
-          {(canViewLeave || canViewOwnLeave) && <NavSection title="Time & Leave" />}
+          {(canViewLeave || canViewOwnLeave) && <NavSection title={t('hRModule.sectionTimeLeave')} />}
           {canViewLeave && (
-            <NavItem icon={CalendarDays} label="Leave Requests" isActive={isActive('leave-requests')} onClick={() => navigate('leave-requests')} />
+            <NavItem icon={CalendarDays} label={t('hRModule.leaveRequests')} isActive={isActive('leave-requests')} onClick={() => navigate('leave-requests')} />
           )}
           {(canViewLeave || canViewOwnLeave) && (
-            <NavItem icon={CalendarDays} label="My Leave"       isActive={isActive('my-leave')}       onClick={() => navigate('my-leave')} />
+            <NavItem icon={CalendarDays} label={t('hRModule.myLeave')}       isActive={isActive('my-leave')}       onClick={() => navigate('my-leave')} />
           )}
 
-          {canViewPayroll && <NavSection title="Payroll" />}
+          {canViewPayroll && <NavSection title={t('hRModule.sectionPayroll')} />}
           {canViewPayroll && (
             <>
-              <NavItem icon={DollarSign}  label="Pay Runs"       isActive={isActive('pay-runs')} onClick={() => navigate('pay-runs')} />
-              <NavItem icon={DollarSign}  label="Salary Records" isActive={isActive('salary')}   onClick={() => navigate('salary')} />
-              <NavItem icon={DollarSign}  label="Overtime"       isActive={isActive('overtime')} onClick={() => navigate('overtime')} />
-              <NavItem icon={TrendingUp}  label="Bonus Rules"    isActive={isActive('bonus')}    onClick={() => navigate('bonus')} />
+              <NavItem icon={DollarSign}  label={t('hRModule.payRuns')}       isActive={isActive('pay-runs')} onClick={() => navigate('pay-runs')} />
+              <NavItem icon={DollarSign}  label={t('hRModule.salaryRecords')} isActive={isActive('salary')}   onClick={() => navigate('salary')} />
+              <NavItem icon={DollarSign}  label={t('hRModule.overtime')}      isActive={isActive('overtime')} onClick={() => navigate('overtime')} />
+              <NavItem icon={TrendingUp}  label={t('hRModule.bonusRules')}    isActive={isActive('bonus')}    onClick={() => navigate('bonus')} />
             </>
           )}
 
-          {canViewBenefits && <NavSection title="Benefits" />}
+          {canViewBenefits && <NavSection title={t('hRModule.sectionBenefits')} />}
           {canViewBenefits && (
-            <NavItem icon={DollarSign} label="Benefits Plans" isActive={isActive('benefits')} onClick={() => navigate('benefits')} />
+            <NavItem icon={DollarSign} label={t('hRModule.benefitsPlans')} isActive={isActive('benefits')} onClick={() => navigate('benefits')} />
           )}
 
-          {canViewPerf && <NavSection title="Performance" />}
+          {canViewPerf && <NavSection title={t('hRModule.sectionPerformance')} />}
           {canViewPerf && (
             <>
-              <NavItem icon={TrendingUp} label="Review Cycles" isActive={isActive('reviews')} onClick={() => navigate('reviews')} />
-              <NavItem icon={TrendingUp} label="Goals / OKRs"  isActive={isActive('goals')}   onClick={() => navigate('goals')} />
+              <NavItem icon={TrendingUp} label={t('hRModule.reviewCycles')} isActive={isActive('reviews')} onClick={() => navigate('reviews')} />
+              <NavItem icon={TrendingUp} label={t('hRModule.goalsOkrs')}  isActive={isActive('goals')}   onClick={() => navigate('goals')} />
             </>
           )}
 
-          {canViewTraining && <NavSection title="Training" />}
+          {canViewTraining && <NavSection title={t('hRModule.sectionTraining')} />}
           {canViewTraining && (
-            <NavItem icon={BookOpen} label="Training Catalog" isActive={isActive('training')} onClick={() => navigate('training')} />
+            <NavItem icon={BookOpen} label={t('hRModule.trainingCatalog')} isActive={isActive('training')} onClick={() => navigate('training')} />
           )}
 
-          {canViewAudit && <NavSection title="Administration" />}
+          {canViewAudit && <NavSection title={t('hRModule.sectionAdministration')} />}
           {canViewAudit && (
-            <NavItem icon={ScrollText} label="HR Audit Log" isActive={isActive('hr-audit')} onClick={() => navigate('hr-audit')} />
+            <NavItem icon={ScrollText} label={t('hRModule.hrAuditLog')} isActive={isActive('hr-audit')} onClick={() => navigate('hr-audit')} />
           )}
         </nav>
 
         <div className="p-4 border-t border-white/5">
           <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
             <HelpCircle size={18} />
-            <span>Support</span>
+            <span>{t('hRModule.support')}</span>
           </button>
         </div>
       </aside>

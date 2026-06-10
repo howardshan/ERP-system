@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Printer, Search, Check, X, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { getSavedPrinter, savePrinter, clearPrinter, getSavedDpi, saveDpi, LABEL_DPIS, LabelDpi } from '../lib/printerConfig';
@@ -6,11 +7,11 @@ import { getSavedPrinter, savePrinter, clearPrinter, getSavedDpi, saveDpi, LABEL
 const PRINT_BRIDGE = 'http://127.0.0.1:6543';
 
 // Installer bundles are served from the website (public/print-bridge/).
-function osBridgeDownload(): { href: string; label: string } | null {
+function osBridgeDownload(): { href: string; labelKey: string } | null {
   if (typeof navigator === 'undefined') return null;
   const ua = navigator.userAgent;
-  if (/Win/i.test(ua)) return { href: '/print-bridge/erp-print-bridge-windows.zip', label: '下载 Windows 打印助手' };
-  if (/Mac/i.test(ua)) return { href: '/print-bridge/erp-print-bridge-macos.zip',   label: '下载 macOS 打印助手' };
+  if (/Win/i.test(ua)) return { href: '/print-bridge/erp-print-bridge-windows.zip', labelKey: 'printerSettingsPopover.downloadWindows' };
+  if (/Mac/i.test(ua)) return { href: '/print-bridge/erp-print-bridge-macos.zip',   labelKey: 'printerSettingsPopover.downloadMacos' };
   return null;
 }
 
@@ -24,13 +25,14 @@ function osKind(): 'win' | 'mac' | 'other' {
 
 /** Collapsible "如何安装？" step-by-step guide, tailored to the visitor's OS. */
 function InstallGuide() {
+  const { t } = useTranslation('ui');
   const [show, setShow] = useState(false);
   const os = osKind();
   const installerName = os === 'win' ? 'install-windows.bat' : 'install-macos.command';
   const warn = os === 'win'
-    ? 'SmartScreen 提示时点「更多信息」→「仍要运行」'
-    : '若提示「无法验证开发者」：右键点该文件 →「打开」→ 再点「打开」';
-  const settingsPath = os === 'win' ? '设置 - 打印机和扫描仪' : '系统设置 - 打印机与扫描仪';
+    ? t('printerSettingsPopover.warnWin')
+    : t('printerSettingsPopover.warnMac');
+  const settingsPath = os === 'win' ? t('printerSettingsPopover.settingsPathWin') : t('printerSettingsPopover.settingsPathMac');
   return (
     <div className="mt-2">
       <button
@@ -39,15 +41,15 @@ function InstallGuide() {
         className="flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline"
       >
         <ChevronDown size={11} className={cn('transition-transform', !show && '-rotate-90')} />
-        如何安装？
+        {t('printerSettingsPopover.howToInstall')}
       </button>
       {show && (
         <ol className="mt-1.5 pl-4 list-decimal space-y-1 text-[11px] text-slate-600 leading-relaxed">
-          <li>点上方下载链接，<b>解压</b>下载的压缩包</li>
-          <li>双击 <code className="font-mono bg-slate-100 px-1 rounded">{installerName}</code>（{warn}）</li>
-          <li>到「{settingsPath}」把标签机默认纸张设为 <b>4×3 英寸</b></li>
-          <li>回到本窗口点「搜索打印机」，选中本机打印机</li>
-          <li>完成 ✓ 之后打印即<b>静默出纸</b>，无需对话框</li>
+          <li>{t('printerSettingsPopover.step1Prefix')}<b>{t('printerSettingsPopover.step1Bold')}</b>{t('printerSettingsPopover.step1Suffix')}</li>
+          <li>{t('printerSettingsPopover.step2Prefix')}<code className="font-mono bg-slate-100 px-1 rounded">{installerName}</code>{t('printerSettingsPopover.step2Open')}{warn}{t('printerSettingsPopover.step2Close')}</li>
+          <li>{t('printerSettingsPopover.step3Prefix', { path: settingsPath })}<b>{t('printerSettingsPopover.step3Bold')}</b></li>
+          <li>{t('printerSettingsPopover.step4')}</li>
+          <li>{t('printerSettingsPopover.step5Prefix')}<b>{t('printerSettingsPopover.step5Bold')}</b>{t('printerSettingsPopover.step5Suffix')}</li>
         </ol>
       )}
     </div>
@@ -56,15 +58,16 @@ function InstallGuide() {
 
 /** "还没装打印助手？下载…" hint shown under the bridge search button. */
 function BridgeDownloadHint() {
+  const { t } = useTranslation('ui');
   const dl = osBridgeDownload();
   return (
     <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
-      还没装打印助手？{dl ? (
-        <a href={dl.href} download className="text-blue-600 hover:underline font-medium">{dl.label}</a>
+      {t('printerSettingsPopover.notInstalledYet')}{dl ? (
+        <a href={dl.href} download className="text-blue-600 hover:underline font-medium">{t(dl.labelKey)}</a>
       ) : (
-        <>下载 <a href="/print-bridge/erp-print-bridge-macos.zip" download className="text-blue-600 hover:underline">macOS</a>
+        <>{t('printerSettingsPopover.downloadPrefix')}<a href="/print-bridge/erp-print-bridge-macos.zip" download className="text-blue-600 hover:underline">macOS</a>
         {' / '}<a href="/print-bridge/erp-print-bridge-windows.zip" download className="text-blue-600 hover:underline">Windows</a></>
-      )}，双击安装后即可静默打印。
+      )}{t('printerSettingsPopover.installHintSuffix')}
     </p>
   );
 }
@@ -79,6 +82,7 @@ function fetchBridge(url: string, timeoutMs: number): Promise<Response> {
 }
 
 export function PrinterSettingsPopover() {
+  const { t } = useTranslation('ui');
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
   const [open, setOpen]         = useState(false);
@@ -109,10 +113,10 @@ export function PrinterSettingsPopover() {
       const { invoke } = await import('@tauri-apps/api/core');
       const list = await invoke<string[]>('list_printers');
       setPrinters(list);
-      if (list.length === 0) flash('未找到打印机，请检查 CUPS 是否已安装');
-      else flash(`找到 ${list.length} 台打印机`);
+      if (list.length === 0) flash(t('printerSettingsPopover.noPrintersCups'));
+      else flash(t('printerSettingsPopover.foundPrinters', { count: list.length }));
     } catch (e) {
-      flash(`搜索失败: ${e instanceof Error ? e.message : String(e)}`);
+      flash(t('printerSettingsPopover.searchFailed', { error: e instanceof Error ? e.message : String(e) }));
     }
     setBusy(false);
   };
@@ -122,14 +126,14 @@ export function PrinterSettingsPopover() {
     setBusy(true);
     try {
       const r = await fetchBridge(`${PRINT_BRIDGE}/printers`, 2000);
-      if (!r.ok) throw new Error('打印助手未运行');
+      if (!r.ok) throw new Error(t('printerSettingsPopover.bridgeNotRunning'));
       const data = await r.json() as string[] | { printers?: string[] };
       const list = Array.isArray(data) ? data : (data.printers ?? []);
       setPrinters(list);
-      if (list.length === 0) flash('未找到打印机，请检查系统打印队列');
-      else flash(`找到 ${list.length} 台打印机`);
+      if (list.length === 0) flash(t('printerSettingsPopover.noPrintersQueue'));
+      else flash(t('printerSettingsPopover.foundPrinters', { count: list.length }));
     } catch (e) {
-      flash(`搜索失败: ${e instanceof Error ? e.message : String(e)}。请先安装打印助手（见下方下载链接）`);
+      flash(t('printerSettingsPopover.searchFailedBridge', { error: e instanceof Error ? e.message : String(e) }));
     }
     setBusy(false);
   };
@@ -137,7 +141,7 @@ export function PrinterSettingsPopover() {
   const select = (name: string) => {
     savePrinter(name);
     setSaved(name);
-    flash('已保存 ✓');
+    flash(t('printerSettingsPopover.saved'));
   };
 
   const saveManual = () => {
@@ -146,20 +150,20 @@ export function PrinterSettingsPopover() {
     savePrinter(v);
     setSaved(v);
     setManual('');
-    flash('已保存 ✓');
+    flash(t('printerSettingsPopover.saved'));
   };
 
   const clear = () => {
     clearPrinter();
     setSaved(null);
     setPrinters([]);
-    flash('已清除');
+    flash(t('printerSettingsPopover.cleared'));
   };
 
   const selectDpi = (d: LabelDpi) => {
     saveDpi(d);
     setDpi(d);
-    flash(`分辨率 ${d} dpi ✓`);
+    flash(t('printerSettingsPopover.dpiSet', { dpi: d }));
   };
 
   return (
@@ -168,7 +172,7 @@ export function PrinterSettingsPopover() {
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        title="标签打印机设置"
+        title={t('printerSettingsPopover.triggerTitle')}
         className={cn(
           'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
           saved
@@ -178,7 +182,7 @@ export function PrinterSettingsPopover() {
       >
         <Printer size={14} />
         <span className="hidden sm:inline font-mono max-w-[160px] truncate">
-          {saved ?? '未设置打印机'}
+          {saved ?? t('printerSettingsPopover.noPrinterSet')}
         </span>
         <ChevronDown size={11} className={cn('transition-transform', open && 'rotate-180')} />
       </button>
@@ -187,7 +191,7 @@ export function PrinterSettingsPopover() {
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold text-slate-700">标签打印机</p>
+            <p className="text-xs font-bold text-slate-700">{t('printerSettingsPopover.title')}</p>
             <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600">
               <X size={13} />
             </button>
@@ -200,7 +204,7 @@ export function PrinterSettingsPopover() {
               ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
               : 'bg-slate-50 border-slate-200 text-slate-400 italic',
           )}>
-            {saved ?? '尚未配置'}
+            {saved ?? t('printerSettingsPopover.notConfigured')}
           </div>
 
           <button
@@ -210,7 +214,7 @@ export function PrinterSettingsPopover() {
             className="w-full mb-2 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium disabled:opacity-50"
           >
             <Search size={12} />
-            {busy ? '搜索中…' : '搜索打印机'}
+            {busy ? t('printerSettingsPopover.searching') : t('printerSettingsPopover.searchPrinter')}
           </button>
 
           {!isTauri && (
@@ -246,7 +250,7 @@ export function PrinterSettingsPopover() {
               value={manual}
               onChange={e => setManual(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && saveManual()}
-              placeholder="手动输入队列名…"
+              placeholder={t('printerSettingsPopover.manualPlaceholder')}
               className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-400"
             />
             <button
@@ -255,14 +259,14 @@ export function PrinterSettingsPopover() {
               disabled={!manual.trim()}
               className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs disabled:opacity-40"
             >
-              保存
+              {t('printerSettingsPopover.save')}
             </button>
           </div>
 
           {/* Printer resolution (per machine) */}
           <div className="mt-3 pt-3 border-t border-slate-100">
             <p className="text-[11px] font-bold text-slate-600 mb-1.5">
-              打印机分辨率 (dpi)
+              {t('printerSettingsPopover.resolutionLabel')}
             </p>
             <div className="flex gap-1.5">
               {LABEL_DPIS.map(d => (
@@ -282,7 +286,7 @@ export function PrinterSettingsPopover() {
               ))}
             </div>
             <p className="mt-1 text-[10px] text-slate-400 leading-relaxed">
-              选成跟这台打印机一致的分辨率，标签最锐（多数热敏机 203，部分 300/600）。
+              {t('printerSettingsPopover.resolutionHint')}
             </p>
           </div>
 
@@ -292,7 +296,7 @@ export function PrinterSettingsPopover() {
               onClick={clear}
               className="mt-3 text-[11px] text-slate-400 hover:text-red-500 transition-colors"
             >
-              清除已保存的打印机
+              {t('printerSettingsPopover.clearSaved')}
             </button>
           )}
 

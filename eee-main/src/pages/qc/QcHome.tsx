@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Flame, Hourglass, FlaskConical, ListChecks,
   CheckCircle2, XCircle, Thermometer, Clock,
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'dashboard', 'view');
   const canRelease = can('qc', 'dashboard', 'release_pass');
@@ -77,7 +79,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
       setForecast(fc);
       setInventory(inv);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Load failed');
+      setError(e instanceof Error ? e.message : t('qcHome.loadFailed'));
     }
     setRefreshing(false);
   };
@@ -106,8 +108,8 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
   const onReleased = () => {
     const item = releaseTarget;
     if (!item) return;
-    const label = item.group_size > 1 ? `${item.group_size} carts` : item.sub_lot_code;
-    setMsg(`${label} released to next process`);
+    const label = item.group_size > 1 ? t('qcHome.cartsCount', { count: item.group_size }) : item.sub_lot_code;
+    setMsg(t('qcHome.releasedToNextProcess', { label }));
     setReleaseTarget(null);
     removeAttentionItem(item.inspection_id);
     // Reload so the Released Inventory section picks up the cart immediately,
@@ -121,9 +123,9 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
 
   const onDisposed = () => {
     const label = disposeTarget
-      ? disposeTarget.group_size > 1 ? `${disposeTarget.group_size} carts` : disposeTarget.sub_lot_code
+      ? disposeTarget.group_size > 1 ? t('qcHome.cartsCount', { count: disposeTarget.group_size }) : disposeTarget.sub_lot_code
       : '—';
-    setMsg(`${label} disposed`);
+    setMsg(t('qcHome.disposed', { label }));
     const id = disposeTarget?.inspection_id;
     setDisposeTarget(null);
     if (id) removeAttentionItem(id);
@@ -131,16 +133,16 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
   };
 
   if (!canView) {
-    return <PermissionDenied permission="qc.dashboard.view" feature="QC Home" />;
+    return <PermissionDenied permission="qc.dashboard.view" feature={t('qcHome.featureName')} />;
   }
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-end justify-between mb-1">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Quality Control</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t('qcHome.title')}</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Today {overview?.today ?? '—'} · live dashboard, auto-refresh every 15s
+            {t('qcHome.subtitle', { date: overview?.today ?? '—' })}
           </p>
         </div>
         <button
@@ -150,7 +152,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
           className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700 disabled:opacity-50"
         >
           <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-          Refresh
+          {t('qcHome.refresh')}
         </button>
       </div>
 
@@ -165,34 +167,34 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
           {/* Drying floor */}
           <section className="mt-5">
             <SectionHeader
-              title="Drying floor"
+              title={t('qcHome.dryingFloor')}
               help={{
-                title: 'Drying floor',
-                content: 'How many carts are in or moving through the dryers right now.',
+                title: t('qcHome.dryingFloor'),
+                content: t('qcHome.dryingFloorHelp'),
               }}
             />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <StatCard
-                label="Currently drying" value={overview.stats.currently_drying}
+                label={t('qcHome.currentlyDrying')} value={overview.stats.currently_drying}
                 icon={Flame} accent="amber"
                 onClick={() => onNavigate('dry-rooms')}
                 help={{
-                  content: 'Carts inside a dryer at this moment — checked in but not yet checked out. Click to see them dryer by dryer.',
+                  content: t('qcHome.currentlyDryingHelp'),
                 }}
               />
               <StatCard
-                label="Expected finish today" value={overview.stats.expected_finish_today}
+                label={t('qcHome.expectedFinishToday')} value={overview.stats.expected_finish_today}
                 icon={Clock} accent="slate"
                 help={{
-                  content: 'Of the carts currently in dryers, how many are expected to come out before the end of today. Based on each cart\'s check-in time plus the drying time you set for it.',
+                  content: t('qcHome.expectedFinishTodayHelp'),
                 }}
               />
               <StatCard
-                label="Room temp drying" value={overview.stats.room_temp_drying}
+                label={t('qcHome.roomTempDrying')} value={overview.stats.room_temp_drying}
                 icon={Thermometer} accent="orange"
                 onClick={() => onNavigate('room-temp')}
                 help={{
-                  content: 'Carts sitting on the room-temperature rack right now. Carts land here when a batch fails inspection and the operator picks "Room temp dry" as the next step. Click to see them.',
+                  content: t('qcHome.roomTempDryingHelp'),
                 }}
               />
             </div>
@@ -201,31 +203,31 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
           {/* Testing pipeline */}
           <section className="mt-4">
             <SectionHeader
-              title="Testing pipeline"
+              title={t('qcHome.testingPipeline')}
               help={{
-                title: 'Testing pipeline',
-                content: 'What\'s happening on the testing bench. The first two are queues waiting for you to do something; the last two are today\'s results so far.',
+                title: t('qcHome.testingPipeline'),
+                content: t('qcHome.testingPipelineHelp'),
               }}
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard
-                label="Awaiting sample" value={overview.stats.awaiting_sample}
+                label={t('qcHome.awaitingSample')} value={overview.stats.awaiting_sample}
                 icon={Hourglass} accent="slate"
                 onClick={() => onNavigate('testing')}
                 help={{
-                  content: 'Carts that have come out of the dryer but no one has taken a sample yet. Click to open Testing and start sampling.',
+                  content: t('qcHome.awaitingSampleHelp'),
                 }}
               />
               <StatCard
-                label="Awaiting WA result" value={overview.stats.awaiting_wa_result}
+                label={t('qcHome.awaitingWaResult')} value={overview.stats.awaiting_wa_result}
                 icon={FlaskConical} accent="blue"
                 onClick={() => onNavigate('testing')}
                 help={{
-                  content: 'Carts whose sample has already been taken, but the water-activity reading hasn\'t been entered yet. Click to open Testing and finish them off.',
+                  content: t('qcHome.awaitingWaResultHelp'),
                 }}
               />
               <StatCard
-                label={`Passed today (${overview.stats.pass_rate_pct ?? '—'}%)`}
+                label={t('qcHome.passedTodayLabel', { pct: overview.stats.pass_rate_pct ?? '—' })}
                 value={overview.stats.passed_today}
                 icon={CheckCircle2} accent="emerald"
                 onClick={() => {
@@ -240,12 +242,12 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                   }
                 }}
                 help={{
-                  title: 'Passed today',
-                  content: 'How many carts have passed inspection since this morning. The percentage in parentheses is today\'s overall pass rate — passes divided by total tests done today. Click the card to see what passed in the last two days, with each row tagged "Released" or "Awaiting release".',
+                  title: t('qcHome.passedToday'),
+                  content: t('qcHome.passedTodayHelp'),
                 }}
               />
               <StatCard
-                label="Failed today"
+                label={t('qcHome.failedToday')}
                 value={overview.stats.failed_today}
                 icon={XCircle} accent="red"
                 onClick={() => {
@@ -266,12 +268,12 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                   const resolved = Math.max(0, total - open);
                   return (
                     <>
-                      <span className="font-bold">{open}</span> still open · {resolved} resolved
+                      <span className="font-bold">{open}</span> {t('qcHome.stillOpenResolved', { resolved })}
                     </>
                   );
                 })()}
                 help={{
-                  content: 'How many carts have failed inspection since this morning — the big number is the running total today (it does NOT shrink when a retest passes). The smaller "X still open · Y resolved" line breaks that down: "open" = no retest pass yet AND not scrapped/discarded yet; "resolved" = already retested to pass or sent to scrap / grind / concession / rework. Click the card to see what failed in the last two days, with each row tagged by outcome.',
+                  content: t('qcHome.failedTodayHelp'),
                 }}
               />
             </div>
@@ -305,23 +307,23 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
           <div className="flex items-baseline justify-between mb-2">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <TrendingUp size={14} className="text-emerald-600" />
-              Predicted passes (in-flight × today's pass rate)
+              {t('qcHome.predictedPasses')}
               <HelpPopover
                 size={13}
                 triggerClass="text-emerald-700"
                 content={
                   <>
-                    A rough estimate of how many more carts will pass by the end of today, broken out per product.
+                    {t('qcHome.predictedPassesHelp1')}
                     <br /><br />
-                    We count every cart that doesn&apos;t have a final result yet — anything still drying, waiting to be tested, mid-inspection, on the room-temp rack, or being re-dried — and multiply by today&apos;s pass rate so far.
+                    {t('qcHome.predictedPassesHelp2')}
                     <br /><br />
-                    If nothing has been tested yet today, we assume 100% to stay optimistic.
+                    {t('qcHome.predictedPassesHelp3')}
                   </>
                 }
               />
             </h2>
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
-              per product
+              {t('qcHome.perProduct')}
             </span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -341,16 +343,16 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                       <p className="text-3xl font-bold tabular-nums text-emerald-700">
                         {f.forecast_passes}
                       </p>
-                      <p className="text-[10px] text-slate-400">est. passes</p>
+                      <p className="text-[10px] text-slate-400">{t('qcHome.estPasses')}</p>
                     </div>
                   </div>
                   <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-600">
                     <span className="font-mono">{f.in_progress}</span>
-                    <span className="text-slate-400">in flight ·</span>
+                    <span className="text-slate-400">{t('qcHome.inFlight')}</span>
                     {ratePct != null ? (
-                      <span className="font-mono">{ratePct}% today</span>
+                      <span className="font-mono">{t('qcHome.pctToday', { pct: ratePct })}</span>
                     ) : (
-                      <span className="text-slate-400">no tests today (assumes 100%)</span>
+                      <span className="text-slate-400">{t('qcHome.noTestsToday')}</span>
                     )}
                   </div>
                 </div>
@@ -365,28 +367,28 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
         <section className="mt-6">
           <div className="flex items-baseline justify-between mb-2">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-              Needs attention <span className="text-slate-400 font-normal">(today's test results)</span>
+              {t('qcHome.needsAttention')} <span className="text-slate-400 font-normal">{t('qcHome.needsAttentionSub')}</span>
               <HelpPopover
                 size={13}
                 content={
                   <>
-                    Test results from today that still need your action. Each sampling group shows up as <strong>one row</strong> — even if you re-tested it a few times, only the latest result appears here.
+                    {t('qcHome.needsAttentionHelp1a')}<strong>{t('qcHome.needsAttentionHelp1b')}</strong>{t('qcHome.needsAttentionHelp1c')}
                     <br /><br />
-                    A green <strong>PASS</strong> row means the whole group is ready to release to packaging. A red <strong>FAIL</strong> row means the whole group needs a disposition (re-test, re-dry, room-temp dry, or scrap).
+                    {t('qcHome.needsAttentionHelp2a')}<strong>{t('qcHome.passLabel')}</strong>{t('qcHome.needsAttentionHelp2b')}<strong>{t('qcHome.failLabel')}</strong>{t('qcHome.needsAttentionHelp2c')}
                     <br /><br />
-                    Inside a row, the cart highlighted in <strong>green</strong> is the one that was physically sampled — the others share its result because they&apos;re in the same sampling group.
+                    {t('qcHome.needsAttentionHelp3a')}<strong>{t('qcHome.greenLabel')}</strong>{t('qcHome.needsAttentionHelp3b')}
                   </>
                 }
               />
             </h2>
             <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
-              {overview.needs_attention.length} entries
+              {t('qcHome.entriesCount', { count: overview.needs_attention.length })}
             </span>
           </div>
 
           {overview.needs_attention.length === 0 ? (
             <div className="bg-white border rounded-xl p-8 text-center text-sm text-slate-500">
-              No new pass or fail results yet today.
+              {t('qcHome.noResultsYet')}
             </div>
           ) : (
             <ul className="space-y-2">

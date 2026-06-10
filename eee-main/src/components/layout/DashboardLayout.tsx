@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { getPendingApprovals } from '../../services/api';
@@ -12,6 +13,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, onHome, onLogout, userName, userEmail }: DashboardLayoutProps) {
+  const { t } = useTranslation('nav');
   const [activeScreen, setActiveScreen] = useState('dashboard');
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -35,8 +37,8 @@ export function DashboardLayout({ children, onHome, onLogout, userName, userEmai
           {children(activeScreen, setActiveScreen)}
         </main>
         <footer className="px-8 py-3 bg-white border-t border-slate-200 text-[10px] text-slate-400 flex justify-between uppercase font-bold tracking-widest">
-          <div>ERP Status: Active</div>
-          <div>Server: US-WEST-1 (Production)</div>
+          <div>{t('dashboardLayout.erpStatus')}</div>
+          <div>{t('dashboardLayout.server')}</div>
         </footer>
       </div>
     </div>

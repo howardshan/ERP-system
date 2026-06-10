@@ -1,0 +1,52 @@
+{
+  "cards": {
+    "vsLastPeriod": "vs. periodo anterior"
+  },
+  "printerSettingsPopover": {
+    "downloadWindows": "Descargar asistente de impresión para Windows",
+    "downloadMacos": "Descargar asistente de impresión para macOS",
+    "howToInstall": "¿Cómo instalar?",
+    "warnWin": "Cuando SmartScreen lo advierta, haz clic en \"Más información\" → \"Ejecutar de todos modos\"",
+    "warnMac": "Si aparece \"no se puede verificar al desarrollador\": haz clic derecho en el archivo → \"Abrir\" → vuelve a hacer clic en \"Abrir\"",
+    "settingsPathWin": "Configuración - Impresoras y escáneres",
+    "settingsPathMac": "Configuración del sistema - Impresoras y escáneres",
+    "step1Prefix": "Haz clic en el enlace de descarga de arriba y ",
+    "step1Bold": "descomprime",
+    "step1Suffix": " el archivo descargado",
+    "step2Prefix": "Haz doble clic en ",
+    "step2Open": " (",
+    "step2Close": ")",
+    "step3Prefix": "Ve a \"{{path}}\" y configura el papel predeterminado de la impresora de etiquetas en ",
+    "step3Bold": "4×3 pulgadas",
+    "step4": "Vuelve a esta ventana, haz clic en \"Buscar impresora\" y selecciona tu impresora",
+    "step5Prefix": "Una vez listo ✓, la impresión ",
+    "step5Bold": "saldrá en silencio",
+    "step5Suffix": " sin cuadro de diálogo",
+    "notInstalledYet": "¿Aún no instalas el asistente de impresión? ",
+    "downloadPrefix": "Descargar ",
+    "installHintSuffix": ". Haz doble clic para instalar y podrás imprimir en silencio.",
+    "noPrintersCups": "No se encontraron impresoras. Verifica si CUPS está instalado",
+    "foundPrinters": "Se encontraron {{count}} impresora(s)",
+    "searchFailed": "Búsqueda fallida: {{error}}",
+    "bridgeNotRunning": "El asistente de impresión no está en ejecución",
+    "noPrintersQueue": "No se encontraron impresoras. Verifica la cola de impresión del sistema",
+    "searchFailedBridge": "Búsqueda fallida: {{error}}. Primero instala el asistente de impresión (ver el enlace de descarga abajo)",
+    "saved": "Guardado ✓",
+    "cleared": "Borrado",
+    "dpiSet": "Resolución {{dpi}} dpi ✓",
+    "triggerTitle": "Configuración de la impresora de etiquetas",
+    "noPrinterSet": "Sin impresora configurada",
+    "title": "Impresora de etiquetas",
+    "notConfigured": "Sin configurar",
+    "searching": "Buscando…",
+    "searchPrinter": "Buscar impresora",
+    "manualPlaceholder": "Ingresar el nombre de la cola manualmente…",
+    "save": "Guardar",
+    "resolutionLabel": "Resolución de la impresora (dpi)",
+    "resolutionHint": "Elige la resolución que coincida con esta impresora para etiquetas más nítidas (la mayoría de las impresoras térmicas son 203, algunas 300/600).",
+    "clearSaved": "Borrar impresora guardada"
+  },
+  "helpPopover": {
+    "triggerAriaLabel": "¿Qué significa esto?"
+  }
+}

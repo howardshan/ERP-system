@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   dashboardSummary,
   createDisposition,
@@ -17,13 +18,14 @@ import { cn } from '../../lib/utils';
 type Panel = 'pending' | 'hold' | 'passed' | 'rate';
 
 const DISP_TYPES = [
-  { value: 'rework' as const,     label: 'Rework' },
-  { value: 'grind' as const,      label: 'Grind & re-line' },
-  { value: 'scrap' as const,      label: 'Scrap' },
-  { value: 'concession' as const, label: 'Concession' },
+  { value: 'rework' as const,     labelKey: 'adminDashboard.dispRework' },
+  { value: 'grind' as const,      labelKey: 'adminDashboard.dispGrind' },
+  { value: 'scrap' as const,      labelKey: 'adminDashboard.dispScrap' },
+  { value: 'concession' as const, labelKey: 'adminDashboard.dispConcession' },
 ];
 
 export default function AdminDashboard() {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'dashboard', 'view');
   // Admin dashboard uses the legacy 4-type disposition picker; require all three
@@ -92,12 +94,12 @@ export default function AdminDashboard() {
         type: dispType,
         remark: dispRemark || undefined,
       });
-      setMsg(`Disposition completed: ${selectedHold.sub_lot_code}`);
+      setMsg(t('adminDashboard.dispositionCompleted', { code: selectedHold.sub_lot_code }));
       setSelectedHold(null);
       setDispRemark('');
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Disposition failed');
+      setError(e instanceof Error ? e.message : t('adminDashboard.dispositionFailed'));
     }
   };
 
@@ -107,12 +109,12 @@ export default function AdminDashboard() {
     setError('');
     try {
       await createDispositionsBulk([...bulkSelected], bulkDispType, bulkDispRemark || null);
-      setMsg(`Disposed ${bulkSelected.size} hold sub-lot(s) as ${bulkDispType}`);
+      setMsg(t('adminDashboard.bulkDisposed', { count: bulkSelected.size, type: bulkDispType }));
       setBulkSelected(new Set());
       setBulkDispRemark('');
       load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Bulk disposition failed');
+      setError(e instanceof Error ? e.message : t('adminDashboard.bulkDispositionFailed'));
     }
     setBusy(false);
   };
@@ -136,14 +138,14 @@ export default function AdminDashboard() {
   const pollingEnabled = selectedHold === null && bulkSelected.size === 0;
 
   if (!canView) {
-    return <PermissionDenied permission="qc.dashboard.view" feature="Quality Dashboard" />;
+    return <PermissionDenied permission="qc.dashboard.view" feature={t('adminDashboard.qualityDashboard')} />;
   }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Quality Dashboard</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('adminDashboard.qualityDashboard')}</h1>
       <p className="text-xs text-slate-500 mb-4">
-        Click a metric card for details · auto-refresh every 4s{!pollingEnabled ? ' (paused while disposing)' : ''}
+        {t('adminDashboard.subtitle')}{!pollingEnabled ? t('adminDashboard.pausedWhileDisposing') : ''}
       </p>
 
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
@@ -152,31 +154,31 @@ export default function AdminDashboard() {
       {data && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <StatCard label="Pending"      value={data.pending_count}                                         accent="amber"   active={panel === 'pending'} onClick={() => togglePanel('pending')} />
-            <StatCard label="Hold"         value={data.hold_count}                                            accent="red"     active={panel === 'hold'}    onClick={() => togglePanel('hold')} />
-            <StatCard label="Passed today" value={data.today_passed}                                          accent="emerald" active={panel === 'passed'}  onClick={() => togglePanel('passed')} />
-            <StatCard label="Pass rate"    value={data.pass_rate != null ? `${data.pass_rate}%` : '—'}        accent="blue"    active={panel === 'rate'}    onClick={() => togglePanel('rate')} />
+            <StatCard label={t('adminDashboard.pending')}      value={data.pending_count}                                         accent="amber"   active={panel === 'pending'} onClick={() => togglePanel('pending')} />
+            <StatCard label={t('adminDashboard.hold')}         value={data.hold_count}                                            accent="red"     active={panel === 'hold'}    onClick={() => togglePanel('hold')} />
+            <StatCard label={t('adminDashboard.passedToday')} value={data.today_passed}                                          accent="emerald" active={panel === 'passed'}  onClick={() => togglePanel('passed')} />
+            <StatCard label={t('adminDashboard.passRate')}    value={data.pass_rate != null ? `${data.pass_rate}%` : '—'}        accent="blue"    active={panel === 'rate'}    onClick={() => togglePanel('rate')} />
           </div>
 
           {data.longest_wait_minutes != null && panel !== 'pending' && (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-              Longest pending wait: {data.longest_wait_minutes} min
+              {t('adminDashboard.longestPendingWait', { minutes: data.longest_wait_minutes })}
             </p>
           )}
 
           {panel === 'pending' && (
-            <DetailPanel title="Pending sub-lots">
+            <DetailPanel title={t('adminDashboard.pendingSubLots')}>
               {data.longest_wait_minutes != null && (
-                <p className="text-sm text-amber-800 mb-3">Longest wait: {data.longest_wait_minutes} min</p>
+                <p className="text-sm text-amber-800 mb-3">{t('adminDashboard.longestWait', { minutes: data.longest_wait_minutes })}</p>
               )}
-              <SubLotList items={data.pending_items} emptyText="No pending sub-lots" showWait />
+              <SubLotList items={data.pending_items} emptyText={t('adminDashboard.noPendingSubLots')} showWait />
             </DetailPanel>
           )}
 
           {panel === 'hold' && (
-            <DetailPanel title="Hold sub-lots · dispose here">
+            <DetailPanel title={t('adminDashboard.holdSubLots')}>
               {data.holds.length === 0 ? (
-                <p className="text-slate-500 text-sm">No holds</p>
+                <p className="text-slate-500 text-sm">{t('adminDashboard.noHolds')}</p>
               ) : (
                 <>
                   {canDispose && (
@@ -185,7 +187,7 @@ export default function AdminDashboard() {
                         total={data.holds.length}
                         selected={bulkSelected.size}
                         onToggleAll={toggleBulkSelectAll}
-                        label="Select all holds"
+                        label={t('adminDashboard.selectAllHolds')}
                       />
                       {bulkSelected.size > 0 && (
                         <div className="flex items-center gap-2 flex-wrap">
@@ -194,11 +196,11 @@ export default function AdminDashboard() {
                             value={bulkDispType}
                             onChange={(e) => setBulkDispType(e.target.value as any)}
                           >
-                            {DISP_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                            {DISP_TYPES.map(d => <option key={d.value} value={d.value}>{t(d.labelKey)}</option>)}
                           </select>
                           <input
                             type="text"
-                            placeholder="Remark (optional)"
+                            placeholder={t('adminDashboard.remarkOptional')}
                             value={bulkDispRemark}
                             onChange={(e) => setBulkDispRemark(e.target.value)}
                             className="border rounded-lg px-2 py-1 text-xs w-48"
@@ -209,7 +211,7 @@ export default function AdminDashboard() {
                             disabled={busy}
                             className="px-3 py-1.5 text-xs font-bold rounded-lg bg-red-600 hover:bg-red-500 text-white disabled:opacity-50"
                           >
-                            {busy ? 'Disposing…' : `Dispose ${bulkSelected.size}`}
+                            {busy ? t('adminDashboard.disposing') : t('adminDashboard.disposeCount', { count: bulkSelected.size })}
                           </button>
                         </div>
                       )}
@@ -243,11 +245,11 @@ export default function AdminDashboard() {
                                 <div className="font-semibold text-slate-900">{h.sub_lot_code}</div>
                                 <p className="text-xs text-slate-600">{h.sku_name}</p>
                                 {h.hold_reason && (
-                                  <p className="text-xs text-red-700 mt-1 leading-snug">Hold reason: {h.hold_reason}</p>
+                                  <p className="text-xs text-red-700 mt-1 leading-snug">{t('adminDashboard.holdReason', { reason: h.hold_reason })}</p>
                                 )}
                                 {h.hold_inspected_at && (
                                   <p className="text-[11px] text-slate-500 mt-1">
-                                    Inspected: {formatQcDateTime(h.hold_inspected_at)}
+                                    {t('adminDashboard.inspected', { time: formatQcDateTime(h.hold_inspected_at) })}
                                   </p>
                                 )}
                               </div>
@@ -260,7 +262,7 @@ export default function AdminDashboard() {
                   </ul>
                   {selectedHold && canDispose && (
                     <div className="bg-white rounded-xl border p-4 space-y-3">
-                      <p className="font-medium text-slate-900">Dispose: {selectedHold.sub_lot_code}</p>
+                      <p className="font-medium text-slate-900">{t('adminDashboard.disposeLabel', { code: selectedHold.sub_lot_code })}</p>
                       {selectedHold.hold_reason && (
                         <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg p-3">
                           {selectedHold.hold_reason}
@@ -271,11 +273,11 @@ export default function AdminDashboard() {
                         value={dispType}
                         onChange={(e) => setDispType(e.target.value as any)}
                       >
-                        {DISP_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                        {DISP_TYPES.map(d => <option key={d.value} value={d.value}>{t(d.labelKey)}</option>)}
                       </select>
                       <textarea
                         className="w-full border rounded-lg px-3 py-2 text-sm min-h-[80px]"
-                        placeholder="Remarks"
+                        placeholder={t('adminDashboard.remarks')}
                         value={dispRemark}
                         onChange={(e) => setDispRemark(e.target.value)}
                       />
@@ -285,14 +287,14 @@ export default function AdminDashboard() {
                           onClick={submitDisposition}
                           className="flex-1 bg-red-600 hover:bg-red-500 text-white py-2 rounded-lg text-sm font-medium"
                         >
-                          Confirm disposition
+                          {t('adminDashboard.confirmDisposition')}
                         </button>
                         <button
                           type="button"
                           onClick={() => setSelectedHold(null)}
                           className="px-4 py-2 rounded-lg border text-sm"
                         >
-                          Cancel
+                          {t('adminDashboard.cancel')}
                         </button>
                       </div>
                     </div>
@@ -303,24 +305,24 @@ export default function AdminDashboard() {
           )}
 
           {panel === 'passed' && (
-            <DetailPanel title="Passed inspections today">
-              <TodayInspectionList items={data.today_passed_items} emptyText="No passed inspections today" />
+            <DetailPanel title={t('adminDashboard.passedInspectionsToday')}>
+              <TodayInspectionList items={data.today_passed_items} emptyText={t('adminDashboard.noPassedInspectionsToday')} />
             </DetailPanel>
           )}
 
           {panel === 'rate' && (
-            <DetailPanel title="Today's inspection summary">
+            <DetailPanel title={t('adminDashboard.todaysInspectionSummary')}>
               <div className="grid sm:grid-cols-3 gap-3 mb-4 text-sm">
                 <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                  <p className="text-slate-600 text-xs">Passed</p>
+                  <p className="text-slate-600 text-xs">{t('adminDashboard.passed')}</p>
                   <p className="text-xl font-bold text-emerald-800">{data.today_passed}</p>
                 </div>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-slate-600 text-xs">Failed</p>
+                  <p className="text-slate-600 text-xs">{t('adminDashboard.failed')}</p>
                   <p className="text-xl font-bold text-red-800">{data.today_failed}</p>
                 </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-slate-600 text-xs">Pass rate</p>
+                  <p className="text-slate-600 text-xs">{t('adminDashboard.passRate')}</p>
                   <p className="text-xl font-bold text-blue-800">
                     {data.pass_rate != null ? `${data.pass_rate}%` : '—'}
                   </p>
@@ -328,12 +330,12 @@ export default function AdminDashboard() {
               </div>
               {data.today_failed > 0 && (
                 <>
-                  <h3 className="font-medium text-red-800 mb-2 text-sm">Failed today (on Hold)</h3>
+                  <h3 className="font-medium text-red-800 mb-2 text-sm">{t('adminDashboard.failedTodayOnHold')}</h3>
                   <TodayInspectionList items={data.today_failed_items} emptyText="" />
                 </>
               )}
               {data.today_passed === 0 && data.today_failed === 0 && (
-                <p className="text-slate-500 text-sm">No inspections recorded today</p>
+                <p className="text-slate-500 text-sm">{t('adminDashboard.noInspectionsToday')}</p>
               )}
             </DetailPanel>
           )}
@@ -378,6 +380,7 @@ function DetailPanel({ title, children }: { title: string; children: React.React
 }
 
 function SubLotList({ items, emptyText, showWait }: { items: SubLot[]; emptyText: string; showWait?: boolean }) {
+  const { t } = useTranslation('qc');
   if (items.length === 0) return <p className="text-slate-500 text-sm">{emptyText}</p>;
   return (
     <ul className="space-y-2">
@@ -386,10 +389,10 @@ function SubLotList({ items, emptyText, showWait }: { items: SubLot[]; emptyText
           <div>
             <div className="font-medium text-slate-900">{s.sub_lot_code}</div>
             <p className="text-xs text-slate-600">{s.sku_name}{s.location_name ? ` · ${s.location_name}` : ''}</p>
-            <p className="text-xs text-slate-500 mt-1">In: {formatQcDateTime(s.in_time)}</p>
-            <p className="text-xs text-slate-500">Out: {formatQcDateTime(s.out_time)}</p>
+            <p className="text-xs text-slate-500 mt-1">{t('adminDashboard.inTime', { time: formatQcDateTime(s.in_time) })}</p>
+            <p className="text-xs text-slate-500">{t('adminDashboard.outTime', { time: formatQcDateTime(s.out_time) })}</p>
             {showWait && s.wait_minutes != null && (
-              <p className="text-xs text-amber-800 mt-1">Waiting {s.wait_minutes} min</p>
+              <p className="text-xs text-amber-800 mt-1">{t('adminDashboard.waiting', { minutes: s.wait_minutes })}</p>
             )}
           </div>
           <QcStatusBadge status={s.status} />
@@ -400,6 +403,7 @@ function SubLotList({ items, emptyText, showWait }: { items: SubLot[]; emptyText
 }
 
 function TodayInspectionList({ items, emptyText }: { items: TodayInspectionItem[]; emptyText: string }) {
+  const { t } = useTranslation('qc');
   if (items.length === 0) {
     return emptyText ? <p className="text-slate-500 text-sm">{emptyText}</p> : null;
   }
@@ -415,7 +419,7 @@ function TodayInspectionList({ items, emptyText }: { items: TodayInspectionItem[
             <QcStatusBadge status={item.status} />
           </div>
           <p className="text-xs mt-2 text-slate-600">
-            Aw {item.aw ?? '—'} · {formatQcDateTime(item.submitted_at)}
+            {t('adminDashboard.aw', { value: item.aw ?? '—', time: formatQcDateTime(item.submitted_at) })}
           </p>
           {item.fail_reason && (
             <p className="text-xs text-red-700 mt-1">{item.fail_reason}</p>

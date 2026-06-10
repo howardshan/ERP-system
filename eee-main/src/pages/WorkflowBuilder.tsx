@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ReactFlow,
   Background,
@@ -33,6 +34,7 @@ let nodeIdCounter = 0;
 function nextId() { return `n_${Date.now()}_${++nodeIdCounter}`; }
 
 export default function WorkflowBuilder({ workflowId, onNavigate }: WorkflowBuilderProps) {
+  const { t } = useTranslation('workflowBuilder');
   // Use ref so onDrop always reads the latest instance without stale closure
   const rfInstanceRef = useRef<ReactFlowInstance | null>(null);
 
@@ -41,7 +43,7 @@ export default function WorkflowBuilder({ workflowId, onNavigate }: WorkflowBuil
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   const [selectedNode, setSelectedNode] = useState<WFNode | null>(null);
-  const [wfName, setWfName] = useState('Untitled Workflow');
+  const [wfName, setWfName] = useState(t('workflowBuilder.untitledWorkflow'));
   const [currentId, setCurrentId] = useState<number | null>(workflowId);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
@@ -132,10 +134,10 @@ export default function WorkflowBuilder({ workflowId, onNavigate }: WorkflowBuil
         const wf = await createWorkflow({ name: wfName, nodes_json: nodesJson, edges_json: edgesJson });
         setCurrentId(wf.id);
       }
-      setSaveMsg('Saved');
+      setSaveMsg(t('workflowBuilder.saved'));
       setTimeout(() => setSaveMsg(''), 2000);
     } catch {
-      setSaveMsg('Error saving');
+      setSaveMsg(t('workflowBuilder.errorSaving'));
     } finally {
       setSaving(false);
     }
@@ -156,7 +158,7 @@ export default function WorkflowBuilder({ workflowId, onNavigate }: WorkflowBuil
           onClick={() => onNavigate('wf-list')}
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 text-xs font-bold transition-colors"
         >
-          <ArrowLeft size={14} /> Back
+          <ArrowLeft size={14} /> {t('workflowBuilder.back')}
         </button>
 
         <div className="w-px h-5 bg-slate-200" />
@@ -165,7 +167,7 @@ export default function WorkflowBuilder({ workflowId, onNavigate }: WorkflowBuil
           value={wfName}
           onChange={e => setWfName(e.target.value)}
           className="bg-transparent text-slate-900 text-sm font-bold focus:outline-none border-b border-transparent focus:border-slate-300 px-1 w-52 transition-colors"
-          placeholder="Workflow name..."
+          placeholder={t('workflowBuilder.workflowNamePlaceholder')}
         />
 
         <div className="ml-auto flex items-center gap-2">
@@ -178,7 +180,7 @@ export default function WorkflowBuilder({ workflowId, onNavigate }: WorkflowBuil
               onClick={handleDeleteSelected}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
             >
-              <Trash2 size={12} /> Delete Node
+              <Trash2 size={12} /> {t('workflowBuilder.deleteNode')}
             </button>
           )}
 
@@ -187,11 +189,11 @@ export default function WorkflowBuilder({ workflowId, onNavigate }: WorkflowBuil
             disabled={saving}
             className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors"
           >
-            <Save size={12} /> {saving ? 'Saving…' : 'Save'}
+            <Save size={12} /> {saving ? t('workflowBuilder.saving') : t('workflowBuilder.save')}
           </button>
 
           <button className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-colors">
-            <Play size={12} /> Run
+            <Play size={12} /> {t('workflowBuilder.run')}
           </button>
         </div>
       </div>
@@ -236,8 +238,8 @@ export default function WorkflowBuilder({ workflowId, onNavigate }: WorkflowBuil
                   <div className="w-12 h-12 rounded-2xl bg-slate-700/60 flex items-center justify-center">
                     <ZoomIn size={22} className="text-slate-400" />
                   </div>
-                  <p className="text-slate-400 text-sm font-medium">Drag nodes from the left panel to get started</p>
-                  <p className="text-slate-500 text-xs">Connect nodes by dragging from one handle to another</p>
+                  <p className="text-slate-400 text-sm font-medium">{t('workflowBuilder.emptyDragHint')}</p>
+                  <p className="text-slate-500 text-xs">{t('workflowBuilder.emptyConnectHint')}</p>
                 </div>
               </Panel>
             )}

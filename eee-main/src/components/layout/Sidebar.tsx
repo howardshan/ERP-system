@@ -14,6 +14,7 @@ import {
   LayoutGrid,
   ScrollText,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
 
@@ -67,6 +68,7 @@ export function Sidebar({ activeScreen, setActiveScreen, pendingApprovalCount = 
   const isActive = (id: string) =>
     activeScreen === id || activeScreen.startsWith(id + ':');
   const { can } = usePermissions();
+  const { t } = useTranslation('nav');
 
   const canViewJE       = can('finance', 'journal_entry', 'view');
   const canCreateJE     = can('finance', 'journal_entry', 'create');
@@ -86,60 +88,60 @@ export function Sidebar({ activeScreen, setActiveScreen, pendingApprovalCount = 
             <LayoutGrid size={14} className="text-white" />
           </div>
           <div>
-            <p className="text-white font-bold text-sm leading-none">Financials</p>
+            <p className="text-white font-bold text-sm leading-none">{t('financials')}</p>
             <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mt-0.5 group-hover:text-slate-400 transition-colors">
-              ← All Modules
+              ← {t('allModules')}
             </p>
           </div>
         </button>
       </div>
 
       <nav className="flex-1 overflow-y-auto space-y-0.5">
-        <NavSection title="Overview" />
-        <NavItem icon={LayoutDashboard} label="Dashboard" isActive={isActive('dashboard')} onClick={() => setActiveScreen('dashboard')} />
+        <NavSection title={t('section.overview')} />
+        <NavItem icon={LayoutDashboard} label={t('item.dashboard')} isActive={isActive('dashboard')} onClick={() => setActiveScreen('dashboard')} />
 
-        <NavSection title="General Ledger" />
+        <NavSection title={t('section.generalLedger')} />
         {canViewCoA && (
-          <NavItem icon={Network} label="Chart of Accounts" isActive={isActive('coa')} onClick={() => setActiveScreen('coa')} />
+          <NavItem icon={Network} label={t('item.chartOfAccounts')} isActive={isActive('coa')} onClick={() => setActiveScreen('coa')} />
         )}
         {canCreateJE && (
-          <NavItem icon={PlusSquare} label="New Journal Entry" isActive={isActive('je-create')} onClick={() => setActiveScreen('je-create')} />
+          <NavItem icon={PlusSquare} label={t('item.newJournalEntry')} isActive={isActive('je-create')} onClick={() => setActiveScreen('je-create')} />
         )}
         {canViewJE && (
-          <NavItem icon={ListFilter} label="Journal Entries" isActive={isActive('je-list') || isActive('je-edit')} onClick={() => setActiveScreen('je-list')} />
+          <NavItem icon={ListFilter} label={t('item.journalEntries')} isActive={isActive('je-list') || isActive('je-edit')} onClick={() => setActiveScreen('je-list')} />
         )}
         {canViewJE && (
-          <NavItem icon={ShieldCheck} label="Approvals" isActive={isActive('approvals')} onClick={() => setActiveScreen('approvals')} badge={pendingApprovalCount} />
+          <NavItem icon={ShieldCheck} label={t('item.approvals')} isActive={isActive('approvals')} onClick={() => setActiveScreen('approvals')} badge={pendingApprovalCount} />
         )}
 
-        <NavSection title="Payables & Receivables" />
-        <NavItem icon={Wallet}  label="Accounts Payable"    isActive={isActive('ap')} onClick={() => setActiveScreen('ap')} />
-        <NavItem icon={Receipt} label="Accounts Receivable" isActive={isActive('ar')} onClick={() => setActiveScreen('ar')} />
+        <NavSection title={t('section.payablesReceivables')} />
+        <NavItem icon={Wallet}  label={t('item.accountsPayable')}    isActive={isActive('ap')} onClick={() => setActiveScreen('ap')} />
+        <NavItem icon={Receipt} label={t('item.accountsReceivable')} isActive={isActive('ar')} onClick={() => setActiveScreen('ar')} />
 
-        {(canViewJE || canViewPeriods) && <NavSection title="Reports" />}
+        {(canViewJE || canViewPeriods) && <NavSection title={t('section.reports')} />}
         {canViewJE && (
-          <NavItem icon={Scale} label="Trial Balance" isActive={isActive('trial-balance')} onClick={() => setActiveScreen('trial-balance')} />
+          <NavItem icon={Scale} label={t('item.trialBalance')} isActive={isActive('trial-balance')} onClick={() => setActiveScreen('trial-balance')} />
         )}
         {canViewJE && (
-          <NavItem icon={TrendingUp} label="Profit &amp; Loss" isActive={isActive('pnl')} onClick={() => setActiveScreen('pnl')} />
+          <NavItem icon={TrendingUp} label={t('item.profitLoss')} isActive={isActive('pnl')} onClick={() => setActiveScreen('pnl')} />
         )}
         {canViewJE && (
-          <NavItem icon={Scale} label="Balance Sheet" isActive={isActive('bs')} onClick={() => setActiveScreen('bs')} />
+          <NavItem icon={Scale} label={t('item.balanceSheet')} isActive={isActive('bs')} onClick={() => setActiveScreen('bs')} />
         )}
         {canViewPeriods && (
-          <NavItem icon={CalendarDays} label="Accounting Periods" isActive={isActive('periods')} onClick={() => setActiveScreen('periods')} />
+          <NavItem icon={CalendarDays} label={t('item.accountingPeriods')} isActive={isActive('periods')} onClick={() => setActiveScreen('periods')} />
         )}
 
-        {canViewAuditLog && <NavSection title="Administration" />}
+        {canViewAuditLog && <NavSection title={t('section.administration')} />}
         {canViewAuditLog && (
-          <NavItem icon={ScrollText} label="Audit Log" isActive={isActive('audit-log')} onClick={() => setActiveScreen('audit-log')} />
+          <NavItem icon={ScrollText} label={t('item.auditLog')} isActive={isActive('audit-log')} onClick={() => setActiveScreen('audit-log')} />
         )}
       </nav>
 
       <div className="p-4 border-t border-white/5 space-y-0.5">
         <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors">
           <HelpCircle size={18} />
-          <span>Support</span>
+          <span>{t('common:support')}</span>
         </button>
       </div>
     </aside>

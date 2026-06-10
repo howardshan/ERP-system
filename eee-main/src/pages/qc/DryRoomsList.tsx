@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Grid3X3, Clock, Boxes, Thermometer, ArrowRight } from 'lucide-react';
 import {
   listDryRoomSummary,
@@ -16,18 +17,19 @@ interface Props {
   onSelectRoomTempDry: () => void;
 }
 
-function fmtRemaining(eta: string | null): string {
+function fmtRemaining(eta: string | null, t: (key: string, opts?: Record<string, unknown>) => string): string {
   if (!eta) return '—';
   const ms = new Date(eta).getTime() - Date.now();
-  if (ms <= 0) return 'Ready now';
+  if (ms <= 0) return t('dryRoomsList.readyNow');
   const mins = Math.round(ms / 60_000);
-  if (mins < 60) return `in ${mins} min`;
+  if (mins < 60) return t('dryRoomsList.inMin', { mins });
   const hrs = Math.floor(mins / 60);
   const rem = mins % 60;
-  return rem === 0 ? `in ${hrs} h` : `in ${hrs} h ${rem} min`;
+  return rem === 0 ? t('dryRoomsList.inHr', { hrs }) : t('dryRoomsList.inHrMin', { hrs, rem });
 }
 
 export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'dry_rooms', 'view_status');
   const [dryers, setDryers] = useState<DryRoomSummary[]>([]);
@@ -50,14 +52,14 @@ export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Pro
   );
 
   if (!canView) {
-    return <PermissionDenied permission="qc.dry_rooms.view_status" feature="Dry Rooms" />;
+    return <PermissionDenied permission="qc.dry_rooms.view_status" feature={t('dryRoomsList.dryRooms')} />;
   }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Dry Rooms</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('dryRoomsList.dryRooms')}</h1>
       <p className="text-slate-600 mb-4 text-sm">
-        5 physical dryers · click a room to view its grid, check carts in/out, and dispose holds.
+        {t('dryRoomsList.subtitle')}
       </p>
 
       {error && <p className="text-red-600 bg-red-50 p-2 rounded-lg mb-3 text-sm">{error}</p>}
@@ -75,8 +77,8 @@ export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Pro
                 <Thermometer size={18} />
               </div>
               <div>
-                <h2 className="font-bold text-slate-900">Room Temp Dry</h2>
-                <p className="text-[11px] text-slate-500">No countdown · count-up only</p>
+                <h2 className="font-bold text-slate-900">{t('dryRoomsList.roomTempDry')}</h2>
+                <p className="text-[11px] text-slate-500">{t('dryRoomsList.countUpOnly')}</p>
               </div>
             </div>
             <span className={cn(
@@ -85,17 +87,17 @@ export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Pro
                 ? 'bg-slate-100 text-slate-500 border-slate-200'
                 : 'bg-orange-100 text-orange-700 border-orange-200',
             )}>
-              {roomTemp.length} active
+              {t('dryRoomsList.activeCount', { count: roomTemp.length })}
             </span>
           </div>
 
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <dt className="text-slate-500 flex items-center gap-1.5"><Boxes size={13} /> Carts drying</dt>
+              <dt className="text-slate-500 flex items-center gap-1.5"><Boxes size={13} /> {t('dryRoomsList.cartsDrying')}</dt>
               <dd className="font-mono font-bold text-slate-900">{roomTemp.length}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-slate-500 flex items-center gap-1.5"><Clock size={13} /> Longest elapsed</dt>
+              <dt className="text-slate-500 flex items-center gap-1.5"><Clock size={13} /> {t('dryRoomsList.longestElapsed')}</dt>
               <dd className="font-mono font-bold text-orange-700">
                 {longestRoomTempMin > 0 ? fmtElapsed(longestRoomTempMin) : '—'}
               </dd>
@@ -103,7 +105,7 @@ export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Pro
           </dl>
 
           <p className="mt-4 text-[11px] text-orange-700 font-bold flex items-center gap-1">
-            Manage room temp dry <ArrowRight size={11} />
+            {t('dryRoomsList.manageRoomTempDry')} <ArrowRight size={11} />
           </p>
         </button>
 
@@ -122,8 +124,8 @@ export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Pro
                     {d.dryer_number}
                   </div>
                   <div>
-                    <h2 className="font-bold text-slate-900">Dryer {d.dryer_number}</h2>
-                    <p className="text-[11px] text-slate-500">100-cell grid</p>
+                    <h2 className="font-bold text-slate-900">{t('dryRoomsList.dryer', { number: d.dryer_number })}</h2>
+                    <p className="text-[11px] text-slate-500">{t('dryRoomsList.cellGrid')}</p>
                   </div>
                 </div>
                 <OccupancyPill rate={occRate} />
@@ -131,22 +133,22 @@ export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Pro
 
               <dl className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-slate-500 flex items-center gap-1.5"><Boxes size={13} /> Occupied</dt>
+                  <dt className="text-slate-500 flex items-center gap-1.5"><Boxes size={13} /> {t('dryRoomsList.occupied')}</dt>
                   <dd className="font-mono font-bold text-slate-900">
                     {d.occupied_count}<span className="text-slate-400 font-normal">/{d.total_cells}</span>
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-500 flex items-center gap-1.5"><Grid3X3 size={13} /> Available</dt>
+                  <dt className="text-slate-500 flex items-center gap-1.5"><Grid3X3 size={13} /> {t('dryRoomsList.available')}</dt>
                   <dd className="font-mono font-bold text-emerald-700">{d.available_count}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-slate-500 flex items-center gap-1.5"><Clock size={13} /> Next finish</dt>
+                  <dt className="text-slate-500 flex items-center gap-1.5"><Clock size={13} /> {t('dryRoomsList.nextFinish')}</dt>
                   <dd className="text-xs text-slate-700">
                     {d.next_finish_at ? (
                       <span>
                         <span className="font-mono">{formatQcDateTime(d.next_finish_at)}</span>
-                        <span className="text-amber-700 ml-1">({fmtRemaining(d.next_finish_at)})</span>
+                        <span className="text-amber-700 ml-1">({fmtRemaining(d.next_finish_at, t)})</span>
                       </span>
                     ) : (
                       <span className="text-slate-400">—</span>
@@ -184,13 +186,14 @@ function fmtElapsed(min: number): string {
 }
 
 function OccupancyPill({ rate }: { rate: number }) {
+  const { t } = useTranslation('qc');
   const pct = Math.round(rate * 100);
   const cls = rate >= 0.9 ? 'bg-red-100 text-red-700 border-red-200'
     : rate >= 0.5 ? 'bg-amber-100 text-amber-700 border-amber-200'
     : 'bg-emerald-100 text-emerald-700 border-emerald-200';
   return (
     <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full border', cls)}>
-      {pct}% full
+      {t('dryRoomsList.percentFull', { pct })}
     </span>
   );
 }

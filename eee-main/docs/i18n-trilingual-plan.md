@@ -1,5 +1,9 @@
 # 全站三语化实施计划（中文 / English / Español-MX）
 
+> **状态：已完成（2026-06-10）。** 全站 ~95 个组件文件已迁移到 `react-i18next`，12 个命名空间（`app/auth/common/finance/hr/nav/packaging/production/qc/ui/warehouse/workflowBuilder`）的 `en/zh/es` 三份翻译齐备；`tsc` 0 错误、`npm run build` 通过。语言切换器在顶栏 / 首页 / 登录页（中文 / English / Español）。语言选择持久化到 `localStorage` key `erp_lang`。配置见 [src/i18n/index.ts](../src/i18n/index.ts)，翻译在 [src/locales/{en,zh,es}/](../src/locales/)。迁移用的合并脚本 [scripts/i18n-merge.mjs](../scripts/i18n-merge.mjs) 保留（若以后新增分片可再合并）。**es-MX 仍建议找母语者复核一遍。**
+>
+> ── 以下为原始计划，存档 ──
+>
 > 状态：**计划（待执行）**。决策已定：用 `react-i18next`；分阶段，先基础设施+切换器+示范模块跑通，再逐模块迁移；译文由 Claude 产出三语，**es-MX 由人工后续复核**。「墨西哥语」按西班牙语 `es-MX` 处理。
 
 ## 背景 / 目标

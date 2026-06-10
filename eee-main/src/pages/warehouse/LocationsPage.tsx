@@ -1,13 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { listLocations, WarehouseLocation } from '../../services/warehouseApi';
-
-const TYPE_LABEL: Record<string, string> = {
-  storage: '存储',
-  receiving: '收货',
-  shipping: '发货',
-  production: '生产',
-  quarantine: '隔离/待检',
-};
 
 const TYPE_BADGE: Record<string, string> = {
   storage: 'bg-emerald-100 text-emerald-700',
@@ -18,8 +11,17 @@ const TYPE_BADGE: Record<string, string> = {
 };
 
 export default function LocationsPage() {
+  const { t } = useTranslation('warehouse');
   const [locations, setLocations] = useState<WarehouseLocation[]>([]);
   const [error, setError] = useState('');
+
+  const TYPE_LABEL: Record<string, string> = {
+    storage: t('locationsPage.type.storage'),
+    receiving: t('locationsPage.type.receiving'),
+    shipping: t('locationsPage.type.shipping'),
+    production: t('locationsPage.type.production'),
+    quarantine: t('locationsPage.type.quarantine'),
+  };
 
   useEffect(() => {
     listLocations().then(setLocations).catch((e) => setError(e.message));
@@ -27,9 +29,9 @@ export default function LocationsPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Locations</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('locationsPage.title')}</h1>
       <p className="text-slate-600 mb-4 text-sm">
-        主工厂的逻辑库区（只读）。维护功能将在后续 Sprint 开放。
+        {t('locationsPage.subtitle')}
       </p>
 
       {error && <p className="text-red-600 mb-3 text-sm">{error}</p>}
@@ -38,10 +40,10 @@ export default function LocationsPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
             <tr>
-              <th className="text-left font-semibold px-4 py-2.5">代码</th>
-              <th className="text-left font-semibold px-4 py-2.5">名称</th>
-              <th className="text-left font-semibold px-4 py-2.5">类型</th>
-              <th className="text-left font-semibold px-4 py-2.5">状态</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('locationsPage.col.code')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('locationsPage.col.name')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('locationsPage.col.type')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('locationsPage.col.status')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -54,11 +56,11 @@ export default function LocationsPage() {
                     {TYPE_LABEL[loc.location_type] ?? loc.location_type}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 text-slate-600">{loc.is_active ? '启用' : '停用'}</td>
+                <td className="px-4 py-2.5 text-slate-600">{loc.is_active ? t('locationsPage.status.active') : t('locationsPage.status.inactive')}</td>
               </tr>
             ))}
             {locations.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-500">暂无库区</td></tr>
+              <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-500">{t('locationsPage.empty')}</td></tr>
             )}
           </tbody>
         </table>

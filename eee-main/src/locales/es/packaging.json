@@ -1,0 +1,35 @@
+{
+  "packagingModule": {
+    "moduleHub": "Centro de módulos",
+    "tag": "Empaque",
+    "title": "Empaque",
+    "subtitle": "Despachar carros de control de calidad liberados — orden PEPS, soporte de escaneo, seguimiento de días en inventario"
+  },
+  "packagingPage": {
+    "errLoadSkus": "Error al cargar los SKU",
+    "errLoadCarts": "Error al cargar los carros",
+    "errDispatch": "Error en la salida",
+    "scanNotFound": "Carro \"{{code}}\" no encontrado o no disponible",
+    "dispatchSuccess": "Se despacharon {{count}} carro(s) (salida #{{outboundId}})",
+    "feature": "Empaque",
+    "productsInStock": "Productos en existencia",
+    "selectProductHint": "Seleccione un producto para ver los carros disponibles",
+    "noReleasedCarts": "No hay carros liberados en la cola de empaque.",
+    "cartsLabel": "carros",
+    "scanPlaceholder": "Escanee el código QR del carro...",
+    "selectToBegin": "Seleccione un producto a la izquierda para comenzar.",
+    "noProductSelected": "Ningún producto seleccionado",
+    "chooseProductHint": "Elija un producto a la izquierda para ver los carros disponibles",
+    "noCartsAvailable": "No hay carros disponibles",
+    "noCartsAvailableHint": "Todos los carros de este producto ya se despacharon o aún no se ha liberado ninguno.",
+    "summaryCount": "{{woCount}} orden(es) de trabajo · {{cartCount}} carro(s)",
+    "noWorkOrder": "(sin orden de trabajo)",
+    "noPackagingAssigned": "Sin empaque asignado",
+    "cartCount": "{{count}} carro(s)",
+    "cartsSelected": "{{count}} carro(s) seleccionado(s)",
+    "notePlaceholder": "Nota de salida opcional...",
+    "dispatchPermissionTitle": "Falta el permiso packaging.outbound.dispatch",
+    "dispatching": "Despachando…",
+    "dispatch": "Despachar"
+  }
+}

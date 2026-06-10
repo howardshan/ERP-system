@@ -1,0 +1,29 @@
+{
+  "financials": "Finanzas",
+  "allModules": "Todos los módulos",
+  "section": {
+    "overview": "Resumen",
+    "generalLedger": "Libro mayor",
+    "payablesReceivables": "Cuentas por pagar y por cobrar",
+    "reports": "Reportes",
+    "administration": "Administración"
+  },
+  "item": {
+    "dashboard": "Panel",
+    "chartOfAccounts": "Catálogo de cuentas",
+    "newJournalEntry": "Nueva póliza",
+    "journalEntries": "Pólizas",
+    "approvals": "Aprobaciones",
+    "accountsPayable": "Cuentas por pagar",
+    "accountsReceivable": "Cuentas por cobrar",
+    "trialBalance": "Balanza de comprobación",
+    "profitLoss": "Estado de resultados",
+    "balanceSheet": "Balance general",
+    "accountingPeriods": "Periodos contables",
+    "auditLog": "Bitácora de auditoría"
+  },
+  "dashboardLayout": {
+    "erpStatus": "Estado del ERP: Activo",
+    "server": "Servidor: US-WEST-1 (Producción)"
+  }
+}

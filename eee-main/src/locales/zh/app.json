@@ -1,0 +1,162 @@
+{
+  "accountSettings": {
+    "backToHome": "返回首页",
+    "title": "账户设置",
+    "subtitle": "管理您的账户和通知偏好",
+    "loading": "加载中…",
+    "noProfile": "您的账户尚未关联 ERP 用户档案。",
+    "account": "账户",
+    "name": "姓名",
+    "email": "邮箱",
+    "role": "角色",
+    "department": "部门",
+    "notificationSettings": "通知设置",
+    "noNotifications": "您还没有任何通知设置。由管理员负责管理您接收哪些通知。",
+    "managedByAdmin": "由管理员管理",
+    "on": "开",
+    "off": "关",
+    "turnOff": "关闭",
+    "turnOn": "开启"
+  },
+  "docsPage": {
+    "home": "首页",
+    "documentation": "文档",
+    "group": {
+      "overview": "概览",
+      "modules": "模块",
+      "database": "数据库"
+    },
+    "nav": {
+      "overview": "项目概览",
+      "gl": "总账",
+      "approvals": "审批流程",
+      "apAr": "应付 / 应收",
+      "reports": "报表与会计期间",
+      "workflow": "流程编排器",
+      "schema": "数据库结构",
+      "rpc": "RPC 函数",
+      "migrations": "迁移与边缘函数"
+    }
+  },
+  "homePage": {
+    "moduleHub": "模块中心",
+    "selectModule": "选择一个模块开始使用",
+    "accountSettings": "账户设置",
+    "reloadPermissions": "重新加载权限",
+    "signOut": "退出登录",
+    "active": "已启用",
+    "comingSoon": "即将推出",
+    "openModule": "打开模块",
+    "inDevelopment": "开发中",
+    "modules": {
+      "finance": {
+        "label": "财务管理",
+        "description": "总账、记账凭证、应付/应收、试算平衡表以及多级审批流程。",
+        "features": {
+          "0": "会计科目表",
+          "1": "记账凭证",
+          "2": "审批流程",
+          "3": "试算平衡表"
+        }
+      },
+      "warehouse": {
+        "label": "仓储与库存",
+        "description": "批次追踪库存、入库收货、库存调拨以及实时余额账。",
+        "features": {
+          "0": "批次追溯",
+          "1": "入库收货",
+          "2": "库存调拨",
+          "3": "库存余额"
+        }
+      },
+      "sales": {
+        "label": "销售与分销",
+        "description": "销售订单、发货计划、客户开票以及应收账款集成。",
+        "features": {
+          "0": "销售订单",
+          "1": "发货跟踪",
+          "2": "应收开票",
+          "3": "客户门户"
+        }
+      },
+      "production": {
+        "label": "生产与制造",
+        "description": "按 SKU 的流水线看板、带料车标签的工单创建、批次追溯以及产品/模板主数据。",
+        "features": {
+          "0": "流水线看板",
+          "1": "工单 + 标签",
+          "2": "批次追溯",
+          "3": "产品与测试类型"
+        }
+      },
+      "workflow": {
+        "label": "工作流工作室",
+        "description": "通过拖拽节点构建自定义自动化——连接数据源、应用逻辑并跨所有模块触发操作。",
+        "features": {
+          "0": "拖放画布",
+          "1": "数据源节点",
+          "2": "逻辑与分支",
+          "3": "操作自动化"
+        }
+      },
+      "docs": {
+        "label": "文档",
+        "description": "项目架构、模块规格、数据库结构、RPC 函数、迁移索引以及设计令牌。",
+        "features": {
+          "0": "路由结构",
+          "1": "模块规格",
+          "2": "数据库结构与 RPC",
+          "3": "迁移索引"
+        }
+      },
+      "qc": {
+        "label": "质量控制",
+        "description": "烘干后检验流程:生产批次、烘干子批次、待检队列、暂存处置以及批次追溯。",
+        "features": {
+          "0": "子批次入库/出库",
+          "1": "待检队列",
+          "2": "暂存处置",
+          "3": "批次追溯"
+        }
+      },
+      "packaging": {
+        "label": "包装",
+        "description": "将已放行的质检料车调度至包装。先进先出排序的料车选择、扫码支持以及在库天数跟踪。",
+        "features": {
+          "0": "先进先出调度",
+          "1": "扫描二维码",
+          "2": "在库天数提醒",
+          "3": "出库记录"
+        }
+      },
+      "hr": {
+        "label": "人力资源",
+        "description": "员工通讯录、职位、部门、汇报关系以及档案管理。",
+        "features": {
+          "0": "员工通讯录",
+          "1": "职位与角色",
+          "2": "部门与主管",
+          "3": "档案编辑"
+        }
+      },
+      "auth": {
+        "label": "用户与认证",
+        "description": "用户账户、基于角色的访问控制、审批层级分配以及审计日志。",
+        "features": {
+          "0": "用户管理",
+          "1": "角色与权限",
+          "2": "审批层级",
+          "3": "审计追踪"
+        }
+      }
+    }
+  },
+  "loginPage": {
+    "subtitle": "登录您的账户",
+    "email": "邮箱",
+    "password": "密码",
+    "signingIn": "正在登录…",
+    "signIn": "登录",
+    "contactAdmin": "请联系管理员以获取访问权限。"
+  }
+}

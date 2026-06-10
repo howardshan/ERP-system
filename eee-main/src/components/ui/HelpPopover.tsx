@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { HelpCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 
 interface Props {
@@ -33,6 +34,7 @@ export function HelpPopover({
   triggerClass,
   align = 'right',
 }: Props) {
+  const { t } = useTranslation('ui');
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
 
@@ -58,7 +60,7 @@ export function HelpPopover({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
-        aria-label="What does this mean?"
+        aria-label={t('helpPopover.triggerAriaLabel')}
         aria-expanded={open}
         className={cn(
           'inline-flex items-center justify-center rounded-full transition-opacity',

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ArrowLeft, BookOpen, ChevronRight } from 'lucide-react';
@@ -16,30 +17,36 @@ import migrationsMd from '../../docs/database/03_migrations-and-edge-functions.m
 
 interface NavItem {
   id: string;
-  label: string;
+  labelKey: string;
   content: string;
   group: string;
 }
 
 const NAV: NavItem[] = [
-  { id: 'overview',   label: 'Project Overview',          content: readmeMd,      group: 'Overview' },
-  { id: 'gl',         label: 'General Ledger',             content: glMd,          group: 'Modules' },
-  { id: 'approvals',  label: 'Approvals Workflow',         content: approvalsMd,   group: 'Modules' },
-  { id: 'ap-ar',      label: 'AP / AR',                    content: apArMd,        group: 'Modules' },
-  { id: 'reports',    label: 'Reports & Periods',          content: reportsMd,     group: 'Modules' },
-  { id: 'workflow',   label: 'Workflow Studio',            content: workflowMd,    group: 'Modules' },
-  { id: 'schema',     label: 'Database Schema',            content: schemaMd,      group: 'Database' },
-  { id: 'rpc',        label: 'RPC Functions',              content: rpcMd,         group: 'Database' },
-  { id: 'migrations', label: 'Migrations & Edge Functions',content: migrationsMd,  group: 'Database' },
+  { id: 'overview',   labelKey: 'docsPage.nav.overview',   content: readmeMd,      group: 'Overview' },
+  { id: 'gl',         labelKey: 'docsPage.nav.gl',         content: glMd,          group: 'Modules' },
+  { id: 'approvals',  labelKey: 'docsPage.nav.approvals',  content: approvalsMd,   group: 'Modules' },
+  { id: 'ap-ar',      labelKey: 'docsPage.nav.apAr',       content: apArMd,        group: 'Modules' },
+  { id: 'reports',    labelKey: 'docsPage.nav.reports',    content: reportsMd,     group: 'Modules' },
+  { id: 'workflow',   labelKey: 'docsPage.nav.workflow',   content: workflowMd,    group: 'Modules' },
+  { id: 'schema',     labelKey: 'docsPage.nav.schema',     content: schemaMd,      group: 'Database' },
+  { id: 'rpc',        labelKey: 'docsPage.nav.rpc',        content: rpcMd,         group: 'Database' },
+  { id: 'migrations', labelKey: 'docsPage.nav.migrations', content: migrationsMd,  group: 'Database' },
 ];
 
 const GROUPS = ['Overview', 'Modules', 'Database'];
+const GROUP_LABEL_KEYS: Record<string, string> = {
+  Overview: 'docsPage.group.overview',
+  Modules: 'docsPage.group.modules',
+  Database: 'docsPage.group.database',
+};
 
 interface DocsPageProps {
   onHome: () => void;
 }
 
 export default function DocsPage({ onHome }: DocsPageProps) {
+  const { t } = useTranslation('app');
   const [activeId, setActiveId] = useState('overview');
   const active = NAV.find(n => n.id === activeId)!;
 
@@ -51,15 +58,15 @@ export default function DocsPage({ onHome }: DocsPageProps) {
           onClick={onHome}
           className="flex items-center gap-1.5 text-slate-500 hover:text-slate-900 text-xs font-bold transition-colors"
         >
-          <ArrowLeft size={14} /> Home
+          <ArrowLeft size={14} /> {t('docsPage.home')}
         </button>
         <div className="w-px h-5 bg-slate-200" />
         <div className="flex items-center gap-2 text-slate-700">
           <BookOpen size={14} />
-          <span className="text-sm font-bold">Documentation</span>
+          <span className="text-sm font-bold">{t('docsPage.documentation')}</span>
         </div>
         <ChevronRight size={13} className="text-slate-400" />
-        <span className="text-sm text-slate-500">{active.label}</span>
+        <span className="text-sm text-slate-500">{t(active.labelKey)}</span>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
@@ -68,7 +75,7 @@ export default function DocsPage({ onHome }: DocsPageProps) {
           {GROUPS.map(group => (
             <div key={group} className="mb-4">
               <p className="px-4 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                {group}
+                {t(GROUP_LABEL_KEYS[group])}
               </p>
               {NAV.filter(n => n.group === group).map(item => (
                 <button
@@ -80,7 +87,7 @@ export default function DocsPage({ onHome }: DocsPageProps) {
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </button>
               ))}
             </div>

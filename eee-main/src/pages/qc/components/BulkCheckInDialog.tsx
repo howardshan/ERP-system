@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, AlertTriangle, CheckCircle2, Boxes } from 'lucide-react';
 import { registerSubLotsBulk, SubLot, BulkCheckInResult } from '../../../services/qcApi';
 import { cn } from '../../../lib/utils';
@@ -15,6 +16,7 @@ interface Props {
 export function BulkCheckInDialog({
   open, dryerNumber, selectedSubLots, ineligibleSubLots = [], onClose, onSuccess,
 }: Props) {
+  const { t } = useTranslation('qc');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,7 +40,7 @@ export function BulkCheckInDialog({
       });
       onSuccess(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Bulk check-in failed');
+      setError(e instanceof Error ? e.message : t('bulkCheckInDialog.bulkCheckInFailed'));
       setBusy(false);
     }
   };
@@ -49,7 +51,7 @@ export function BulkCheckInDialog({
         type="button"
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={t('bulkCheckInDialog.close')}
       />
       <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl">
         <header className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -58,11 +60,11 @@ export function BulkCheckInDialog({
               <Boxes size={18} />
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Confirm check-in</p>
-              <h2 className="text-base font-bold text-slate-900">Dryer {dryerNumber}</h2>
+              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('bulkCheckInDialog.confirmCheckIn')}</p>
+              <h2 className="text-base font-bold text-slate-900">{t('bulkCheckInDialog.dryerNumber', { number: dryerNumber })}</h2>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100" aria-label="Close">
+          <button onClick={onClose} className="p-1 rounded hover:bg-slate-100" aria-label={t('bulkCheckInDialog.close')}>
             <X size={16} />
           </button>
         </header>
@@ -74,10 +76,10 @@ export function BulkCheckInDialog({
             total === 0 ? 'border-slate-200 bg-slate-50'
               : 'border-emerald-300 bg-emerald-50',
           )}>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">Carts to check in</p>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700">{t('bulkCheckInDialog.cartsToCheckIn')}</p>
             <p className="text-3xl font-bold tabular-nums text-slate-900 mt-1">{total}</p>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Each cart will occupy 1 of the 100 slots in Dryer {dryerNumber}.
+              {t('bulkCheckInDialog.slotOccupancyNote', { number: dryerNumber })}
             </p>
           </div>
 
@@ -87,10 +89,10 @@ export function BulkCheckInDialog({
               <AlertTriangle size={18} className="text-amber-700 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-amber-900">
-                  {brokenCount} sub-lot(s) skipped — please verify
+                  {t('bulkCheckInDialog.skippedWarning', { count: brokenCount })}
                 </p>
                 <p className="text-[11px] text-amber-800 mt-1">
-                  These weren't eligible for check-in (wrong status or barcode error). Common reasons: already in a dryer, already inspected, or scanner returned a code that doesn't match any sub-lot.
+                  {t('bulkCheckInDialog.skippedReason')}
                 </p>
                 <ul className="mt-2 space-y-0.5 max-h-32 overflow-auto text-[11px] font-mono">
                   {realIneligible.map(s => (
@@ -107,7 +109,7 @@ export function BulkCheckInDialog({
           {selectedSubLots.length > 0 && (
             <details className="mb-3" open={selectedSubLots.length <= 5}>
               <summary className="text-xs font-bold text-slate-600 cursor-pointer hover:text-slate-900">
-                Show eligible sub-lots ({selectedSubLots.length})
+                {t('bulkCheckInDialog.showEligibleSubLots', { count: selectedSubLots.length })}
               </summary>
               <ul className="mt-2 space-y-1 max-h-48 overflow-auto text-[11px] font-mono pl-2">
                 {selectedSubLots.map(s => (
@@ -131,7 +133,7 @@ export function BulkCheckInDialog({
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-xs font-bold border border-slate-300 text-slate-700 hover:bg-white"
           >
-            Cancel
+            {t('bulkCheckInDialog.cancel')}
           </button>
           <button
             type="button"
@@ -140,7 +142,7 @@ export function BulkCheckInDialog({
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <CheckCircle2 size={13} />
-            {busy ? 'Checking in…' : `Confirm — check in ${total}`}
+            {busy ? t('bulkCheckInDialog.checkingIn') : t('bulkCheckInDialog.confirmCheckInCount', { count: total })}
           </button>
         </footer>
       </div>

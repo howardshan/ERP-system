@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   listProducts,
   createProductionBatch,
@@ -27,6 +28,7 @@ function parseSeq(code: string): number {
 }
 
 export default function Production({ onCreated }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canCreateBatch = can('production', 'work_orders', 'create');
   const disabled = !canCreateBatch;
@@ -178,21 +180,24 @@ export default function Production({ onCreated }: Props) {
     setError('');
     setMsg('');
     if (disabled) {
-      setError('You lack permission to create production lots and sub-lots');
+      setError(t('production.errNoPermission'));
       return;
     }
     if (hasConflict) {
       setError(
-        `Cart number${conflictingSeqs.length > 1 ? 's' : ''} ${conflictingSeqs.map(n => String(n).padStart(3, '0')).join(', ')} already exist in this work order.`,
+        t('production.errCartsExist', {
+          count: conflictingSeqs.length,
+          carts: conflictingSeqs.map(n => String(n).padStart(3, '0')).join(', '),
+        }),
       );
       return;
     }
     if (skuMismatch) {
-      setError('Selected SKU does not match the existing work order. Please select the correct SKU or use a different work order number.');
+      setError(t('production.errSkuMismatch'));
       return;
     }
     if (subLotCount === 0 || maxN < minN) {
-      setError('Last cart number must be >= first cart number');
+      setError(t('production.errLastCart'));
       return;
     }
 
@@ -205,7 +210,12 @@ export default function Production({ onCreated }: Props) {
           start_seq: minN,
           end_seq: maxN,
         });
-        setMsg(`Added ${res.added_count} cart(s) to ${existingLot.lot_number} (carts ${res.start_seq}–${res.end_seq}).`);
+        setMsg(t('production.addedCarts', {
+          count: res.added_count,
+          lot: existingLot.lot_number,
+          start: res.start_seq,
+          end: res.end_seq,
+        }));
         setLastCreatedLotId(existingLot.id);
         const subs = await listSubLotsForLot(existingLot.id);
         setExistingSubLots(subs);
@@ -222,7 +232,7 @@ export default function Production({ onCreated }: Props) {
           });
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Add failed');
+        setError(err instanceof Error ? err.message : t('production.errAddFailed'));
       }
       setBusy(false);
       return;
@@ -231,19 +241,19 @@ export default function Production({ onCreated }: Props) {
     // ── Create a brand-new work order ────────────────────────────
     const dryDays = parseFloat(expectedDryDays);
     if (!dryDays || dryDays <= 0) {
-      setError('Expected dry time is required (BR-Q29).');
+      setError(t('production.errDryRequired'));
       return;
     }
     const dryMin = daysToMinutes(dryDays);
     if (!dryMin || dryMin <= 0) {
-      setError('Expected dry time must be > 0');
+      setError(t('production.errDryPositive'));
       return;
     }
     // M-095: if the SKU has any linked final-product options, the operator
     // MUST pick one — packaging is intentionally required at lot creation so
     // it shows up on stickers and downstream packaging routing.
     if (linkedItems.length > 0 && !packagingItemId) {
-      setError('Pick a final product before creating the work order.');
+      setError(t('production.errPickFinalProduct'));
       return;
     }
     setBusy(true);
@@ -262,7 +272,12 @@ export default function Production({ onCreated }: Props) {
         packaging_item_id: packagingItemId ? Number(packagingItemId) : null,
       };
       const res = await createProductionBatch(payload);
-      setMsg(`Created work order ${res.lot_number} with ${res.sub_lot_count} cart(s): ${wo}-${String(minN).padStart(3,'0')} … ${wo}-${String(maxN).padStart(3,'0')}.`);
+      setMsg(t('production.createdWorkOrder', {
+        count: res.sub_lot_count,
+        lot: res.lot_number,
+        first: `${wo}-${String(minN).padStart(3,'0')}`,
+        last: `${wo}-${String(maxN).padStart(3,'0')}`,
+      }));
       setLastCreatedLotId(res.lot_id);
       // Fetch the freshly-created sub_lots so the sticker print button has
       // their codes.  Wrap separately so a list failure doesn't mask the
@@ -281,7 +296,7 @@ export default function Production({ onCreated }: Props) {
       // Navigation to Dry Rooms is now triggered by the success-banner button
       // so the user has a chance to print stickers first.
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Create failed');
+      setError(err instanceof Error ? err.message : t('production.errCreateFailed'));
     }
     setBusy(false);
   };
@@ -292,9 +307,9 @@ export default function Production({ onCreated }: Props) {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Production</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('production.title')}</h1>
       <p className="text-slate-600 mb-4 text-sm">
-        Create a new work order or add carts to an existing one.
+        {t('production.subtitle')}
       </p>
 
       {msg && (
@@ -307,7 +322,7 @@ export default function Production({ onCreated }: Props) {
                 onClick={() => setPrintOpen(true)}
                 className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white"
               >
-                Print {printable.carts.length} sticker{printable.carts.length === 1 ? '' : 's'}
+                {t('production.printStickers', { count: printable.carts.length })}
               </button>
             )}
             {lastCreatedLotId && onCreated && (
@@ -316,7 +331,7 @@ export default function Production({ onCreated }: Props) {
                 onClick={() => onCreated(lastCreatedLotId)}
                 className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white"
               >
-                Continue to Dry Rooms →
+                {t('production.continueToDryRooms')}
               </button>
             )}
           </div>
@@ -326,7 +341,7 @@ export default function Production({ onCreated }: Props) {
 
       {disabled && (
         <p className="text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-lg mb-4 text-sm">
-          You need <code className="font-mono">qc.production.create_batch</code> permission to use this page.
+          {t('production.needPermPrefix')} <code className="font-mono">qc.production.create_batch</code> {t('production.needPermSuffix')}
         </p>
       )}
 
@@ -334,22 +349,22 @@ export default function Production({ onCreated }: Props) {
         {/* ── Production-level fields ────────────────────────────────── */}
         <section className="bg-white border rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-slate-900 text-sm">Production header</h2>
+            <h2 className="font-semibold text-slate-900 text-sm">{t('production.productionHeader')}</h2>
             <button type="button" onClick={fillDemo}
                     className="text-xs text-blue-600 underline">
-              Fill demo values
+              {t('production.fillDemo')}
             </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="block sm:col-span-2">
-              <span className="text-xs font-medium text-slate-700">Work order number</span>
+              <span className="text-xs font-medium text-slate-700">{t('production.workOrderNumber')}</span>
               <div className="relative mt-1">
                 <input
                   type="text"
                   value={workOrder}
                   onChange={(e) => { setWorkOrder(e.target.value); setMsg(''); setError(''); }}
-                  placeholder="e.g. WO-2026-001"
+                  placeholder={t('production.workOrderPlaceholder')}
                   className={cn(
                     'w-full border rounded-lg px-3 h-10 text-sm font-mono',
                     isAddMode ? 'border-amber-400 bg-amber-50 font-bold' : '',
@@ -358,13 +373,13 @@ export default function Production({ onCreated }: Props) {
                 />
                 {lookingUp && (
                   <span className="absolute right-3 top-2.5 text-[10px] text-slate-400 animate-pulse">
-                    checking…
+                    {t('production.checking')}
                   </span>
                 )}
               </div>
               {wo && !isAddMode && (
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Cart codes will be{' '}
+                  {t('production.cartCodesWillBe')}{' '}
                   <code className="font-mono text-slate-600">{wo}-001</code>,{' '}
                   <code className="font-mono text-slate-600">{wo}-002</code>, …
                 </p>
@@ -372,14 +387,14 @@ export default function Production({ onCreated }: Props) {
             </label>
 
             <label className="block">
-              <span className="text-xs font-medium text-slate-700">Product SKU</span>
+              <span className="text-xs font-medium text-slate-700">{t('production.productSku')}</span>
               <select
                 value={skuId}
                 onChange={(e) => setSkuId(e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 h-10 text-sm"
                 required={!isAddMode}
               >
-                <option value="">— Select SKU —</option>
+                <option value="">{t('production.selectSku')}</option>
                 {skus.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
               </select>
             </label>
@@ -388,7 +403,7 @@ export default function Production({ onCreated }: Props) {
             {!isAddMode && (
               <label className="block">
                 <span className="text-xs font-medium text-slate-700">
-                  Expected drying time <span className="text-slate-400">(days — BR-Q29)</span>
+                  {t('production.expectedDryingTime')} <span className="text-slate-400">{t('production.expectedDryingTimeHint')}</span>
                 </span>
                 <input
                   type="number"
@@ -397,12 +412,12 @@ export default function Production({ onCreated }: Props) {
                   value={expectedDryDays}
                   onChange={(e) => setExpectedDryDays(e.target.value)}
                   className="mt-1 w-full border rounded-lg px-3 h-10 text-sm"
-                  placeholder="e.g. 1.5"
+                  placeholder={t('production.dryingTimePlaceholder')}
                   required
                 />
                 {currentSku?.standard_drying_minutes != null && (
                   <p className="text-[11px] text-slate-400 mt-1">
-                    SKU SOP default: {minutesToDays(currentSku.standard_drying_minutes)?.toFixed(2)}d
+                    {t('production.skuSopDefault', { days: minutesToDays(currentSku.standard_drying_minutes)?.toFixed(2) })}
                   </p>
                 )}
               </label>
@@ -424,8 +439,8 @@ export default function Production({ onCreated }: Props) {
               </span>
               <p className={cn('text-sm font-bold', skuMismatch ? 'text-red-900' : 'text-amber-900')}>
                 {skuMismatch
-                  ? 'SKU mismatch — cannot add carts to this work order'
-                  : 'Work order already exists — adding carts'}
+                  ? t('production.skuMismatchTitle')
+                  : t('production.workOrderExistsTitle')}
               </p>
             </div>
             <div className={cn('flex flex-wrap gap-x-6 gap-y-1 text-xs', skuMismatch ? 'text-red-800' : 'text-amber-800')}>

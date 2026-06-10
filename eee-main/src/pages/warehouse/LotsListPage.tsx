@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { listLots, listItems, WarehouseLot, WarehouseItem } from '../../services/warehouseApi';
 
 const LOT_STATUS_BADGE: Record<string, string> = {
@@ -11,6 +12,7 @@ const LOT_STATUS_BADGE: Record<string, string> = {
 };
 
 export default function LotsListPage({ onOpenLot }: { onOpenLot: (lotId: number) => void }) {
+  const { t } = useTranslation('warehouse');
   const [lots, setLots] = useState<WarehouseLot[]>([]);
   const [itemMap, setItemMap] = useState<Record<number, WarehouseItem>>({});
   const [error, setError] = useState('');
@@ -26,8 +28,8 @@ export default function LotsListPage({ onOpenLot }: { onOpenLot: (lotId: number)
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Lots</h1>
-      <p className="text-slate-600 mb-4 text-sm">批次登记。点击批次号查看流水时间线、调拨与调整。</p>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('lotsListPage.title')}</h1>
+      <p className="text-slate-600 mb-4 text-sm">{t('lotsListPage.subtitle')}</p>
 
       {error && <p className="text-red-600 mb-3 text-sm">{error}</p>}
 
@@ -35,11 +37,11 @@ export default function LotsListPage({ onOpenLot }: { onOpenLot: (lotId: number)
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
             <tr>
-              <th className="text-left font-semibold px-4 py-2.5">批次号</th>
-              <th className="text-left font-semibold px-4 py-2.5">物料</th>
-              <th className="text-left font-semibold px-4 py-2.5">来源</th>
-              <th className="text-left font-semibold px-4 py-2.5">状态</th>
-              <th className="text-left font-semibold px-4 py-2.5">保质期</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('lotsListPage.colLotNumber')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('lotsListPage.colItem')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('lotsListPage.colSource')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('lotsListPage.colStatus')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('lotsListPage.colExpiry')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -70,7 +72,7 @@ export default function LotsListPage({ onOpenLot }: { onOpenLot: (lotId: number)
               );
             })}
             {lots.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">暂无批次</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">{t('lotsListPage.empty')}</td></tr>
             )}
           </tbody>
         </table>

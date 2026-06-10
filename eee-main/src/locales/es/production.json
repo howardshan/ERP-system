@@ -1,0 +1,33 @@
+{
+  "productionDashboard": {
+    "title": "Panel de producción",
+    "subtitle": "Vista por SKU de cada carro que se encuentra actualmente en el flujo de producción → empaque. Actualización automática cada 15 s.",
+    "refresh": "Actualizar",
+    "loading": "Cargando…",
+    "empty": "Aún no hay carros en ninguna etapa del flujo. Cree una orden de trabajo en Producción para poblar este panel.",
+    "loadFailed": "Error al cargar",
+    "sku": "SKU",
+    "total": "Total",
+    "colProduction": "Producción",
+    "colDryRoom": "Cuarto de secado",
+    "colTesting": "Pruebas",
+    "colReleased": "Liberado",
+    "colPackaged": "Empacado",
+    "statusMapping": "Asignación de estados"
+  },
+  "productionModule": {
+    "brandTitle": "Producción y Manufactura",
+    "allModules": "Todos los módulos",
+    "dashboard": "Tablero",
+    "sectionFloor": "Planta",
+    "production": "Producción",
+    "sectionTraceability": "Trazabilidad",
+    "batchTrace": "Trazabilidad de lotes",
+    "sectionMasterData": "Datos maestros",
+    "products": "Productos",
+    "testTypes": "Tipos de prueba",
+    "support": "Soporte",
+    "moduleHub": "Centro de módulos",
+    "headerTitle": "Producción y Manufactura"
+  }
+}

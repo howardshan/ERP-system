@@ -8,11 +8,13 @@ import {
   openAccountingPeriod, closeAccountingPeriod, createAccountingPeriod
 } from '../services/api';
 import { usePermissions } from '../contexts/PermissionContext';
+import { useTranslation } from 'react-i18next';
 
 // ---------------------------------------------------------------
 //  Trial Balance
 // ---------------------------------------------------------------
 export function TrialBalance() {
+  const { t } = useTranslation('finance');
   const [rows, setRows] = useState<GlAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,9 +32,9 @@ export function TrialBalance() {
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Trial Balance</h2>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('reportsAndPeriods.trialBalance')}</h2>
           <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">
-            Unadjusted · from posted entries only
+            {t('reportsAndPeriods.trialBalanceSubtitle')}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -41,11 +43,11 @@ export function TrialBalance() {
               'px-3 py-1 text-xs font-bold rounded-full',
               isBalanced ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
             )}>
-              {isBalanced ? 'In Balance' : 'OUT OF BALANCE'}
+              {isBalanced ? t('reportsAndPeriods.inBalance') : t('reportsAndPeriods.outOfBalance')}
             </span>
           )}
           <button className="px-4 py-2 text-xs font-bold bg-slate-900 text-white rounded shadow hover:bg-black uppercase tracking-wide flex items-center gap-2">
-            <Download size={14} /> Export
+            <Download size={14} /> {t('reportsAndPeriods.export')}
           </button>
         </div>
       </div>
@@ -54,22 +56,22 @@ export function TrialBalance() {
         {loading ? (
           <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
             <Loader2 size={20} className="animate-spin" />
-            <span className="text-sm">Computing balances...</span>
+            <span className="text-sm">{t('reportsAndPeriods.computingBalances')}</span>
           </div>
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <p className="text-sm">No posted entries yet — balances will appear here after posting journal entries.</p>
+            <p className="text-sm">{t('reportsAndPeriods.noPostedEntries')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
-                  <th className="px-6 py-4 w-32">Code</th>
-                  <th className="px-6 py-4">Account Name</th>
-                  <th className="px-6 py-4 w-24">Type</th>
-                  <th className="px-6 py-4 text-right w-40">Debit ($)</th>
-                  <th className="px-6 py-4 text-right w-40">Credit ($)</th>
+                  <th className="px-6 py-4 w-32">{t('reportsAndPeriods.code')}</th>
+                  <th className="px-6 py-4">{t('reportsAndPeriods.accountName')}</th>
+                  <th className="px-6 py-4 w-24">{t('reportsAndPeriods.type')}</th>
+                  <th className="px-6 py-4 text-right w-40">{t('reportsAndPeriods.debit')}</th>
+                  <th className="px-6 py-4 text-right w-40">{t('reportsAndPeriods.credit')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -89,7 +91,7 @@ export function TrialBalance() {
               </tbody>
               <tfoot>
                 <tr className="bg-slate-900 text-white border-t-2 border-slate-700">
-                  <td className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em]" colSpan={3}>Totals</td>
+                  <td className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em]" colSpan={3}>{t('reportsAndPeriods.totals')}</td>
                   <td className="px-6 py-4 text-right font-mono text-sm font-bold">{formatCurrency(totalDebit)}</td>
                   <td className="px-6 py-4 text-right font-mono text-sm font-bold">{formatCurrency(totalCredit)}</td>
                 </tr>
@@ -106,6 +108,7 @@ export function TrialBalance() {
 //  Create Period Modal
 // ---------------------------------------------------------------
 function CreatePeriodModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation('finance');
   const now = new Date();
   const [form, setForm] = useState({
     name: `${now.toLocaleString('default', { month: 'short' }).toUpperCase()} ${now.getFullYear()}`,
@@ -134,12 +137,12 @@ function CreatePeriodModal({ onClose, onSaved }: { onClose: () => void; onSaved:
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-bold text-slate-900">Create Accounting Period</h3>
+          <h3 className="text-lg font-bold text-slate-900">{t('reportsAndPeriods.createPeriodTitle')}</h3>
           <button onClick={onClose}><X size={20} className="text-slate-400" /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Period Name</label>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('reportsAndPeriods.periodName')}</label>
             <input
               type="text"
               value={form.name}
@@ -149,7 +152,7 @@ function CreatePeriodModal({ onClose, onSaved }: { onClose: () => void; onSaved:
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Start Date</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('reportsAndPeriods.startDate')}</label>
               <input
                 type="date"
                 value={form.start_date}
@@ -158,7 +161,7 @@ function CreatePeriodModal({ onClose, onSaved }: { onClose: () => void; onSaved:
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">End Date</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('reportsAndPeriods.endDate')}</label>
               <input
                 type="date"
                 value={form.end_date}
@@ -168,7 +171,7 @@ function CreatePeriodModal({ onClose, onSaved }: { onClose: () => void; onSaved:
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fiscal Year</label>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('reportsAndPeriods.fiscalYear')}</label>
             <input
               type="number"
               value={form.fiscal_year}
@@ -182,10 +185,10 @@ function CreatePeriodModal({ onClose, onSaved }: { onClose: () => void; onSaved:
             </div>
           )}
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm font-bold border border-slate-200 rounded hover:bg-slate-50">Cancel</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 text-sm font-bold border border-slate-200 rounded hover:bg-slate-50">{t('reportsAndPeriods.cancel')}</button>
             <button type="submit" disabled={saving} className="flex-1 flex justify-center items-center gap-2 px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
               {saving && <Loader2 size={14} className="animate-spin" />}
-              Create Period
+              {t('reportsAndPeriods.createPeriod')}
             </button>
           </div>
         </form>
@@ -205,6 +208,7 @@ const periodStatusColors: Record<string, 'positive' | 'negative' | 'info' | 'neu
 };
 
 export function AccountingPeriods() {
+  const { t } = useTranslation('finance');
   const { can } = usePermissions();
   const canClose  = can('finance', 'accounting_periods', 'close');
   const canOpen   = can('finance', 'accounting_periods', 'open');
@@ -258,15 +262,15 @@ export function AccountingPeriods() {
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Accounting Periods</h2>
-          <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">Fiscal year operational status</p>
+          <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('reportsAndPeriods.accountingPeriods')}</h2>
+          <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">{t('reportsAndPeriods.accountingPeriodsSubtitle')}</p>
         </div>
         {canCreate && (
           <button
             onClick={() => setShowModal(true)}
             className="px-4 py-2 text-xs font-bold bg-blue-600 text-white rounded shadow hover:bg-blue-700 uppercase tracking-wide flex items-center gap-2"
           >
-            <Plus size={14} /> New Period
+            <Plus size={14} /> {t('reportsAndPeriods.newPeriod')}
           </button>
         )}
       </div>
@@ -280,14 +284,14 @@ export function AccountingPeriods() {
       {loading ? (
         <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
           <Loader2 size={20} className="animate-spin" />
-          <span className="text-sm">Loading periods...</span>
+          <span className="text-sm">{t('reportsAndPeriods.loadingPeriods')}</span>
         </div>
       ) : periods.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
-          <p className="text-sm">No accounting periods yet.</p>
+          <p className="text-sm">{t('reportsAndPeriods.noPeriods')}</p>
           {canCreate && (
             <button onClick={() => setShowModal(true)} className="text-sm font-bold text-blue-600 hover:underline">
-              Create your first period →
+              {t('reportsAndPeriods.createFirstPeriod')}
             </button>
           )}
         </div>
@@ -303,9 +307,9 @@ export function AccountingPeriods() {
               </div>
               <h3 className="text-lg font-bold text-slate-900">{period.name}</h3>
               <div className="mt-3 space-y-1">
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Duration</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t('reportsAndPeriods.duration')}</p>
                 <p className="text-xs text-slate-600 font-medium">{period.start_date} → {period.end_date}</p>
-                <p className="text-[10px] text-slate-400">FY {period.fiscal_year}</p>
+                <p className="text-[10px] text-slate-400">{t('reportsAndPeriods.fy', { year: period.fiscal_year })}</p>
               </div>
               <div className="mt-5">
                 {period.status === 'open' && canClose && (
@@ -315,7 +319,7 @@ export function AccountingPeriods() {
                     className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-rose-50 text-rose-600 text-[10px] font-bold rounded uppercase hover:bg-rose-100 border border-rose-100 disabled:opacity-50"
                   >
                     {actionLoading === period.id ? <Loader2 size={12} className="animate-spin" /> : <Lock size={12} />}
-                    Close Period
+                    {t('reportsAndPeriods.closePeriod')}
                   </button>
                 )}
                 {period.status === 'closed' && canOpen && (
@@ -325,7 +329,7 @@ export function AccountingPeriods() {
                     className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase hover:bg-blue-100 border border-blue-100 disabled:opacity-50"
                   >
                     {actionLoading === period.id ? <Loader2 size={12} className="animate-spin" /> : <Unlock size={12} />}
-                    Reopen
+                    {t('reportsAndPeriods.reopen')}
                   </button>
                 )}
                 {period.status === 'future' && canOpen && (
@@ -335,12 +339,12 @@ export function AccountingPeriods() {
                     className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded uppercase hover:bg-emerald-100 border border-emerald-100 disabled:opacity-50"
                   >
                     {actionLoading === period.id ? <Loader2 size={12} className="animate-spin" /> : <Unlock size={12} />}
-                    Open Period
+                    {t('reportsAndPeriods.openPeriod')}
                   </button>
                 )}
                 {period.status === 'soft_closed' && (
                   <div className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-slate-50 text-slate-400 text-[10px] font-bold rounded uppercase border border-slate-100">
-                    <Lock size={12} /> Soft Closed
+                    <Lock size={12} /> {t('reportsAndPeriods.softClosed')}
                   </div>
                 )}
               </div>

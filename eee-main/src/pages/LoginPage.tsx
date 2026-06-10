@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { BarChart3, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 export default function LoginPage() {
+  const { t } = useTranslation('app');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,6 +22,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
       <div className="w-full max-w-sm px-4">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8 gap-3">
@@ -27,7 +33,7 @@ export default function LoginPage() {
           </div>
           <div className="text-center">
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">PetFood ERP</h1>
-            <p className="text-slate-500 text-sm mt-0.5">Sign in to your account</p>
+            <p className="text-slate-500 text-sm mt-0.5">{t('loginPage.subtitle')}</p>
           </div>
         </div>
 
@@ -36,7 +42,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                Email
+                {t('loginPage.email')}
               </label>
               <input
                 type="email"
@@ -51,7 +57,7 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
-                Password
+                {t('loginPage.password')}
               </label>
               <input
                 type="password"
@@ -74,13 +80,13 @@ export default function LoginPage() {
               disabled={loading || !email || !password}
               className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold rounded-lg transition-colors mt-2"
             >
-              {loading ? <><Loader2 size={15} className="animate-spin" /> Signing in…</> : 'Sign In'}
+              {loading ? <><Loader2 size={15} className="animate-spin" /> {t('loginPage.signingIn')}</> : t('loginPage.signIn')}
             </button>
           </form>
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          Contact your administrator to get access.
+          {t('loginPage.contactAdmin')}
         </p>
       </div>
     </div>

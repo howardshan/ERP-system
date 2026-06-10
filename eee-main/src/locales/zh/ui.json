@@ -1,0 +1,52 @@
+{
+  "cards": {
+    "vsLastPeriod": "较上期"
+  },
+  "printerSettingsPopover": {
+    "downloadWindows": "下载 Windows 打印助手",
+    "downloadMacos": "下载 macOS 打印助手",
+    "howToInstall": "如何安装？",
+    "warnWin": "SmartScreen 提示时点「更多信息」→「仍要运行」",
+    "warnMac": "若提示「无法验证开发者」：右键点该文件 →「打开」→ 再点「打开」",
+    "settingsPathWin": "设置 - 打印机和扫描仪",
+    "settingsPathMac": "系统设置 - 打印机与扫描仪",
+    "step1Prefix": "点上方下载链接，",
+    "step1Bold": "解压",
+    "step1Suffix": "下载的压缩包",
+    "step2Prefix": "双击 ",
+    "step2Open": "（",
+    "step2Close": "）",
+    "step3Prefix": "到「{{path}}」把标签机默认纸张设为 ",
+    "step3Bold": "4×3 英寸",
+    "step4": "回到本窗口点「搜索打印机」，选中本机打印机",
+    "step5Prefix": "完成 ✓ 之后打印即",
+    "step5Bold": "静默出纸",
+    "step5Suffix": "，无需对话框",
+    "notInstalledYet": "还没装打印助手？",
+    "downloadPrefix": "下载 ",
+    "installHintSuffix": "，双击安装后即可静默打印。",
+    "noPrintersCups": "未找到打印机，请检查 CUPS 是否已安装",
+    "foundPrinters": "找到 {{count}} 台打印机",
+    "searchFailed": "搜索失败: {{error}}",
+    "bridgeNotRunning": "打印助手未运行",
+    "noPrintersQueue": "未找到打印机，请检查系统打印队列",
+    "searchFailedBridge": "搜索失败: {{error}}。请先安装打印助手（见下方下载链接）",
+    "saved": "已保存 ✓",
+    "cleared": "已清除",
+    "dpiSet": "分辨率 {{dpi}} dpi ✓",
+    "triggerTitle": "标签打印机设置",
+    "noPrinterSet": "未设置打印机",
+    "title": "标签打印机",
+    "notConfigured": "尚未配置",
+    "searching": "搜索中…",
+    "searchPrinter": "搜索打印机",
+    "manualPlaceholder": "手动输入队列名…",
+    "save": "保存",
+    "resolutionLabel": "打印机分辨率 (dpi)",
+    "resolutionHint": "选成跟这台打印机一致的分辨率，标签最锐（多数热敏机 203，部分 300/600）。",
+    "clearSaved": "清除已保存的打印机"
+  },
+  "helpPopover": {
+    "triggerAriaLabel": "这是什么意思?"
+  }
+}

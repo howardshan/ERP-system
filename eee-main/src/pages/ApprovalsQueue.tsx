@@ -5,8 +5,10 @@ import { Loader2, CheckCircle2, XCircle, Eye, Clock, AlertTriangle, ShieldOff } 
 import { JournalEntry, ApprovalTier } from '../types';
 import { getPendingApprovals, approveJournalEntry, rejectJournalEntry, getApprovalTiers, getJournalEntry } from '../services/api';
 import { usePermissions } from '../contexts/PermissionContext';
+import { useTranslation } from 'react-i18next';
 
 export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: string) => void }) {
+  const { t } = useTranslation('finance');
   const { can, approvalLimit } = usePermissions();
   const canApprove = can('finance', 'journal_entry', 'approve');
   const myLimit = approvalLimit('finance', 'journal_entry', 'approve');
@@ -35,7 +37,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
       setEntries(pending);
       setTiers(tierList);
     } catch (e: any) {
-      setError(e.message ?? 'Failed to load approvals.');
+      setError(e.message ?? t('approvalsQueue.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -54,7 +56,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
       const full = await getJournalEntry(entry.id);
       setSelectedEntry(full);
     } catch (e: any) {
-      setModalError(e.message ?? 'Failed to load entry details.');
+      setModalError(e.message ?? t('approvalsQueue.loadEntryFailed'));
     } finally {
       setModalLoading(false);
     }
@@ -78,7 +80,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
       closeModal();
       await load();
     } catch (e: any) {
-      setModalError(e.message ?? 'Failed to approve entry.');
+      setModalError(e.message ?? t('approvalsQueue.approveFailed'));
     } finally {
       setActionLoading(false);
     }
@@ -87,7 +89,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
   async function handleReject() {
     if (!selectedEntry) return;
     if (!rejectReason.trim()) {
-      setRejectError('Rejection reason is required.');
+      setRejectError(t('approvalsQueue.rejectReasonRequired'));
       return;
     }
     setActionLoading(true);
@@ -98,7 +100,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
       closeModal();
       await load();
     } catch (e: any) {
-      setModalError(e.message ?? 'Failed to reject entry.');
+      setModalError(e.message ?? t('approvalsQueue.rejectFailed'));
     } finally {
       setActionLoading(false);
     }
@@ -122,8 +124,8 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-3 text-slate-400">
         <ShieldOff size={32} className="text-slate-300" />
-        <p className="text-sm font-medium">You don't have permission to approve journal entries.</p>
-        <p className="text-xs">Required: Financial Management → Journal Entries → Approve</p>
+        <p className="text-sm font-medium">{t('approvalsQueue.noPermission')}</p>
+        <p className="text-xs">{t('approvalsQueue.noPermissionRequired')}</p>
       </div>
     );
   }
@@ -131,9 +133,9 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Approvals Queue</h2>
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{t('approvalsQueue.title')}</h2>
         <p className="text-xs text-slate-500 mt-1 uppercase font-bold tracking-wider">
-          {entries.length} entr{entries.length === 1 ? 'y' : 'ies'} pending approval
+          {t('approvalsQueue.pendingCount', { count: entries.length })}
         </p>
       </div>
 
@@ -147,7 +149,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
       {tiers.length > 0 && (
         <div className="flex flex-wrap gap-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 self-center mr-1">
-            Approval Tiers:
+            {t('approvalsQueue.approvalTiers')}
           </span>
           {tiers.map(tier => (
             <div
@@ -156,7 +158,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
             >
               <span className="text-[10px] font-bold uppercase tracking-wide text-slate-700">{tier.label}</span>
               <span className="text-[10px] text-slate-400">
-                {tier.approval_limit == null ? 'Unlimited' : `up to ${formatCurrency(tier.approval_limit)}`}
+                {tier.approval_limit == null ? t('approvalsQueue.unlimited') : t('approvalsQueue.upTo', { amount: formatCurrency(tier.approval_limit) })}
               </span>
             </div>
           ))}
@@ -168,24 +170,24 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
           {loading ? (
             <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
               <Loader2 size={20} className="animate-spin" />
-              <span className="text-sm">Loading pending approvals...</span>
+              <span className="text-sm">{t('approvalsQueue.loadingPending')}</span>
             </div>
           ) : entries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
               <CheckCircle2 size={32} className="text-emerald-400" />
-              <p className="text-sm font-medium">No entries pending approval</p>
+              <p className="text-sm font-medium">{t('approvalsQueue.noPending')}</p>
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
-                  <th className="px-6 py-4">Entry #</th>
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Description</th>
-                  <th className="px-6 py-4">Submitted By</th>
-                  <th className="px-6 py-4 text-right">Amount</th>
-                  <th className="px-6 py-4">Required Tier</th>
-                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">{t('approvalsQueue.colEntryNumber')}</th>
+                  <th className="px-6 py-4">{t('approvalsQueue.colDate')}</th>
+                  <th className="px-6 py-4">{t('approvalsQueue.colDescription')}</th>
+                  <th className="px-6 py-4">{t('approvalsQueue.colSubmittedBy')}</th>
+                  <th className="px-6 py-4 text-right">{t('approvalsQueue.colAmount')}</th>
+                  <th className="px-6 py-4">{t('approvalsQueue.colRequiredTier')}</th>
+                  <th className="px-6 py-4">{t('approvalsQueue.colStatus')}</th>
                   <th className="px-6 py-4 w-12" />
                 </tr>
               </thead>
@@ -217,7 +219,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                       {getTierLabel(entry.required_tier_id)}
                     </td>
                     <td className="px-6 py-4">
-                      <Badge type="warning">Pending Approval</Badge>
+                      <Badge type="warning">{t('approvalsQueue.pendingApproval')}</Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <Eye
@@ -249,7 +251,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
               <button
                 onClick={closeModal}
                 className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-                aria-label="Close"
+                aria-label={t('approvalsQueue.close')}
               >
                 <XCircle size={20} />
               </button>
@@ -265,7 +267,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
 
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div className="space-y-1">
-                  <p className="font-bold uppercase tracking-widest text-slate-400">Submitted By</p>
+                  <p className="font-bold uppercase tracking-widest text-slate-400">{t('approvalsQueue.colSubmittedBy')}</p>
                   <p className="font-mono text-slate-700">
                     {selectedEntry.submitted_by
                       ? `…${selectedEntry.submitted_by.slice(-8)}`
@@ -273,14 +275,14 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="font-bold uppercase tracking-widest text-slate-400">Required Tier</p>
+                  <p className="font-bold uppercase tracking-widest text-slate-400">{t('approvalsQueue.colRequiredTier')}</p>
                   <p className="font-bold text-slate-700 uppercase">
                     {getTierLabel(selectedEntry.required_tier_id)}
                   </p>
                 </div>
                 {selectedEntry.submitted_at && (
                   <div className="space-y-1">
-                    <p className="font-bold uppercase tracking-widest text-slate-400">Submitted At</p>
+                    <p className="font-bold uppercase tracking-widest text-slate-400">{t('approvalsQueue.submittedAt')}</p>
                     <p className="text-slate-700 flex items-center gap-1">
                       <Clock size={12} />
                       {new Date(selectedEntry.submitted_at).toLocaleString()}
@@ -289,7 +291,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                 )}
                 {selectedEntry.notes && (
                   <div className="space-y-1 col-span-2">
-                    <p className="font-bold uppercase tracking-widest text-slate-400">Notes</p>
+                    <p className="font-bold uppercase tracking-widest text-slate-400">{t('approvalsQueue.notes')}</p>
                     <p className="text-slate-700">{selectedEntry.notes}</p>
                   </div>
                 )}
@@ -298,20 +300,20 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
               {modalLoading ? (
                 <div className="flex items-center justify-center py-10 gap-3 text-slate-400">
                   <Loader2 size={18} className="animate-spin" />
-                  <span className="text-sm">Loading lines...</span>
+                  <span className="text-sm">{t('approvalsQueue.loadingLines')}</span>
                 </div>
               ) : selectedEntry.lines && selectedEntry.lines.length > 0 ? (
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-                    Journal Lines
+                    {t('approvalsQueue.journalLines')}
                   </p>
                   <table className="w-full text-left border-collapse border border-slate-200 rounded-lg overflow-hidden text-xs">
                     <thead>
                       <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
-                        <th className="px-4 py-3">Account</th>
-                        <th className="px-4 py-3">Description</th>
-                        <th className="px-4 py-3 text-right">Debit</th>
-                        <th className="px-4 py-3 text-right">Credit</th>
+                        <th className="px-4 py-3">{t('approvalsQueue.colAccount')}</th>
+                        <th className="px-4 py-3">{t('approvalsQueue.colDescription')}</th>
+                        <th className="px-4 py-3 text-right">{t('approvalsQueue.colDebit')}</th>
+                        <th className="px-4 py-3 text-right">{t('approvalsQueue.colCredit')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -334,7 +336,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                     </tbody>
                     <tfoot>
                       <tr className="bg-slate-50 border-t border-slate-200 font-bold text-[10px] uppercase tracking-widest text-slate-500">
-                        <td className="px-4 py-2.5 col-span-2" colSpan={2}>Totals</td>
+                        <td className="px-4 py-2.5 col-span-2" colSpan={2}>{t('approvalsQueue.totals')}</td>
                         <td className="px-4 py-2.5 text-right font-mono text-slate-900">
                           {formatCurrency(
                             selectedEntry.lines.reduce((s, l) => s + Number(l.debit), 0)
@@ -354,13 +356,13 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
               {showRejectForm && (
                 <div className="space-y-2 pt-2">
                   <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                    Rejection Reason <span className="text-rose-500">*</span>
+                    {t('approvalsQueue.rejectionReason')} <span className="text-rose-500">*</span>
                   </label>
                   <textarea
                     value={rejectReason}
                     onChange={e => { setRejectReason(e.target.value); setRejectError(null); }}
                     rows={3}
-                    placeholder="Explain why this entry is being rejected..."
+                    placeholder={t('approvalsQueue.rejectPlaceholder')}
                     className={cn(
                       'w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-1 resize-none',
                       rejectError
@@ -380,7 +382,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                 onClick={closeModal}
                 className="px-4 py-2 text-xs font-bold border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors uppercase tracking-wide"
               >
-                Cancel
+                {t('approvalsQueue.cancel')}
               </button>
 
               <div className="flex items-center gap-3">
@@ -391,7 +393,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                     className="flex items-center gap-2 px-4 py-2 text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors disabled:opacity-50 uppercase tracking-wide"
                   >
                     <XCircle size={14} />
-                    Reject
+                    {t('approvalsQueue.reject')}
                   </button>
                 ) : (
                   <button
@@ -404,7 +406,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                     ) : (
                       <XCircle size={14} />
                     )}
-                    Confirm Rejection
+                    {t('approvalsQueue.confirmRejection')}
                   </button>
                 )}
 
@@ -415,7 +417,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                     <button
                       onClick={handleApprove}
                       disabled={actionLoading || overLimit}
-                      title={overLimit ? `Exceeds your approval limit of $${myLimit!.toLocaleString()}` : undefined}
+                      title={overLimit ? t('approvalsQueue.exceedsLimit', { limit: myLimit!.toLocaleString() }) : undefined}
                       className="flex items-center gap-2 px-4 py-2 text-xs font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide"
                     >
                       {actionLoading ? (
@@ -423,7 +425,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                       ) : (
                         <CheckCircle2 size={14} />
                       )}
-                      {overLimit ? `Over Limit ($${myLimit!.toLocaleString()})` : 'Approve'}
+                      {overLimit ? t('approvalsQueue.overLimit', { limit: myLimit!.toLocaleString() }) : t('approvalsQueue.approve')}
                     </button>
                   );
                 })()}

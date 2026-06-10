@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { listProductionLots, ProductionLot } from '../../services/qcApi';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -7,6 +8,7 @@ import { PermissionDenied } from './components/PermissionDenied';
 interface Props { onSelectLot: (id: string) => void; }
 
 export default function TraceListPage({ onSelectLot }: Props) {
+  const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('production', 'trace', 'view');
   const [lots, setLots] = useState<ProductionLot[]>([]);
@@ -44,15 +46,15 @@ export default function TraceListPage({ onSelectLot }: Props) {
   };
 
   if (!canView) {
-    return <PermissionDenied permission="production.trace.view" feature="Batch Trace" />;
+    return <PermissionDenied permission="production.trace.view" feature={t('traceListPage.feature')} />;
   }
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Batch Trace</h1>
-      <p className="text-sm text-slate-500 mb-5">Grouped by product · click a working order to view sub-lot history</p>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('traceListPage.title')}</h1>
+      <p className="text-sm text-slate-500 mb-5">{t('traceListPage.subtitle')}</p>
       {error && <p className="text-red-600 mb-3 text-sm">{error}</p>}
-      {groups.length === 0 && !error && <p className="text-slate-400 text-sm">No production lots found.</p>}
+      {groups.length === 0 && !error && <p className="text-slate-400 text-sm">{t('traceListPage.empty')}</p>}
 
       <div className="space-y-3">
         {groups.map(g => {
@@ -72,7 +74,7 @@ export default function TraceListPage({ onSelectLot }: Props) {
                     <span className="font-bold text-slate-900 text-sm">{g.skuName}</span>
                   </div>
                 </div>
-                <span className="text-xs text-slate-400 font-medium">{g.lots.length} order{g.lots.length !== 1 ? 's' : ''}</span>
+                <span className="text-xs text-slate-400 font-medium">{t('traceListPage.orderCount', { count: g.lots.length })}</span>
               </button>
 
               {/* Working orders list */}
@@ -103,7 +105,7 @@ export default function TraceListPage({ onSelectLot }: Props) {
                                 ? 'bg-slate-100 text-slate-500'
                                 : 'bg-amber-100 text-amber-800')
                             }
-                            title={allScanned ? 'All carts scanned in' : `${total - scanned} cart(s) not yet scanned`}
+                            title={allScanned ? t('traceListPage.allScanned') : t('traceListPage.cartsNotScanned', { count: total - scanned })}
                           >
                             {scanned}/{total}
                           </span>

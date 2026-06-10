@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RefreshCw, FlaskConical, CheckCircle2, Hourglass, Calendar } from 'lucide-react';
 import { getTestingDashboard, TestingDashboardData } from '../../services/qcApi';
 
 export default function TestingDashboard() {
+  const { t } = useTranslation('qc');
   const [data, setData] = useState<TestingDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,14 +14,14 @@ export default function TestingDashboard() {
     try {
       setData(await getTestingDashboard());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Load failed');
+      setError(e instanceof Error ? e.message : t('testingDashboard.loadFailed'));
     }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  if (loading) return <div className="p-8 text-slate-400 text-sm">Loading dashboard…</div>;
+  if (loading) return <div className="p-8 text-slate-400 text-sm">{t('testingDashboard.loading')}</div>;
   if (error) return <div className="p-8 text-red-600 text-sm">{error}</div>;
   if (!data) return null;
 
@@ -28,27 +30,27 @@ export default function TestingDashboard() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-900">Testing Dashboard</h2>
+        <h2 className="text-lg font-bold text-slate-900">{t('testingDashboard.title')}</h2>
         <button onClick={load} className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700">
-          <RefreshCw size={12} /> Refresh
+          <RefreshCw size={12} /> {t('testingDashboard.refresh')}
         </button>
       </div>
 
       {/* Today's summary */}
       <section>
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Today's Progress</h3>
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{t('testingDashboard.todaysProgress')}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <SummaryCard icon={Hourglass} label="Awaiting Sample" value={today_summary.awaiting_sample} color="amber" />
-          <SummaryCard icon={FlaskConical} label="Sample Taken" value={today_summary.sample_taken} color="blue" />
-          <SummaryCard icon={RefreshCw} label="Awaiting Result" value={today_summary.awaiting_result} color="orange" />
-          <SummaryCard icon={CheckCircle2} label="Completed Today" value={today_summary.completed_today} color="emerald" />
+          <SummaryCard icon={Hourglass} label={t('testingDashboard.awaitingSample')} value={today_summary.awaiting_sample} color="amber" />
+          <SummaryCard icon={FlaskConical} label={t('testingDashboard.sampleTaken')} value={today_summary.sample_taken} color="blue" />
+          <SummaryCard icon={RefreshCw} label={t('testingDashboard.awaitingResult')} value={today_summary.awaiting_result} color="orange" />
+          <SummaryCard icon={CheckCircle2} label={t('testingDashboard.completedToday')} value={today_summary.completed_today} color="emerald" />
         </div>
       </section>
 
       {/* 3-day forecast */}
       <section>
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-          <Calendar size={12} /> Upcoming Tests (Next 3 Days)
+          <Calendar size={12} /> {t('testingDashboard.upcomingTests')}
         </h3>
         <div className="space-y-3">
           {forecast.map(day => (
@@ -59,12 +61,12 @@ export default function TestingDashboard() {
                   <span className="ml-2 text-xs text-slate-400">{day.date}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-bold text-slate-700">{day.total_samples ?? day.total} samples</span>
-                  <span className="ml-1.5 text-xs text-slate-400">({day.total} carts)</span>
+                  <span className="text-sm font-bold text-slate-700">{t('testingDashboard.samplesCount', { count: day.total_samples ?? day.total })}</span>
+                  <span className="ml-1.5 text-xs text-slate-400">{t('testingDashboard.cartsParen', { count: day.total })}</span>
                 </div>
               </div>
               {day.products.length === 0 ? (
-                <p className="px-4 py-3 text-xs text-slate-400">No carts finishing this day</p>
+                <p className="px-4 py-3 text-xs text-slate-400">{t('testingDashboard.noCarts')}</p>
               ) : (
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-slate-100">
@@ -75,8 +77,8 @@ export default function TestingDashboard() {
                           <span className="font-medium text-slate-800">{p.sku_name}</span>
                         </td>
                         <td className="px-4 py-2.5 text-right">
-                          <span className="font-bold text-slate-900">{p.samples_needed ?? p.count} samples</span>
-                          <span className="ml-1.5 text-xs text-slate-400">/ {p.count} carts</span>
+                          <span className="font-bold text-slate-900">{t('testingDashboard.samplesCount', { count: p.samples_needed ?? p.count })}</span>
+                          <span className="ml-1.5 text-xs text-slate-400">{t('testingDashboard.cartsSlash', { count: p.count })}</span>
                         </td>
                       </tr>
                     ))}

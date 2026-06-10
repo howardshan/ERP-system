@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight, ChevronDown, Search } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import {
@@ -32,6 +33,7 @@ interface ItemGroup {
 }
 
 export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number) => void }) {
+  const { t } = useTranslation('warehouse');
   const [rows, setRows] = useState<WarehouseBalance[]>([]);
   const [locations, setLocations] = useState<WarehouseLocation[]>([]);
   const [items, setItems] = useState<WarehouseItem[]>([]);
@@ -124,20 +126,20 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Inventory Balance</h1>
-      <p className="text-slate-600 mb-4 text-sm">按物料 / 批次 / 库位的实时余额（派生自只增流水）。</p>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('balancePage.title')}</h1>
+      <p className="text-slate-600 mb-4 text-sm">{t('balancePage.subtitle')}</p>
 
       {error && <p className="text-red-600 mb-3 text-sm">{error}</p>}
 
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-slate-700">物料筛选</label>
+          <label className="text-xs font-medium text-slate-700">{t('balancePage.itemFilter')}</label>
           <select
             className="border rounded-lg px-3 py-1.5 text-sm bg-white"
             value={itemId}
             onChange={(e) => setItemId(e.target.value ? Number(e.target.value) : '')}
           >
-            <option value="">全部物料</option>
+            <option value="">{t('balancePage.allItems')}</option>
             {items.map((i) => <option key={i.id} value={i.id}>{i.sku} · {i.name}</option>)}
           </select>
         </div>
@@ -147,7 +149,7 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
             onClick={() => { setItemId(''); setLocationId(''); }}
             className="text-xs text-slate-500 hover:text-slate-800 underline"
           >
-            清除筛选
+            {t('balancePage.clearFilter')}
           </button>
         )}
       </div>
@@ -158,7 +160,7 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="搜索物料（SKU 或名称）…"
+            placeholder={t('balancePage.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full border rounded-lg pl-8 pr-3 py-1.5 text-sm"
@@ -170,11 +172,11 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
             onClick={allExpanded ? collapseAll : expandAll}
             className="text-xs text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100"
           >
-            {allExpanded ? '全部收起' : '全部展开'}
+            {allExpanded ? t('balancePage.collapseAll') : t('balancePage.expandAll')}
           </button>
         )}
         <span className="text-xs text-slate-500">
-          {filteredGroups.length} 物料 · {rows.length} 明细行
+          {t('balancePage.summaryCount', { items: filteredGroups.length, lines: rows.length })}
         </span>
       </div>
 
@@ -183,11 +185,11 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
             <tr>
-              <th className="text-left font-semibold px-4 py-2.5 w-[40%]">物料 / 批次</th>
-              <th className="text-left font-semibold px-4 py-2.5">库位</th>
-              <th className="text-right font-semibold px-4 py-2.5">在库</th>
-              <th className="text-right font-semibold px-4 py-2.5">可用</th>
-              <th className="text-left font-semibold px-4 py-2.5 pl-3">单位</th>
+              <th className="text-left font-semibold px-4 py-2.5 w-[40%]">{t('balancePage.colItemLot')}</th>
+              <th className="text-left font-semibold px-4 py-2.5">{t('balancePage.colLocation')}</th>
+              <th className="text-right font-semibold px-4 py-2.5">{t('balancePage.colOnHand')}</th>
+              <th className="text-right font-semibold px-4 py-2.5">{t('balancePage.colAvailable')}</th>
+              <th className="text-left font-semibold px-4 py-2.5 pl-3">{t('balancePage.colUom')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -211,10 +213,10 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-500">
-                      {g.lotCount} 批次 · {g.locationCount} 库位
+                      {t('balancePage.lotLocationSummary', { lots: g.lotCount, locations: g.locationCount })}
                       {g.totalOnHand > g.totalAvailable && (
                         <span className="ml-1 text-amber-700 font-semibold">
-                          · 冻结 {g.totalOnHand - g.totalAvailable}
+                          {t('balancePage.frozenSummary', { qty: g.totalOnHand - g.totalAvailable })}
                         </span>
                       )}
                     </td>
@@ -243,7 +245,7 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
                         )}
                         {r.lot_status && (
                           <span className={`ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded ${LOT_STATUS_BADGE[r.lot_status] ?? 'bg-slate-100 text-slate-600'}`}>
-                            {r.lot_status}
+                            {t(`balancePage.lotStatus.${r.lot_status}`, { defaultValue: r.lot_status })}
                           </span>
                         )}
                       </td>
@@ -258,11 +260,11 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
             })}
             {!loading && filteredGroups.length === 0 && (
               <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">
-                {search ? '无匹配物料' : '暂无库存'}
+                {search ? t('balancePage.noMatchingItems') : t('balancePage.noInventory')}
               </td></tr>
             )}
             {loading && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">加载中…</td></tr>
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">{t('balancePage.loading')}</td></tr>
             )}
           </tbody>
         </table>
@@ -270,9 +272,9 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
 
         {/* Location tabs (replaces the dropdown filter) */}
         <aside className="w-44 shrink-0 sticky top-4">
-          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">库位</div>
+          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-1">{t('balancePage.locationsHeader')}</div>
           <div className="rounded-xl border bg-white overflow-hidden">
-            <LocationTab label="全部" isActive={locationId === ''} onClick={() => setLocationId('')} />
+            <LocationTab label={t('balancePage.allLocations')} isActive={locationId === ''} onClick={() => setLocationId('')} />
             <div className="h-px bg-slate-100" />
             {locations.map((l) => (
               <LocationTab
