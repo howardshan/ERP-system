@@ -40,8 +40,10 @@ function productToForm(p: Product): ProductInput {
       .filter(t => t.test_type_id != null)
       .map(t => ({
         test_type_id: t.test_type_id!,
-        lower_limit: t.lower_limit,
-        upper_limit: t.upper_limit,
+        lower_limit:      t.lower_limit,
+        upper_limit:      t.upper_limit,
+        soft_lower_limit: t.soft_lower_limit,
+        soft_upper_limit: t.soft_upper_limit,
       })),
   };
 }
@@ -137,12 +139,18 @@ export default function ProductManagement() {
     // Validate limits — DecimalField emits NaN for empty/partial input, so we
     // reject here instead of letting NaN propagate to the backend.
     for (const t of form.templates) {
-      if (!Number.isFinite(t.lower_limit) || !Number.isFinite(t.upper_limit)) {
-        setError('Each test needs a lower and upper limit.');
+      if (!Number.isFinite(t.lower_limit) || !Number.isFinite(t.upper_limit) ||
+          !Number.isFinite(t.soft_lower_limit) || !Number.isFinite(t.soft_upper_limit)) {
+        setError('Each test needs hard PASS + soft tolerance limits (4 values).');
         return;
       }
       if (t.lower_limit > t.upper_limit) {
-        setError('Lower limit must be ≤ upper limit.');
+        setError('Hard PASS lower limit must be ≤ upper limit.');
+        return;
+      }
+      // M-118: soft must wrap hard so the DB CHECK matches.
+      if (t.soft_lower_limit > t.lower_limit || t.soft_upper_limit < t.upper_limit) {
+        setError('Soft tolerance must wrap the hard PASS range (soft_lower ≤ lower, soft_upper ≥ upper).');
         return;
       }
     }
@@ -371,11 +379,21 @@ export default function ProductManagement() {
                         <div className="sm:col-span-2">
                           <dt className="text-slate-500 mb-1">Required tests</dt>
                           <dd className="flex flex-wrap gap-1.5">
-                            {p.templates.map(tmpl => (
-                              <span key={tmpl.id} className="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded px-2 py-0.5">
-                                {tmpl.item_name} · [{tmpl.lower_limit}, {tmpl.upper_limit}]
-                              </span>
-                            ))}
+                            {p.templates.map(tmpl => {
+                              const hasSoftBand =
+                                tmpl.soft_lower_limit < tmpl.lower_limit ||
+                                tmpl.soft_upper_limit > tmpl.upper_limit;
+                              return (
+                                <span key={tmpl.id} className="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded px-2 py-0.5">
+                                  {tmpl.item_name} · [{tmpl.lower_limit}, {tmpl.upper_limit}]
+                                  {hasSoftBand && (
+                                    <span className="ml-1 text-amber-700">
+                                      · soft [{tmpl.soft_lower_limit}, {tmpl.soft_upper_limit}]
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
                           </dd>
                         </div>
                       )}
@@ -418,8 +436,13 @@ function ProductFormFields({
   const addTemplate = (typeId: number) => {
     setForm({
       ...form,
-      // Start empty (NaN) so operator types fresh values; submit validates.
-      templates: [...form.templates, { test_type_id: typeId, lower_limit: NaN, upper_limit: NaN }],
+      // M-118: 4 empty fields. Operator must fill hard PASS range AND soft
+      // tolerance range; submit validates wrap (soft ⊇ hard) and finiteness.
+      templates: [...form.templates, {
+        test_type_id: typeId,
+        lower_limit: NaN, upper_limit: NaN,
+        soft_lower_limit: NaN, soft_upper_limit: NaN,
+      }],
     });
   };
 
@@ -502,25 +525,63 @@ function ProductFormFields({
                   <Trash2 size={13} />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="block">
-                  <span className="text-[11px] text-slate-600">Lower limit</span>
-                  <DecimalField
-                    allowNegative
-                    className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
-                    value={tmpl.lower_limit}
-                    onChange={(n) => updateTemplate(idx, { lower_limit: n })}
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-[11px] text-slate-600">Upper limit</span>
-                  <DecimalField
-                    allowNegative
-                    className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
-                    value={tmpl.upper_limit}
-                    onChange={(n) => updateTemplate(idx, { upper_limit: n })}
-                  />
-                </label>
+              {/* M-118: Hard PASS range — auto-pass. */}
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-2">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 mb-1.5">
+                  Hard PASS range
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="text-[11px] text-slate-600">Lower</span>
+                    <DecimalField
+                      allowNegative
+                      className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                      value={tmpl.lower_limit}
+                      onChange={(n) => updateTemplate(idx, { lower_limit: n })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] text-slate-600">Upper</span>
+                    <DecimalField
+                      allowNegative
+                      className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                      value={tmpl.upper_limit}
+                      onChange={(n) => updateTemplate(idx, { upper_limit: n })}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* M-118: Soft tolerance — supervisor-only override window.
+                  Must wrap hard. soft = hard means no override is possible
+                  (anything outside hard is forced FAIL). */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-2">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-amber-700 mb-1.5">
+                  Soft tolerance (supervisor discretion)
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <span className="text-[11px] text-slate-600">Lower</span>
+                    <DecimalField
+                      allowNegative
+                      className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                      value={tmpl.soft_lower_limit}
+                      onChange={(n) => updateTemplate(idx, { soft_lower_limit: n })}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[11px] text-slate-600">Upper</span>
+                    <DecimalField
+                      allowNegative
+                      className="mt-0.5 w-full border rounded-lg px-3 py-1.5 text-sm"
+                      value={tmpl.soft_upper_limit}
+                      onChange={(n) => updateTemplate(idx, { soft_upper_limit: n })}
+                    />
+                  </label>
+                </div>
+                <p className="mt-1 text-[10px] text-slate-500 leading-snug">
+                  Must wrap the hard range. Set equal to hard to disable supervisor override (anything outside hard ⇒ forced FAIL).
+                </p>
               </div>
             </div>
           );

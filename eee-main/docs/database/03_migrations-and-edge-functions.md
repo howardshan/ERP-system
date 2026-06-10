@@ -1935,6 +1935,88 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-118 `20260527000015_qc_soft_limits.sql`
+**用途**: QC 检验加 **三区分级判定**(hard / soft / out),并把手动 override 收紧到新加的 supervisor 权限 `qc.testing.supervisor_judge`。
+
+**问题**: M-109 让 `qc_submit_inspection` 接受 `p_result` 直接 override 自动判定,但**没有任何约束** —— 任何持 `qc.testing.submit_inspection` 的人都能把超出 hard PASS 范围的读数硬过 PASS。运营反馈这放过了不合格品,需要把 override 限制到 (a) 受控范围内 (b) 受控人群手中。
+
+**新规则**:
+
+| 读数位置 | 判定 |
+|---|---|
+| Hard 内 `[lower_limit, upper_limit]` | 自动 PASS;**supervisor** 可改 FAIL |
+| Soft 边带 `[soft_lower, lower) ∪ (upper, soft_upper]` | **仅 supervisor** 可决定 PASS/FAIL |
+| Soft 外 | **强制 FAIL,任何人都不能 override** |
+
+**Schema 变更**:
+- `qc_inspection_template` 加 `soft_lower_limit / soft_upper_limit numeric(10,4) NOT NULL`
+- 回填:**所有现有 7 个 template 都设 soft = hard**(立刻关掉 override 通道,运营按需重配)
+- CHECK 约束 `qc_inspection_template_soft_wraps_hard`(soft 必须包住 hard)+ `qc_inspection_template_soft_order`(soft_lower ≤ soft_upper)
+
+**RPC 变更**:
+- `qc_submit_inspection`:加载 tmpl 后计算 `in_hard / in_soft`,如果 `p_result <> suggested`:
+  - 不在 soft 内 → `RAISE EXCEPTION 'Reading … outside soft tolerance — manual override not allowed'`
+  - 在 soft 内但无 `qc.testing.supervisor_judge` 权限 → `RAISE EXCEPTION 'Supervisor permission … required'`
+  - 写库的 `values_json` 多记 `in_hard / in_soft`;quality_event payload 多记 `in_hard / in_soft / manual_override_by_supervisor / soft_limits`,审计可追溯
+  - **群组传染逻辑完全不动**(冠军 PASS → siblings 全 passed,FAIL → siblings hold,这套 M-106 / M-109 引入的语义保留)
+- `qc_list_products`:templates 输出多 `soft_lower_limit / soft_upper_limit`,ProductManagement 直接读
+
+**新权限**:
+- `qc.testing.supervisor_judge`(prereq `submit_inspection`)— 持有此权限才能在 soft 边带做决定,以及在 hard 内反向 override 成 FAIL
+- 命名空间放在 `qc.testing.*` 跟其他 inspection 权限一致(M-094 没动 testing 子树)
+- Seed: `ysha@smu.edu` / `shayiqing16@gmail.com` 两个 dev 账号开箱即有,延续 M-064 / M-083 习惯
+
+**前端配套**:
+- `src/services/qcApi.ts` — `TemplateInput` / `InspectionTemplate` 加 `soft_lower_limit / soft_upper_limit`;`createProduct` / `updateProduct` 的 insert/update rows 同步;`inspectionTemplateForSubLot` 的 select + 返回类型扩展
+- `src/pages/qc/ProductManagement.tsx` — 每个 test template block 拆成两个 grouped fieldset:绿色 "Hard PASS range" + 琥珀色 "Soft tolerance"(各 2 列 Lower/Upper);`addTemplate` 初始化 4 个 NaN;submit 校验加 wrap check;SKU 卡片预览里 soft ≠ hard 时多打一段琥珀色 `· soft [...]`
+- `src/pages/qc/TestingPage.tsx` — `canSupervise` hook;`band: 'hard' | 'soft' | 'out' | null` state 跟着读数变;`limits` 类型加 soft 两列;Pass/Fail 按钮按下表 disabled:
+
+| band | Pass | Fail |
+|---|---|---|
+| hard | enabled | supervisor only |
+| soft | supervisor only | supervisor only |
+| out | **disabled** | enabled |
+
+  显示区从原来的 `Spec range: [a, b]` 改成 `Hard [a, b]` + 必要时 `Soft [c, d]` + `band` 角标(emerald/amber/red),soft band 内但非 supervisor 时显示 "请叫 supervisor",out 时显示 "outside soft tolerance — must FAIL"
+- `src/lib/permissionStructure.ts` — `qc.testing` 资源下加 `supervisor_judge` 条目,prereq `submit_inspection`
+
+**业务规则**:
+- **BR-Q70** 每个检验模板必须配 hard `[lower, upper]` + soft `[soft_lower, soft_upper]`,soft 必须**包住** hard(`soft_lower ≤ lower` AND `soft_upper ≥ upper`);DB CHECK 强制,前端 submit 同步校验。
+- **BR-Q71** Manual override 受 `qc.testing.supervisor_judge` 守门:读数在 hard 内反向选 FAIL,或在 soft 边带选任意 verdict,都需此权限;无此权限的提交跟着自动判定走。
+- **BR-Q72** 读数超出 soft 范围时,**任何人**(包括 supervisor)都不能 override,RPC 强制返回 FAIL。
+- **BR-Q73** Migration 默认所有现有 SKU `soft = hard`,等于关闭 override 通道;运营按需为单个 SKU 加宽 soft 才开放 supervisor discretion。
+
+**审计**: 走过 supervisor override 路径的 inspection,`qc_quality_event(inspection_passed | inspection_failed_hold)` 的 payload 含 `manual_override_by_supervisor: true / in_hard / in_soft / soft_limits`,Audit Log 可直接过滤。
+
+---
+
+### M-119 `20260527000016_qc_sample_id_from_cart.sql`
+**用途**: 取消运营手动维护 sample 号码;sample ID 一律服务端从车号(`sub_lot_code`)派生。
+
+**问题**: TestingPage Take Sample 之前必须手动输 `S-2026-0521-001` 这种自编号,运营反馈跟车号是两套独立编号体系,既麻烦又容易记错(尤其同一车多次 retest 时)。车号 `<work_order>-NNN` 本来就唯一,直接复用最干净。
+
+**规则**(服务端在 `qc_take_sample` 自动算):
+- n = 该 sub_lot 已有 qc_sample 行数
+- n = 0(初次测) → `sample_id = <sub_lot_code>`,例如 `W12345-001`
+- n = 1(第一次 retest) → `<sub_lot_code>R`,例如 `W12345-001R`
+- n ≥ 2(第二/三/... 次 retest) → `<sub_lot_code>R<n>`,例如 `W12345-001R2`、`W12345-001R3`
+
+**变更**:
+- `qc_take_sample` 的 `p_sample_id` 参数变为可选(`DEFAULT NULL`);传 `NULL` 或空字符串 → 走自动派生;传非空 → 沿用旧的"使用调用方传入值"语义(保留 backward compat)
+- `qc_quality_event(sample_taken).payload` 加 `auto_generated: boolean`,审计可追溯
+
+**前端配套**:
+- `src/services/qcApi.ts` — `takeSample` 的 `sample_id` 改 optional,默认不传 → 服务端派生
+- `src/pages/qc/TestingPage.tsx` — Step 1 的手动输入框换成只读预览块,显示 server 会派出的 ID(`<code>` / `<code>R` / `<code>RN`),retest 时步骤标题改成 "Take retest sample #N" + 角标 "retest #N"
+
+**业务规则**:
+- **BR-Q74** Sample ID 默认服务端派生:初次 = 车号(`sub_lot_code`),retest 加 `R` / `R2` / `R3` ... 后缀。前端不再要求操作员手输 ID。
+- **BR-Q75** 旧的手动输入路径**保留**(调用方传 `p_sample_id` 时跳过自动派生),便于脚本/补录场景按需提供显式 ID。
+
+**未做**: `qc_sample.sample_id` 没有加 UNIQUE 约束(历史上手动输入允许重复 / 跨 sub_lot 同名);如未来要彻底归一,需要单独再做一个唯一性约束 migration。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2032,7 +2114,9 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-115 | 20260527000012_qc_create_production_lot_with_sub_lots_v2.sql |
 | M-116 | 20260527000013_qc_release_passed_sub_lot_v2.sql |
 | M-117 | 20260527000014_qc_hold_event_hooks.sql |
-| **M-112** | _(下一个)_ |
+| M-118 | 20260527000015_qc_soft_limits.sql |
+| M-119 | 20260527000016_qc_sample_id_from_cart.sql |
+| **M-120** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

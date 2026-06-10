@@ -1,10 +1,73 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Printer, Search, Check, X, ChevronDown, Usb } from 'lucide-react';
+import { Printer, Search, Check, X, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { getSavedPrinter, savePrinter, clearPrinter } from '../lib/printerConfig';
-import { isWebUsbSupported, openUsbPrinter } from '../lib/usbPrint';
+import { getSavedPrinter, savePrinter, clearPrinter, getSavedDpi, saveDpi, LABEL_DPIS, LabelDpi } from '../lib/printerConfig';
 
 const PRINT_BRIDGE = 'http://127.0.0.1:6543';
+
+// Installer bundles are served from the website (public/print-bridge/).
+function osBridgeDownload(): { href: string; label: string } | null {
+  if (typeof navigator === 'undefined') return null;
+  const ua = navigator.userAgent;
+  if (/Win/i.test(ua)) return { href: '/print-bridge/erp-print-bridge-windows.zip', label: '下载 Windows 打印助手' };
+  if (/Mac/i.test(ua)) return { href: '/print-bridge/erp-print-bridge-macos.zip',   label: '下载 macOS 打印助手' };
+  return null;
+}
+
+function osKind(): 'win' | 'mac' | 'other' {
+  if (typeof navigator === 'undefined') return 'other';
+  const ua = navigator.userAgent;
+  if (/Win/i.test(ua)) return 'win';
+  if (/Mac/i.test(ua)) return 'mac';
+  return 'other';
+}
+
+/** Collapsible "如何安装？" step-by-step guide, tailored to the visitor's OS. */
+function InstallGuide() {
+  const [show, setShow] = useState(false);
+  const os = osKind();
+  const installerName = os === 'win' ? 'install-windows.bat' : 'install-macos.command';
+  const warn = os === 'win'
+    ? 'SmartScreen 提示时点「更多信息」→「仍要运行」'
+    : '若提示「无法验证开发者」：右键点该文件 →「打开」→ 再点「打开」';
+  const settingsPath = os === 'win' ? '设置 - 打印机和扫描仪' : '系统设置 - 打印机与扫描仪';
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setShow(v => !v)}
+        className="flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline"
+      >
+        <ChevronDown size={11} className={cn('transition-transform', !show && '-rotate-90')} />
+        如何安装？
+      </button>
+      {show && (
+        <ol className="mt-1.5 pl-4 list-decimal space-y-1 text-[11px] text-slate-600 leading-relaxed">
+          <li>点上方下载链接，<b>解压</b>下载的压缩包</li>
+          <li>双击 <code className="font-mono bg-slate-100 px-1 rounded">{installerName}</code>（{warn}）</li>
+          <li>到「{settingsPath}」把标签机默认纸张设为 <b>4×3 英寸</b></li>
+          <li>回到本窗口点「搜索打印机」，选中本机打印机</li>
+          <li>完成 ✓ 之后打印即<b>静默出纸</b>，无需对话框</li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
+/** "还没装打印助手？下载…" hint shown under the bridge search button. */
+function BridgeDownloadHint() {
+  const dl = osBridgeDownload();
+  return (
+    <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+      还没装打印助手？{dl ? (
+        <a href={dl.href} download className="text-blue-600 hover:underline font-medium">{dl.label}</a>
+      ) : (
+        <>下载 <a href="/print-bridge/erp-print-bridge-macos.zip" download className="text-blue-600 hover:underline">macOS</a>
+        {' / '}<a href="/print-bridge/erp-print-bridge-windows.zip" download className="text-blue-600 hover:underline">Windows</a></>
+      )}，双击安装后即可静默打印。
+    </p>
+  );
+}
 
 function fetchBridge(url: string, timeoutMs: number): Promise<Response> {
   if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
@@ -17,13 +80,11 @@ function fetchBridge(url: string, timeoutMs: number): Promise<Response> {
 
 export function PrinterSettingsPopover() {
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-  const isWebUsb = !isTauri && isWebUsbSupported();
-  const isBrowserCups = !isTauri && !isWebUsb;
 
   const [open, setOpen]         = useState(false);
   const [saved, setSaved]       = useState<string | null>(() => getSavedPrinter());
+  const [dpi, setDpi]           = useState<LabelDpi>(() => getSavedDpi());
   const [printers, setPrinters] = useState<string[]>([]);
-  const [usbDevice, setUsbDevice] = useState<string | null>(null);
   const [manual, setManual]     = useState('');
   const [busy, setBusy]         = useState(false);
   const [msg, setMsg]           = useState('');
@@ -39,37 +100,7 @@ export function PrinterSettingsPopover() {
     return () => document.removeEventListener('mousedown', h);
   }, [open]);
 
-  // Check for already-authorised USB device on open
-  useEffect(() => {
-    if (!open || !isWebUsb) return;
-    navigator.usb.getDevices().then(devices => {
-      const printer = devices.find(d =>
-        d.configurations.some(c =>
-          c.interfaces.some(i => i.alternates.some(a => a.interfaceClass === 7)),
-        ),
-      );
-      setUsbDevice(printer ? `${printer.manufacturerName ?? ''} ${printer.productName ?? ''}`.trim() : null);
-    });
-  }, [open, isWebUsb]);
-
   const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 3000); };
-
-  // WebUSB: prompt device picker
-  const connectUsb = async () => {
-    setBusy(true);
-    try {
-      const device = await openUsbPrinter();
-      const name = `${device.manufacturerName ?? ''} ${device.productName ?? ''}`.trim() || 'USB 打印机';
-      setUsbDevice(name);
-      flash(`已连接: ${name} ✓`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes('No device selected') && !msg.includes('cancelled')) {
-        flash(`连接失败: ${msg}`);
-      }
-    }
-    setBusy(false);
-  };
 
   // Tauri: search CUPS printers via Rust
   const searchTauri = async () => {
@@ -86,19 +117,19 @@ export function PrinterSettingsPopover() {
     setBusy(false);
   };
 
-  // Browser: list CUPS queues via local print bridge
+  // Browser: list printers via the local print bridge (打印助手)
   const searchBridge = async () => {
     setBusy(true);
     try {
       const r = await fetchBridge(`${PRINT_BRIDGE}/printers`, 2000);
-      if (!r.ok) throw new Error('print bridge 未运行');
+      if (!r.ok) throw new Error('打印助手未运行');
       const data = await r.json() as string[] | { printers?: string[] };
       const list = Array.isArray(data) ? data : (data.printers ?? []);
       setPrinters(list);
-      if (list.length === 0) flash('未找到打印机，请检查 CUPS 队列');
+      if (list.length === 0) flash('未找到打印机，请检查系统打印队列');
       else flash(`找到 ${list.length} 台打印机`);
     } catch (e) {
-      flash(`搜索失败: ${e instanceof Error ? e.message : String(e)}。请先运行 python3 print_server.py`);
+      flash(`搜索失败: ${e instanceof Error ? e.message : String(e)}。请先安装打印助手（见下方下载链接）`);
     }
     setBusy(false);
   };
@@ -125,6 +156,12 @@ export function PrinterSettingsPopover() {
     flash('已清除');
   };
 
+  const selectDpi = (d: LabelDpi) => {
+    saveDpi(d);
+    setDpi(d);
+    flash(`分辨率 ${d} dpi ✓`);
+  };
+
   return (
     <div className="relative" ref={ref}>
       {/* Trigger */}
@@ -134,16 +171,14 @@ export function PrinterSettingsPopover() {
         title="标签打印机设置"
         className={cn(
           'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
-          (isWebUsb ? (saved || usbDevice) : saved)
+          saved
             ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
             : 'text-amber-600 bg-amber-50 hover:bg-amber-100',
         )}
       >
-        {isWebUsb ? <Usb size={14} /> : <Printer size={14} />}
+        <Printer size={14} />
         <span className="hidden sm:inline font-mono max-w-[160px] truncate">
-          {isWebUsb
-            ? (saved ?? usbDevice ?? '未设置打印机')
-            : (saved ?? '未设置打印机')}
+          {saved ?? '未设置打印机'}
         </span>
         <ChevronDown size={11} className={cn('transition-transform', open && 'rotate-180')} />
       </button>
@@ -158,163 +193,107 @@ export function PrinterSettingsPopover() {
             </button>
           </div>
 
-          {/* ── WebUSB mode ── */}
-          {isWebUsb ? (
+          {/* Currently saved printer */}
+          <div className={cn(
+            'rounded-lg border px-3 py-2 text-xs font-mono mb-3',
+            saved
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : 'bg-slate-50 border-slate-200 text-slate-400 italic',
+          )}>
+            {saved ?? '尚未配置'}
+          </div>
+
+          <button
+            type="button"
+            onClick={isTauri ? searchTauri : searchBridge}
+            disabled={busy}
+            className="w-full mb-2 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium disabled:opacity-50"
+          >
+            <Search size={12} />
+            {busy ? '搜索中…' : '搜索打印机'}
+          </button>
+
+          {!isTauri && (
             <>
-              <div className={cn(
-                'rounded-lg border px-3 py-2 text-xs font-mono mb-3',
-                usbDevice
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                  : 'bg-slate-50 border-slate-200 text-slate-400 italic',
-              )}>
-                {usbDevice ?? '尚未授权 USB 设备'}
-              </div>
-              <button
-                type="button"
-                onClick={connectUsb}
-                disabled={busy}
-                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium disabled:opacity-50"
-              >
-                <Usb size={12} />
-                {busy ? '连接中…' : (usbDevice ? '重新选择 USB 打印机' : '连接 USB 打印机')}
-              </button>
-              <p className="mt-2 text-[11px] text-slate-400 leading-relaxed">
-                点击打印时浏览器会记住已授权设备，无需每次重新选择。仅支持 Chrome / Edge。
-              </p>
-
-              <div className="mt-4 pt-3 border-t border-slate-100">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-                  CUPS（Mac + print bridge）
-                </p>
-                <div className={cn(
-                  'rounded-lg border px-3 py-2 text-xs font-mono mb-2',
-                  saved
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                    : 'bg-slate-50 border-slate-200 text-slate-400 italic',
-                )}>
-                  {saved ?? '未设置队列名'}
-                </div>
-                <button
-                  type="button"
-                  onClick={searchBridge}
-                  disabled={busy}
-                  className="w-full mb-2 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium disabled:opacity-50"
-                >
-                  <Search size={12} />
-                  {busy ? '搜索中…' : '搜索 CUPS 打印机'}
-                </button>
-                {printers.length > 0 && (
-                  <div className="mb-2 rounded-lg border border-slate-200 overflow-hidden max-h-32 overflow-y-auto">
-                    {printers.map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => select(p)}
-                        className={cn(
-                          'w-full flex items-center justify-between px-3 py-2 text-xs font-mono text-left transition-colors',
-                          saved === p ? 'bg-emerald-50 text-emerald-800' : 'hover:bg-slate-50 text-slate-700',
-                          'border-b border-slate-100 last:border-0',
-                        )}
-                      >
-                        <span className="truncate">{p}</span>
-                        {saved === p && <Check size={12} className="text-emerald-600 shrink-0 ml-2" />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={manual}
-                    onChange={e => setManual(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && saveManual()}
-                    placeholder="Gprinter_GP_1324D"
-                    className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={saveManual}
-                    disabled={!manual.trim()}
-                    className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs disabled:opacity-40"
-                  >
-                    保存
-                  </button>
-                </div>
-              </div>
+              <BridgeDownloadHint />
+              <InstallGuide />
             </>
-          ) : (
-            <>
-              {/* ── Tauri / CUPS mode ── */}
-              <div className={cn(
-                'rounded-lg border px-3 py-2 text-xs font-mono mb-3',
-                saved
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                  : 'bg-slate-50 border-slate-200 text-slate-400 italic',
-              )}>
-                {saved ?? '尚未配置'}
-              </div>
+          )}
 
-              {(isTauri || isBrowserCups) && (
+          {printers.length > 0 && (
+            <div className="my-3 rounded-lg border border-slate-200 overflow-hidden max-h-40 overflow-y-auto">
+              {printers.map(p => (
                 <button
+                  key={p}
                   type="button"
-                  onClick={isTauri ? searchTauri : searchBridge}
-                  disabled={busy}
-                  className="w-full mb-2 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium disabled:opacity-50"
+                  onClick={() => select(p)}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3 py-2 text-xs font-mono text-left transition-colors',
+                    saved === p ? 'bg-emerald-50 text-emerald-800' : 'hover:bg-slate-50 text-slate-700',
+                    'border-b border-slate-100 last:border-0',
+                  )}
                 >
-                  <Search size={12} />
-                  {busy ? '搜索中…' : (isBrowserCups ? '搜索 CUPS 打印机 (bridge)' : '搜索 CUPS 打印机')}
+                  <span className="truncate">{p}</span>
+                  {saved === p && <Check size={12} className="text-emerald-600 shrink-0 ml-2" />}
                 </button>
-              )}
+              ))}
+            </div>
+          )}
 
-              {printers.length > 0 && (
-                <div className="mb-3 rounded-lg border border-slate-200 overflow-hidden">
-                  {printers.map(p => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => select(p)}
-                      className={cn(
-                        'w-full flex items-center justify-between px-3 py-2 text-xs font-mono text-left transition-colors',
-                        saved === p ? 'bg-emerald-50 text-emerald-800' : 'hover:bg-slate-50 text-slate-700',
-                        'border-b border-slate-100 last:border-0',
-                      )}
-                    >
-                      <span className="truncate">{p}</span>
-                      {saved === p && <Check size={12} className="text-emerald-600 shrink-0 ml-2" />}
-                    </button>
-                  ))}
-                </div>
-              )}
+          <div className="flex gap-1.5 mb-2 mt-3">
+            <input
+              type="text"
+              value={manual}
+              onChange={e => setManual(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveManual()}
+              placeholder="手动输入队列名…"
+              className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-400"
+            />
+            <button
+              type="button"
+              onClick={saveManual}
+              disabled={!manual.trim()}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs disabled:opacity-40"
+            >
+              保存
+            </button>
+          </div>
 
-              <div className="flex gap-1.5 mb-2">
-                <input
-                  type="text"
-                  value={manual}
-                  onChange={e => setManual(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && saveManual()}
-                  placeholder="手动输入队列名…"
-                  className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-400"
-                />
+          {/* Printer resolution (per machine) */}
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <p className="text-[11px] font-bold text-slate-600 mb-1.5">
+              打印机分辨率 (dpi)
+            </p>
+            <div className="flex gap-1.5">
+              {LABEL_DPIS.map(d => (
                 <button
+                  key={d}
                   type="button"
-                  onClick={saveManual}
-                  disabled={!manual.trim()}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs disabled:opacity-40"
+                  onClick={() => selectDpi(d)}
+                  className={cn(
+                    'flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                    dpi === d
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+                  )}
                 >
-                  保存
+                  {d}
                 </button>
-              </div>
+              ))}
+            </div>
+            <p className="mt-1 text-[10px] text-slate-400 leading-relaxed">
+              选成跟这台打印机一致的分辨率，标签最锐（多数热敏机 203，部分 300/600）。
+            </p>
+          </div>
 
-              {saved && (
-                <button
-                  type="button"
-                  onClick={clear}
-                  className="text-[11px] text-slate-400 hover:text-red-500 transition-colors"
-                >
-                  清除已保存的打印机
-                </button>
-              )}
-            </>
+          {saved && (
+            <button
+              type="button"
+              onClick={clear}
+              className="mt-3 text-[11px] text-slate-400 hover:text-red-500 transition-colors"
+            >
+              清除已保存的打印机
+            </button>
           )}
 
           {msg && (

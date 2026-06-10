@@ -84,6 +84,10 @@ export interface InspectionTemplate {
   unit: string | null;
   lower_limit: number;
   upper_limit: number;
+  // M-118: soft band. Backfilled = hard on existing rows so override is closed
+  // by default; ops widens per SKU to enable supervisor discretion.
+  soft_lower_limit: number;
+  soft_upper_limit: number;
 }
 
 export interface Product {
@@ -99,6 +103,10 @@ export interface TemplateInput {
   test_type_id: number;
   lower_limit: number;
   upper_limit: number;
+  // M-118: soft band must wrap hard ([soft_lower, lower) ∪ (upper, soft_upper]
+  // = supervisor-decided range). soft = hard disables the supervisor override.
+  soft_lower_limit: number;
+  soft_upper_limit: number;
 }
 
 export interface ProductInput {
@@ -244,8 +252,10 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       sku_id: sku.id,
       test_type_id: t.test_type_id,
       item_name: '',          // will be overwritten by qc_list_products JOIN
-      lower_limit: t.lower_limit,
-      upper_limit: t.upper_limit,
+      lower_limit:      t.lower_limit,
+      upper_limit:      t.upper_limit,
+      soft_lower_limit: t.soft_lower_limit,
+      soft_upper_limit: t.soft_upper_limit,
     }));
     // item_name is NOT NULL — derive it from the test type
     const { data: types } = await supabase
@@ -293,8 +303,10 @@ export async function updateProduct(id: string, input: Partial<ProductInput>): P
         test_type_id: t.test_type_id,
         item_name: typeMap[t.test_type_id]?.name ?? 'Unknown',
         unit: typeMap[t.test_type_id]?.unit ?? null,
-        lower_limit: t.lower_limit,
-        upper_limit: t.upper_limit,
+        lower_limit:      t.lower_limit,
+        upper_limit:      t.upper_limit,
+        soft_lower_limit: t.soft_lower_limit,
+        soft_upper_limit: t.soft_upper_limit,
       }));
       const { error: insErr } = await supabase.from('qc_inspection_template').insert(rows);
       if (insErr) throw new Error(insErr.message);
@@ -738,7 +750,16 @@ export async function listPendingInspections(): Promise<SubLot[]> {
 
 export async function inspectionTemplateForSubLot(subLotId: string): Promise<{
   sub_lot: SubLot;
-  template: { item_name: string; lower_limit: number; upper_limit: number };
+  template: {
+    item_name: string;
+    lower_limit: number;
+    upper_limit: number;
+    // M-118: TestingPage uses these to compute the three-band verdict and
+    // gate the Pass/Fail buttons. soft = hard means no supervisor override
+    // is available (anything outside hard is forced FAIL).
+    soft_lower_limit: number;
+    soft_upper_limit: number;
+  };
 }> {
   const { data: subRow, error: subErr } = await supabase
     .from('qc_drying_sub_lot')
@@ -756,7 +777,7 @@ export async function inspectionTemplateForSubLot(subLotId: string): Promise<{
 
   const { data: tmpl, error: tmplErr } = await supabase
     .from('qc_inspection_template')
-    .select('item_name, lower_limit, upper_limit')
+    .select('item_name, lower_limit, upper_limit, soft_lower_limit, soft_upper_limit')
     .eq('sku_id', lot.sku_id)
     .limit(1)
     .maybeSingle();
@@ -771,8 +792,10 @@ export async function inspectionTemplateForSubLot(subLotId: string): Promise<{
     sub_lot,
     template: {
       item_name: tmpl.item_name as string,
-      lower_limit: Number(tmpl.lower_limit),
-      upper_limit: Number(tmpl.upper_limit),
+      lower_limit:      Number(tmpl.lower_limit),
+      upper_limit:      Number(tmpl.upper_limit),
+      soft_lower_limit: Number(tmpl.soft_lower_limit),
+      soft_upper_limit: Number(tmpl.soft_upper_limit),
     },
   };
 }
@@ -808,10 +831,12 @@ export interface Sample {
   result?: 'pass' | 'fail' | null;
 }
 
-export async function takeSample(input: { sub_lot_id: string; sample_id: string }): Promise<Sample> {
+export async function takeSample(input: { sub_lot_id: string; sample_id?: string | null }): Promise<Sample> {
+  // M-119: when sample_id is omitted the backend auto-generates from the
+  // cart code (<sub_lot_code> / <sub_lot_code>R / <sub_lot_code>R2 / ...).
   return rpc<Sample>('qc_take_sample', {
     p_sub_lot_id: input.sub_lot_id,
-    p_sample_id: input.sample_id,
+    p_sample_id: input.sample_id ?? null,
   });
 }
 

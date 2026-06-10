@@ -1,0 +1,4 @@
+# Build intermediates — do not commit
+node_modules/
+dist-bin/
+vendor/
