@@ -714,6 +714,9 @@ export async function checkOutSubLotsLegacy(subLotIds: string[], outTime?: strin
 }
 
 // M-048: Bulk check-out that also forms sampling groups + picks champions.
+// M-118: deterministic chunking + operator-chosen sampling method.
+export type SamplingMethod = 'method_1' | 'method_2';
+
 export interface BulkCheckOutGroup {
   test_group_id: string;
   group_sequence: number;
@@ -721,6 +724,9 @@ export interface BulkCheckOutGroup {
   member_count: number;
   champion_id: string;
   member_ids: string[];
+  redry?: boolean;
+  original_group_id?: string | null;
+  sampling_method?: SamplingMethod;
 }
 export interface BulkCheckOutResult {
   requested: number;
@@ -737,10 +743,12 @@ export interface BulkCheckOutResult {
 export async function checkOutSubLotsBulk(input: {
   sub_lot_ids: string[];
   out_time?: string | null;
+  sampling_method?: SamplingMethod;
 }): Promise<BulkCheckOutResult> {
   return rpc<BulkCheckOutResult>('qc_check_out_sub_lots_bulk', {
     p_sub_lot_ids: input.sub_lot_ids,
     p_out_time: input.out_time ?? null,
+    p_sampling_method: input.sampling_method ?? 'method_1',
   });
 }
 
@@ -1179,6 +1187,13 @@ export interface QcOverviewStats {
   awaiting_wa_result: number;
   passed_today: number;
   failed_today: number;
+  /**
+   * M-120: subset of `failed_today` whose fails have NOT been resolved yet
+   * — no later passing inspection and no later terminal disposition
+   * (scrap / grind / concession / rework) on the same cart or anywhere in
+   * the same sampling group.
+   */
+  failed_today_open?: number;
   longest_wait_minutes: number | null;
   pass_rate_pct: number | null;
 }
@@ -1290,6 +1305,13 @@ export async function releasePassedSubLotsGroup(subLotIds: string[], yieldQuanti
 /** Apply the same disposition to every cart in a sampling group. */
 export async function createDispositionGroup(input: {
   sub_lot_ids: string[];
+  /**
+   * The cart whose result the group inherited (the existing champion). When
+   * provided AND `type === 'retest'`, the single retest call is dispatched on
+   * this cart so M-106's normalisation keeps the original champion in place.
+   * Falls back to `sub_lot_ids[0]` if omitted. See bug note in QcHome.
+   */
+  champion_sub_lot_id?: string;
   type: DispositionType;
   remark: string | null;
   redry_expected_dry_minutes: number | null;
@@ -1300,7 +1322,7 @@ export async function createDispositionGroup(input: {
   // disposition type (scrap / redry / room-temp) is genuinely per-cart.
   if (input.type === 'retest') {
     await createDisposition({
-      drying_sub_lot_id: input.sub_lot_ids[0],
+      drying_sub_lot_id: input.champion_sub_lot_id ?? input.sub_lot_ids[0],
       type: input.type,
       remark: input.remark,
       redry_expected_dry_minutes: input.redry_expected_dry_minutes,
@@ -1505,6 +1527,16 @@ export interface FailGroupMember {
   status: string;
   is_champion: boolean;
 }
+/**
+ * M-120: outcome resolved against later events (same cart or same group).
+ *   - `retest_passed` — a later passing inspection exists
+ *   - `disposed`     — a later terminal disposition exists
+ *                       (scrap / grind / concession / rework)
+ *   - `open`         — neither; the failure is still in the open queue
+ * Precedence (highest wins): retest_passed > disposed > open.
+ */
+export type FailOutcome = 'retest_passed' | 'disposed' | 'open';
+
 export interface RecentFailItem {
   inspection_id: string;
   sample_id: string | null;
@@ -1515,10 +1547,36 @@ export interface RecentFailItem {
   work_order_barcode: string | null;
   champion_code: string;
   test_group_id: string | null;
+  outcome?: FailOutcome;
   group_members: FailGroupMember[];
 }
 export async function getRecentFailedInspections(days = 2): Promise<RecentFailItem[]> {
   return rpc<RecentFailItem[]>('qc_recent_failed_inspections', { p_days: days });
+}
+
+/**
+ * M-121: mirror of RecentFailItem for passed inspections.
+ *   `released`         — every group member has moved past `passed`
+ *   `awaiting_release` — at least one member is still `passed`
+ */
+export type PassOutcome = 'released' | 'awaiting_release';
+
+export interface RecentPassItem {
+  inspection_id: string;
+  sample_id: string | null;
+  aw: number | null;
+  submitted_at: string;
+  sku_name: string | null;
+  lot_number: string | null;
+  work_order_barcode: string | null;
+  champion_code: string;
+  test_group_id: string | null;
+  outcome?: PassOutcome;
+  group_members: FailGroupMember[];
+}
+
+export async function getRecentPassedInspections(days = 2): Promise<RecentPassItem[]> {
+  return rpc<RecentPassItem[]>('qc_recent_passed_inspections', { p_days: days });
 }
 
 /** Fetch all sub-lots that belong to the same test group (by test_group_id). */

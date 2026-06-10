@@ -2107,6 +2107,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-108 | 20260527000005_qc_sub_lot_produced_at.sql |
 | M-109 | 20260527000006_qc_manual_judgment_and_remark.sql |
 | M-110 | 20260527000007_wh_lot_lifecycle.sql |
+| M-111~M-117 | _(Warehouse S4 + QC v2 / hold hooks — 见 docs/modules/11_warehouse-inventory.md & 09_qc.md)_ |
+| M-118 | 20260527000015_qc_check_out_bulk_sampling_method.sql |
 | M-111 | 20260527000008_wh_balance_status_aware_available.sql |
 | M-112 | 20260527000009_wh_qc_lot_link_schema.sql |
 | M-113 | 20260527000010_wh_recompute_lot_status.sql |
