@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import { getISOWeek } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
+import { Combobox, type ComboOption } from '../../components/ui/Combobox';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { PermissionDenied } from '../qc/components/PermissionDenied';
 import {
@@ -369,6 +370,16 @@ function EntryDrawer(p: DrawerProps) {
   const { t, draft, setDraft } = p;
   const set = (k: keyof Draft) => (v: string) => setDraft({ ...draft, [k]: v });
 
+  // Searchable options. Operators match on badge # or name; items on item # or
+  // description (hint is both shown muted and included in the search).
+  const machineOpts = useMemo<ComboOption[]>(
+    () => p.machines.map((m) => ({ value: m.id, label: m.code })), [p.machines]);
+  const operatorOpts = useMemo<ComboOption[]>(
+    () => p.operators.map((o) => ({ value: o.id, label: `${o.badge_no} · ${o.name}` })), [p.operators]);
+  const productOpts = useMemo<ComboOption[]>(
+    () => p.products.map((pr) => ({ value: pr.id, label: pr.item_number, hint: pr.description ?? undefined })),
+    [p.products]);
+
   const labelCls = 'block';
   const spanCls = 'text-xs font-medium text-slate-600';
   const inputCls = 'w-full border border-slate-300 rounded-lg px-2.5 h-9 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400';
@@ -408,22 +419,16 @@ function EntryDrawer(p: DrawerProps) {
             <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{t('dailyReport.secId')}</h3>
             <div className="grid grid-cols-2 gap-3">
               <Field label={t('dailyReport.colMachine')} required>
-                <select className={inputCls} value={draft.machine_id} onChange={(e) => set('machine_id')(e.target.value)}>
-                  <option value="">{t('dailyReport.selectPlaceholder')}</option>
-                  {p.machines.map((m) => <option key={m.id} value={m.id}>{m.code}</option>)}
-                </select>
+                <Combobox className={inputCls} value={draft.machine_id} onChange={set('machine_id')}
+                  options={machineOpts} placeholder={t('dailyReport.selectPlaceholder')} />
               </Field>
               <Field label={t('dailyReport.colOperator')} required>
-                <select className={inputCls} value={draft.operator_id} onChange={(e) => set('operator_id')(e.target.value)}>
-                  <option value="">{t('dailyReport.selectPlaceholder')}</option>
-                  {p.operators.map((o) => <option key={o.id} value={o.id}>{o.badge_no} · {o.name}</option>)}
-                </select>
+                <Combobox className={inputCls} value={draft.operator_id} onChange={set('operator_id')}
+                  options={operatorOpts} placeholder={t('dailyReport.selectPlaceholder')} />
               </Field>
               <Field label={t('dailyReport.colItem')}>
-                <select className={inputCls} value={draft.product_id} onChange={(e) => set('product_id')(e.target.value)}>
-                  <option value="">{t('dailyReport.selectPlaceholder')}</option>
-                  {p.products.map((pr) => <option key={pr.id} value={pr.id}>{pr.item_number}</option>)}
-                </select>
+                <Combobox className={inputCls} value={draft.product_id} onChange={set('product_id')}
+                  options={productOpts} placeholder={t('dailyReport.selectPlaceholder')} />
               </Field>
               <Field label={t('dailyReport.colWorkOrder')}>
                 <input className={inputCls} value={draft.work_order} onChange={(e) => set('work_order')(e.target.value)} />
