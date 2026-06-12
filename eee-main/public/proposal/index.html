@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NPIC · Production Quality Management Digitization — Final Implementation Proposal</title>
+<style>
+  *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --tx:#1e293b; --txm:#475569; --txl:#94a3b8; --blue:#2563eb;
+    --div:#e2e8f0; --sbg:#eef4fb; --sbrd:#cdddee; --bg:#f6f8fb;
+    --f:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Helvetica,Arial,sans-serif;
+  }
+  html { -webkit-text-size-adjust:100%; }
+  body { font-family:var(--f); color:var(--tx); background:var(--bg); line-height:1.7; font-size:16px; }
+  .sheet {
+    max-width: 840px; margin: 32px auto; background:#fff; padding: 64px 72px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 10px 40px rgba(15,23,42,.06); border-radius: 4px;
+  }
+  .topbar { display:flex; justify-content:space-between; font-size:11px; color:var(--txl); letter-spacing:.02em; padding-bottom:10px; border-bottom:1px solid var(--div); margin-bottom:40px; }
+  h1 { font-size:34px; line-height:1.15; font-weight:800; letter-spacing:-.01em; }
+  .subtitle { font-size:20px; font-weight:600; color:var(--txm); margin-top:6px; padding-bottom:18px; border-bottom:3px solid var(--blue); }
+  .meta { margin:22px 0 8px; font-size:15px; color:var(--txm); }
+  .meta b { color:var(--tx); }
+  h2 { font-size:23px; font-weight:800; margin:48px 0 4px; padding-bottom:8px; border-bottom:3px solid var(--blue); }
+  h3 { font-size:16px; font-weight:800; margin:26px 0 8px; color:var(--tx); }
+  h4 { font-size:15px; font-weight:800; margin:20px 0 6px; color:var(--tx); }
+  p { margin:12px 0; color:#283549; }
+  ul { margin:10px 0 10px 4px; padding-left:22px; }
+  li { margin:7px 0; color:#283549; }
+  table { width:100%; border-collapse:collapse; margin:16px 0 8px; font-size:14.5px; }
+  th,td { text-align:left; vertical-align:top; padding:11px 14px; border:1px solid var(--div); }
+  thead th { background:var(--sbg); border-color:var(--sbrd); font-weight:700; color:#243; }
+  tbody tr:nth-child(even) { background:#fafcff; }
+  .tot td { font-weight:800; background:#eef4fb; }
+  .hr { height:1px; background:var(--div); margin:40px 0; border:0; }
+  .pill { display:inline-block; font-size:11px; font-weight:700; color:var(--blue); background:#eaf1fe; border:1px solid #cfe0fb; border-radius:999px; padding:2px 10px; }
+  .foot { margin-top:48px; padding-top:16px; border-top:1px solid var(--div); display:flex; justify-content:space-between; font-size:12px; color:var(--txl); }
+  .confidential-note { font-size:12.5px; color:var(--txl); font-style:italic; margin-top:28px; }
+  .dl-btn {
+    position:fixed; top:20px; right:20px; z-index:50; display:inline-flex; align-items:center; gap:8px;
+    background:var(--blue); color:#fff; text-decoration:none; border:0; font-family:var(--f); font-size:14px; font-weight:700;
+    padding:10px 16px; border-radius:10px; box-shadow:0 6px 18px rgba(37,99,235,.35); cursor:pointer;
+    transition:background .15s, transform .1s;
+  }
+  .dl-btn:hover { background:#1d4ed8; } .dl-btn:active { transform:translateY(1px); }
+  @media (max-width:680px){ .sheet{ padding:36px 22px; margin:0; border-radius:0; } h1{font-size:27px;} h2{font-size:20px;} .dl-btn{ top:12px; right:12px; padding:9px 13px; font-size:13px; } }
+  @media print {
+    body{ background:#fff; } .sheet{ box-shadow:none; margin:0; max-width:none; padding:0 8mm; }
+    table,tr,li{ break-inside:avoid; } .no-print { display:none !important; }
+  }
+</style>
+</head>
+<body>
+<a class="dl-btn no-print" href="/proposal/NPIC-QC-Proposal-EN.pdf" download="NPIC-QC-Proposal-EN.pdf" aria-label="Download PDF">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  Download PDF
+</a>
+<article class="sheet">
+
+  <div class="topbar"><span>Final Implementation Proposal</span><span>Confidential — v2.0</span></div>
+
+  <h1>Production Quality Management Digitization</h1>
+  <div class="subtitle">Final Implementation Proposal</div>
+  <div class="meta">
+    <div><b>Prepared by:</b> Crave &amp; Cook, Inc.</div>
+    <div><b>Submitted to:</b> NPIC Management Team</div>
+    <div><b>Date:</b> June 2026</div>
+    <div><b>Version:</b> v2.0 (Confidential)</div>
+  </div>
+
+  <h2>1. Executive Summary</h2>
+  <p>NPIC's current production and quality inspection processes rely on paper records, resulting in three core problems: delayed QC results, absence of decision-making support during night shifts, and information asymmetry between departments.</p>
+  <p>This project will build a dedicated <b>QC Real-Time Management System (Phase 1)</b> for NPIC, covering the complete workflow from production batch creation to inspection result decisions and qualified product release to the packaging queue — replacing all existing paper records.</p>
+  <p>System development is complete. Both parties have concluded the final requirements meeting and are now entering the testing and go-live phase. This document details the system scope, testing plan, implementation plan, and investment.</p>
+
+  <h2>2. Current State Diagnosis</h2>
+  <h3>2.1 QC Information Is Significantly Delayed</h3>
+  <p>All tests can only be completed near the end of each shift; results are not available in real time. This means:</p>
+  <ul>
+    <li>An information gap of several hours between when a cart finishes drying and when results are available;</li>
+    <li>Quality issues cannot be addressed in real time; problem batches may continue to flow downstream;</li>
+    <li>Drying room check-in records depend on manual paper forms, causing delays and errors.</li>
+  </ul>
+  <h3>2.2 Night Shift Decisions Lack Real-Time Support</h3>
+  <p>Because test results are only summarized at end of shift, management cannot remotely determine during the night shift which batches are qualified and which require disposition.</p>
+  <h3>2.3 Cross-Department Information Silos</h3>
+  <p>The warehouse and packaging teams lack shared real-time records. Batch flow status exists only in each department's paper records or verbal communication. When disputes arise, there is no evidence to consult.</p>
+  <h3>2.4 Drying Room Check-In/Out Relies on Manual Paper</h3>
+  <p>Cart number entries are prone to duplication errors. Every morning shift, staff must manually transcribe check-in forms for all pending drying carts — taking over 3 hours — with frequent data errors.</p>
+  <h3>2.5 Sales Team Cannot Access Real-Time Production Status</h3>
+  <p>Because the various systems are not connected, the sales team cannot monitor production progress and inventory status in real time, making delivery commitments and inventory planning unreliable.</p>
+
+  <h2>3. System Scope: QC Real-Time Management System</h2>
+  <h3>3.1 System Workflow</h3>
+  <p>The system covers the complete workflow:</p>
+  <ul>
+    <li>Work order creation → Label printing → Production staff attach labels to carts</li>
+    <li>Barcode scanner scan → Confirm cart entry into drying queue</li>
+    <li>Manual drying room assignment → Automatic countdown timer starts</li>
+    <li>Expiry alert → Batch checkout → Sampling notification</li>
+    <li>Lab technician enters water activity reading → System auto-judges Pass / Fail</li>
+    <li>Qualified products enter packaging queue → Management releases with one click</li>
+    <li>Non-conforming products trigger disposition workflow (Re-test / Re-dry / Scrap)</li>
+    <li>Packaging dept views all released carts, multi-selects, batch dispatches</li>
+  </ul>
+
+  <h3>3.2 Core Functional Modules</h3>
+  <h4>Module A — Production Batch &amp; Cart Management</h4>
+  <ul>
+    <li>Work order creation generates production batches; system auto-generates cart numbers (WO#-001 through WO#-N)</li>
+    <li>Each cart label is bound to its system record; scan to view real-time status</li>
+    <li>Work orders can be printed; production staff attach labels to corresponding carts</li>
+  </ul>
+  <h4>Module B — Drying Room Real-Time Monitoring</h4>
+  <ul>
+    <li>Real-time display of carts currently in each drying room and their status</li>
+    <li>Automatic calculation of estimated completion time based on configured target drying duration</li>
+    <li>Automatic expiry alerts to prevent over-drying or failure to retrieve on time</li>
+  </ul>
+  <h4>Module C — Sampling &amp; Inspection Workflow</h4>
+  <ul>
+    <li>Configurable sampling rules to reduce unnecessary inspections</li>
+    <li>Lab technicians enter water activity readings directly; system auto-judges Pass/Fail</li>
+    <li>Inspection results reported in real time — no need to wait for end-of-shift roll-up</li>
+  </ul>
+  <h4>Module D — Non-Conforming Product Disposition Workflow</h4>
+  <ul>
+    <li>Failed batches immediately trigger a disposition workflow: Re-test / Re-dry / Ambient dry / Scrap</li>
+    <li>Disposition decisions are fully recorded with a complete audit trail</li>
+  </ul>
+  <h4>Module E — Management Dashboard</h4>
+  <ul>
+    <li>Real-time overview: batches currently drying, pending inspection, today's pass rate, batches requiring attention</li>
+    <li>Qualified batches released to packaging queue with a single click</li>
+  </ul>
+  <h4>Module F — Complete Batch Traceability</h4>
+  <ul>
+    <li>Any batch is fully traceable: Production batch → Sub-lot (cart) → Sampling record → Inspection result → Disposition → Release time</li>
+    <li>Provides a complete evidence chain when inter-departmental disputes arise</li>
+  </ul>
+  <h4>Module G — Product &amp; Inspection Standard Management</h4>
+  <ul>
+    <li>Create products and customize basic information</li>
+    <li>Define inspection items and pass/fail ranges per product (dual-limit or upper-limit-only modes)</li>
+    <li>Configurable manual-review zone: borderline results escalated to a supervisor</li>
+  </ul>
+  <h4>Module H — Packaging Release Queue <span class="pill">New</span></h4>
+  <ul>
+    <li>Wendy (Packaging Dept Leader) logs in to view a complete list of all QC-released carts</li>
+    <li>Supports multi-select and batch Dispatch — confirm multiple carts in one action</li>
+    <li>Release records are linked to corresponding work orders and inspection results; packaging and warehouse data stay in sync in real time</li>
+  </ul>
+
+  <h3>3.3 Problems Solved</h3>
+  <table>
+    <thead><tr><th>Current Problem</th><th>System Solution</th></tr></thead>
+    <tbody>
+      <tr><td>Test results only summarized at end of shift — no real-time decisions</td><td>Lab enters results on-site; outcome visible immediately</td></tr>
+      <tr><td>Packaging team cannot anticipate incoming qualified inventory</td><td>Qualified products enter packaging queue instantly after release</td></tr>
+      <tr><td>Problem batches discovered too late; cannot be resolved within the shift</td><td>Failed batches trigger disposition workflow in real time, same shift</td></tr>
+      <tr><td>Drying room check-in/out entirely manual — time-consuming and error-prone</td><td>Barcode scanner check-in/out; system monitors drying status and sends automatic expiry alerts</td></tr>
+      <tr><td>Packaging team has no view of released carts; batch operations are inefficient</td><td>Module H provides complete release queue with multi-select batch Dispatch</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. Technical Architecture</h2>
+  <table>
+    <thead><tr><th style="width:32%">Aspect</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>Devices</td><td>Accessible on Windows / Mac computers and tablets; responsive interface adapts to screen size</td></tr>
+      <tr><td>Data Storage</td><td>Cloud database with real-time backups; auto-syncs when connectivity is restored after outages</td></tr>
+      <tr><td>Data Security</td><td>Enterprise-grade encrypted storage; data belongs to NPIC; no third-party access</td></tr>
+      <tr><td>Access Control</td><td>Role-based permissions; each position only sees and operates within its authorized scope</td></tr>
+      <tr><td>Deployment &amp; Maintenance</td><td>Deployed and maintained by Crave &amp; Cook; NPIC requires no server infrastructure or IT staff</td></tr>
+    </tbody>
+  </table>
+
+  <h2>5. Deliverables &amp; Provided Equipment</h2>
+  <p>Crave &amp; Cook will deliver the following to NPIC as part of this project:</p>
+  <h4>Software</h4>
+  <ul>
+    <li>QC Real-Time Management System (fully developed and configured per NPIC requirements)</li>
+    <li>User accounts and role-based permission setup</li>
+    <li>Role-specific operation manuals (print and digital)</li>
+  </ul>
+  <h4>Hardware (delivered with the project)</h4>
+  <ul>
+    <li>2 barcode scanners (for drying room cart check-in / check-out)</li>
+    <li>3 date stamps</li>
+    <li>2 ink pads</li>
+  </ul>
+
+  <h2>6. Testing Plan</h2>
+  <p>Testing is conducted using 2 real work orders that exercise the complete system workflow. IT must complete account setup and permission assignment before testing begins.</p>
+  <h3>6.1 Pre-Test Setup (Before Day 1)</h3>
+  <table>
+    <thead><tr><th>Task</th><th style="width:18%">Responsible</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>Create account for Du Gong; assign drying room operator permissions</td><td>IT</td><td>Can scan check-in/checkout, assign drying rooms, batch checkout</td></tr>
+      <tr><td>Create account for Vivian; assign inspection module permissions</td><td>IT</td><td>Can receive sampling notifications, enter water activity results, handle Pass/Fail</td></tr>
+      <tr><td>Create account for Wendy; assign packaging module permissions</td><td>IT</td><td>Can view released cart list, multi-select, batch dispatch</td></tr>
+      <tr><td>Create accounts for production printing staff</td><td>IT</td><td>Can create work orders, print labels</td></tr>
+      <tr><td>Verify barcode scanner connects to system correctly</td><td>Crave &amp; Cook + Du Gong</td><td>Drying room device fully tested and operational</td></tr>
+    </tbody>
+  </table>
+  <h3>6.2 Testing Timeline (5 Working Days)</h3>
+  <table>
+    <thead><tr><th style="width:10%">Day</th><th style="width:16%">Phase</th><th style="width:16%">Responsible</th><th>Before</th><th>After</th></tr></thead>
+    <tbody>
+      <tr><td>Day 1</td><td>Work Order Creation &amp; Printing</td><td>Production Supervisor</td><td>Each cart had one label with two barcodes on it</td><td>Consolidated into a single QR code label; production staff print and attach to each cart; scan binds the cart to its work order</td></tr>
+      <tr><td>Day 2–3</td><td>Production</td><td>Production Staff</td><td colspan="2" style="color:var(--txl)">No change from existing process</td></tr>
+      <tr><td>Day 3–4</td><td>Drying Room Entry</td><td>Du Gong</td><td>Manual paper form for room entry; handwritten date</td><td>Barcode scanner scan completes system check-in; date stamp for check-in/out date; system auto-starts drying timer and records room assignment</td></tr>
+      <tr><td>Day 4–5</td><td>Drying Room Exit</td><td>Du Gong</td><td>No system record; no defined exit timestamp</td><td>Batch checkout in system; exit time automatically recorded</td></tr>
+      <tr><td>Day 4–5</td><td>Inspection &amp; Testing</td><td>Vivian + Release Approver</td><td>End-of-shift summary handed off as Excel; no real-time visibility or same-shift decisions</td><td>Each completed test entered immediately; results visible in real time; disposition decisions made within the same shift</td></tr>
+      <tr><td>Day 4–5</td><td>Packaging Dispatch</td><td>Wendy</td><td>Only physical Pass/Fail stamps on the floor to distinguish packable batches; relied on manual on-site communication</td><td>Real-time view of all released carts in system; multi-select batch Dispatch</td></tr>
+    </tbody>
+  </table>
+  <h3>6.3 Acceptance Criteria</h3>
+  <ul>
+    <li>Both work orders successfully complete the full cycle — from creation to dispatch — with accurate data and zero recording errors</li>
+    <li>All user accounts have correct permissions; each role can only access its authorized functions</li>
+    <li>All notifications delivered to correct personnel at each step (sampling notifications, expiry alerts, release notifications)</li>
+    <li>Barcode scanner check-in/out, batch checkout, and batch dispatch functions work correctly</li>
+    <li>System data matches actual operations with no missing records</li>
+  </ul>
+  <p><b>Total testing duration:</b> approximately 5 working days (including production cycle)</p>
+
+  <h2>7. Implementation Plan</h2>
+  <p>Implementation proceeds in four phases, from data initialization to full go-live.</p>
+  <h4>Phase 1: Data Entry &amp; System Initialization</h4>
+  <table>
+    <thead><tr><th>Task</th><th style="width:26%">Responsible</th><th>Details</th></tr></thead>
+    <tbody>
+      <tr><td>Product catalog entry (SKU information, inspection limits)</td><td>Crave &amp; Cook + NPIC QC Manager</td><td>Enter all product basic info and water activity pass/fail ranges</td></tr>
+      <tr><td>Inspection template configuration</td><td>Crave &amp; Cook</td><td>Configure Pass/Fail judgment rules and manual-review zones per SKU</td></tr>
+      <tr><td>Work order format confirmation and configuration</td><td>Crave &amp; Cook + Production Supervisor</td><td>Confirm WO number format, configure print template</td></tr>
+      <tr><td>Account creation and permission assignment</td><td>IT + Crave &amp; Cook</td><td>Create all user accounts, assign role-based permissions</td></tr>
+    </tbody>
+  </table>
+  <h4>Phase 2: On-Site Installation &amp; Device Setup</h4>
+  <table>
+    <thead><tr><th style="width:22%">Role / Device</th><th>Tasks</th><th style="width:24%">Responsible</th></tr></thead>
+    <tbody>
+      <tr><td>Drying Room (Du Gong)</td><td>Install and test barcode scanner and tablet; verify check-in/out and room assignment functions</td><td>Crave &amp; Cook + Du Gong</td></tr>
+      <tr><td>Testing Lab (Vivian)</td><td>Install and test tablet/PC; verify sampling notification receipt and result entry functions</td><td>Crave &amp; Cook + Vivian</td></tr>
+      <tr><td>Packaging Dept (Wendy)</td><td>Install and test tablet; verify released cart list and batch dispatch functions</td><td>Crave &amp; Cook + Wendy</td></tr>
+      <tr><td>Management Dashboard</td><td>Management can access real-time full-system overview on PC or tablet</td><td>Crave &amp; Cook</td></tr>
+    </tbody>
+  </table>
+  <h4>Phase 3: Parallel Run</h4>
+  <ul>
+    <li>Paper records and system run in parallel for 1 week to validate data accuracy</li>
+    <li>Issues identified during the parallel run are resolved</li>
+    <li>Client confirms system meets acceptance criteria and signs the Acceptance Certificate</li>
+  </ul>
+  <h4>Phase 4: Role-Based Training &amp; Go-Live</h4>
+  <table>
+    <thead><tr><th>Trainee</th><th>Training Content</th><th style="width:14%">Duration</th><th style="width:16%">Trainer</th></tr></thead>
+    <tbody>
+      <tr><td>Printing Staff</td><td>Work order creation, label printing, cart numbering rules</td><td>1 hour</td><td>Crave &amp; Cook</td></tr>
+      <tr><td>Drying Room Operator</td><td>Barcode scanner check-in/out, drying room assignment, batch checkout, expiry alert handling</td><td>2 hours</td><td>Crave &amp; Cook</td></tr>
+      <tr><td>Testing Lab Leader</td><td>Sampling notification receipt, water activity entry, Pass/Fail disposition workflow</td><td>2 hours</td><td>Crave &amp; Cook</td></tr>
+      <tr><td>Packaging Dept Leader</td><td>View released cart list, multi-select, batch dispatch operation</td><td>1 hour</td><td>Crave &amp; Cook</td></tr>
+    </tbody>
+  </table>
+  <p>After each training session, role-specific operation manuals are provided (both print and digital). Upon completion of all training, the system fully cuts over to digital; paper processes are discontinued; official go-live.</p>
+
+  <h2>8. Expected Benefits</h2>
+  <h3>Operational Efficiency Gains</h3>
+  <ul>
+    <li>Drying room check-in/out fully scan-based, replacing repeated manual writing — estimated <b>50%+</b> reduction in related labor time</li>
+    <li>System automatically tracks and recommends sample batches, eliminating the lab's manual counting and sample selection process</li>
+    <li>Inspection data entered directly in the system, replacing write-then-transcribe-to-Excel double-entry — estimated <b>30%+</b> reduction in related labor hours</li>
+    <li>Inspection results visible in real time — decision lead time reduced from end-of-shift report to instant visibility</li>
+  </ul>
+  <h3>Quality Control Strengthened</h3>
+  <ul>
+    <li>Non-conforming batch alerts pushed in real time; management completes disposition within the same shift</li>
+    <li>Inspection anomalies synced to the production line in real time, enabling rapid process adjustments</li>
+    <li>Complete inspection history accumulated for long-term quality trend analysis and continuous improvement</li>
+  </ul>
+  <h3>Cross-Department Collaboration</h3>
+  <ul>
+    <li>QC and packaging teams share a single real-time data platform, eliminating the information black hole</li>
+    <li>Full batch traceability ensures inter-departmental disputes are backed by verifiable records</li>
+    <li>Reduced communication overhead and departmental friction caused by information asymmetry</li>
+  </ul>
+
+  <h2>9. Investment</h2>
+  <p><b>Billing rate:</b> USD $100 / hour</p>
+  <table>
+    <thead><tr><th>Service</th><th style="width:16%">Hours</th><th style="width:20%">Subtotal (USD)</th></tr></thead>
+    <tbody>
+      <tr><td>Requirements &amp; Process Mapping (SKU standards, WO format, permission planning)</td><td>22 hrs</td><td>$2,200</td></tr>
+      <tr><td>System Configuration &amp; Data Initialization (product catalog, inspection templates, account setup)</td><td>195 hrs</td><td>$19,500</td></tr>
+      <tr><td>On-Site Testing &amp; Acceptance Support (parallel run, issue resolution)</td><td>20 hrs</td><td>$2,000</td></tr>
+      <tr><td>Go-Live Training &amp; Documentation (per-role training, operation manuals)</td><td>20 hrs</td><td>$2,000</td></tr>
+      <tr><td>Testing Assistance &amp; Data Entry</td><td>20 hrs</td><td>$2,000</td></tr>
+      <tr class="tot"><td>Total</td><td>277 hrs</td><td>$27,700</td></tr>
+    </tbody>
+  </table>
+  <h4>Payment Schedule</h4>
+  <p>Phase 1 fees are payable in three milestone installments:</p>
+  <table>
+    <thead><tr><th style="width:18%">Installment</th><th>Payment Milestone</th><th style="width:18%">Amount (USD)</th><th style="width:14%">Percentage</th></tr></thead>
+    <tbody>
+      <tr><td>Installment 1</td><td>Upon contract signing, before system configuration begins</td><td>$8,310</td><td>30%</td></tr>
+      <tr><td>Installment 2</td><td>Parallel run complete; client signs Acceptance Certificate</td><td>$13,850</td><td>50%</td></tr>
+      <tr><td>Installment 3</td><td>Role-based training complete; system officially go-live</td><td>$5,540</td><td>20%</td></tr>
+    </tbody>
+  </table>
+
+  <hr class="hr" />
+
+  <h2>Add-On Option: IP Access Control</h2>
+  <p>This section describes an optional add-on service, <b>not included in the Phase 1 base price</b>. It may be purchased separately as needed.</p>
+  <h4>Overview</h4>
+  <p>Using Vercel Edge Middleware, access to the system is restricted to a whitelist of approved IP addresses. Requests from any IP not on the whitelist are blocked at the edge before the page loads — this cannot be bypassed by end users.</p>
+  <h4>Use Cases</h4>
+  <ul>
+    <li>NPIC's factory network has a static IP — add it to the whitelist directly</li>
+    <li>If no static IP is available, a VPN can be configured for relevant staff; all access routes through the VPN's fixed exit IP, which is then whitelisted</li>
+    <li>Multiple IPs can be whitelisted (e.g., factory, office, management home) — NPIC IT manages additions and removals via the Vercel dashboard</li>
+  </ul>
+  <h4>Deliverables</h4>
+  <ul>
+    <li>Vercel Edge Middleware IP whitelist implementation (including test verification)</li>
+    <li>IP management documentation for NPIC IT self-service maintenance</li>
+  </ul>
+  <table>
+    <thead><tr><th>Item</th><th style="width:18%">Amount (USD)</th><th style="width:34%">Notes</th></tr></thead>
+    <tbody>
+      <tr><td>IP Access Control (Add-On)</td><td>$2,000</td><td>One-time fee; purchased separately; not included in Phase 1 pricing</td></tr>
+    </tbody>
+  </table>
+
+  <h2>10. About Us</h2>
+  <p>We specialize in delivering tailored digital transformation solutions for manufacturing clients, with particular expertise in translating complex production workflows into intuitive, easy-to-use management systems. The QC system designed for NPIC is purpose-built for the actual workflows of the food manufacturing industry — not a generic ERP retrofitted to the use case.</p>
+  <p>Thank you for the trust placed in Crave &amp; Cook, Inc. We look forward to partnering with NPIC to drive its digital transformation in production management.</p>
+
+  <p class="confidential-note">This document is a confidential commercial proposal intended solely for NPIC's internal decision-making.</p>
+
+  <div class="foot"><span>Crave &amp; Cook, Inc.</span><span>Confidential — v2.0</span></div>
+
+</article>
+</body>
+</html>
