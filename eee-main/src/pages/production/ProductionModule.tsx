@@ -6,6 +6,7 @@ import {
   GitBranch,
   Package,
   FlaskConical,
+  ClipboardList,
   HelpCircle,
   ArrowLeft,
   LayoutGrid,
@@ -25,6 +26,7 @@ import ProductManagement from '../qc/ProductManagement';
 import TestTypesPage from '../qc/TestTypesPage';
 import SubLotHistoryDrawer from '../qc/SubLotHistoryDrawer';
 import ProductionDashboard from './ProductionDashboard';
+import DailyReportPage from './DailyReportPage';
 import { PrinterSettingsPopover } from '../../components/PrinterSettingsPopover';
 
 interface Props {
@@ -72,6 +74,7 @@ export default function ProductionModule({ onHome }: Props) {
   const canCreateBatch    = can('production', 'work_orders', 'create');
   const canViewTrace      = can('production', 'trace', 'view');
   const canManageProducts = can('production', 'products', 'view');
+  const canDailyReport    = can('production', 'daily_report', 'view');
 
   const isActive = (id: string) => screen === id || screen.startsWith(id + ':');
   const navigate = (s: string) => setScreen(s);
@@ -107,6 +110,9 @@ export default function ProductionModule({ onHome }: Props) {
     }
     if (screen === 'test-types') {
       return <TestTypesPage />;
+    }
+    if (screen === 'daily-report') {
+      return <DailyReportPage />;
     }
     return <ProductionDashboard />;
   }
@@ -158,6 +164,14 @@ export default function ProductionModule({ onHome }: Props) {
               <NavSection title={t('productionModule.sectionMasterData')} />
               <NavItem icon={Package}      label={t('productionModule.products')}   isActive={isActive('products')}   onClick={() => navigate('products')} />
               <NavItem icon={FlaskConical} label={t('productionModule.testTypes')} isActive={isActive('test-types')} onClick={() => navigate('test-types')} />
+            </>
+          )}
+
+          {canDailyReport && (
+            <>
+              <NavSection title={t('productionModule.sectionReporting')} />
+              <NavItem icon={ClipboardList} label={t('productionModule.dailyReport')}
+                       isActive={isActive('daily-report')} onClick={() => navigate('daily-report')} />
             </>
           )}
         </nav>

@@ -92,7 +92,10 @@ eee-main/
     │   ├── 06_users-auth.md         # 用户管理与权限系统
     │   ├── 07_hr.md                 # HR 模块：员工目录 + 档案编辑
     │   ├── 08_finance-audit-log.md  # Finance 审计日志
-    │   └── 09_qc.md                 # Quality Control：烘干后检验闭环
+    │   ├── 09_qc.md                 # Quality Control：烘干后检验闭环
+    │   ├── 10_packaging.md          # Packaging：合格车出库/包装
+    │   ├── 11_warehouse-inventory.md # Warehouse & Inventory：库存基座
+    │   └── 12_production-daily-report.md # Production 成型生产日报录入
     └── database/
         ├── 01_schema.md             # 完整数据库表结构
         ├── 02_rpc-functions.md      # 所有 RPC / View
@@ -298,6 +301,7 @@ App（正常渲染）  ←──────────────────
 | **HR 模块** | ✅ 完成 | → modules/07_hr.md |
 | **Finance Audit Log** | ✅ 完成 | → modules/08_finance-audit-log.md |
 | **Quality Control (QC)** | ✅ 完成（Phase 1 MVP） | → modules/09_qc.md |
+| **Production 成型生产日报** | ✅ 第一阶段（1:1 复刻 Excel 录入） | → modules/12_production-daily-report.md |
 | P&L / 资产负债表 | 🔲 未开始 | — |
 | **Workflow Studio** | ✅ 完成（执行引擎待开发） | → modules/05_workflow-studio.md |
 
