@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { PermissionProvider } from './contexts/PermissionContext';
+import { ModuleVisibilityProvider, useModuleVisibility } from './contexts/ModuleVisibilityContext';
+import { SuperuserApp } from './pages/superuser/SuperuserDashboard';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
@@ -28,6 +30,15 @@ import BalanceSheet from './pages/finance/BalanceSheet';
 import AccountSettings from './pages/AccountSettings';
 
 export default function App() {
+  // Developer superuser panel — a separate sub-route, not gated by Supabase auth.
+  const isSuperuserRoute = typeof window !== 'undefined'
+    && window.location.pathname.replace(/\/+$/, '') === '/superuser';
+  if (isSuperuserRoute) return <SuperuserApp />;
+
+  return <MainApp />;
+}
+
+function MainApp() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [activeModule, setActiveModule] = useState<string>('home');
 
@@ -59,13 +70,15 @@ export default function App() {
 
   return (
     <PermissionProvider authUserId={session.user.id}>
-      <AppShell
-        activeModule={activeModule}
-        setActiveModule={setActiveModule}
-        userName={userName}
-        userEmail={userEmail}
-        onLogout={handleLogout}
-      />
+      <ModuleVisibilityProvider>
+        <AppShell
+          activeModule={activeModule}
+          setActiveModule={setActiveModule}
+          userName={userName}
+          userEmail={userEmail}
+          onLogout={handleLogout}
+        />
+      </ModuleVisibilityProvider>
     </PermissionProvider>
   );
 }
@@ -79,6 +92,20 @@ function AppShell({
   userEmail: string;
   onLogout: () => void;
 }) {
+  const { isVisible } = useModuleVisibility();
+
+  // Block direct navigation to a module hidden by the superuser panel.
+  if (activeModule !== 'home' && activeModule !== 'account-settings' && !isVisible(activeModule)) {
+    return (
+      <HomePage
+        onNavigate={setActiveModule}
+        onLogout={onLogout}
+        userName={userName}
+        userEmail={userEmail}
+      />
+    );
+  }
+
   if (activeModule === 'home') {
     return (
       <HomePage

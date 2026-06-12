@@ -2118,7 +2118,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-117 | 20260527000014_qc_hold_event_hooks.sql |
 | M-118 | 20260527000015_qc_soft_limits.sql |
 | M-119 | 20260527000016_qc_sample_id_from_cart.sql |
-| **M-120** | _(下一个)_ |
+| M-123 | 20260611000001_app_module_visibility.sql · 开发者 superuser 面板的模块显隐配置(表 `app_module_visibility` 单行全局配置 + 公开只读 RLS + 校验密钥的 `set_module_visibility(p_hidden,p_secret)` RPC)。前端 `/superuser` 子路由读写,控制 HomePage 入口卡片、模块导航与权限开关的显示。 |
+| **M-124** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
