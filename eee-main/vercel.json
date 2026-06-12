@@ -3,6 +3,8 @@
   "outputDirectory": "dist",
   "routes": [
     { "src": "/ppt/(.*)", "dest": "/ppt/$1" },
+    { "src": "/proposal", "dest": "/proposal/index.html" },
+    { "src": "/proposal/", "dest": "/proposal/index.html" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
