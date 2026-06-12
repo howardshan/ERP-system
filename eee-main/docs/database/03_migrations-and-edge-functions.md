@@ -2017,6 +2017,41 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-122 `20260610000001_prod_daily_report.sql`
+**用途**: 把客户成型生产(Forming Production)的每日 Excel 报表(`docs/2026 Daily Report Forming Production.xlsx` 的 Daily Report sheet)的"填写"动作搬进系统。第一阶段 1:1 复刻该表录入功能。
+
+**背景**: 该 Excel 是生产流水表,每行 = 一个(日期 × 班次 × 机台 × 工单 × 操作员)的记录。24 列里约 13 列人工填,其余 10 列是 Excel 公式(VLOOKUP 进 RAW DATA / name item 字典 + 算术)自动算。
+
+**新建 5 张表**(均 `prod_` 前缀、`uuid` 主键、`created_at/created_by`、`dev_all` 宽松 RLS):
+- `prod_product_master` — 独立产品主数据(料号、描述、规格、`oz_per_piece`、`lbs_per_hr`、`pcs_lbs_per_hour`、`runner_avg`、`bone_avg`、`is_activity`)。**刻意不复用** `qc_product_sku` / `item`,因为本表要承载公式所需的标准速率。
+- `prod_machine` — 机台清单(`code`、`kind` inj/ext/other)。
+- `prod_downtime_reason` — 停机原因(`label` 保留双语原串如 `Other其他问题`)。
+- `prod_operator` — 操作员花名册(`badge_no` = Excel "Name Item" 工号 → `name`,可选 `erp_user_id` FK)。**不**把 ~159 个一线工人塞进登录表 `erp_user`。
+- `prod_daily_report` — 日报流水,**只存人工录入字段**。索引 `(report_date, shift)`。
+
+**视图 `prod_daily_report_view`**: join 三张主数据表,导出全部原始列 + 10 个计算列。前端直接 `.from('prod_daily_report_view').select()` 读(与 `account_balance` 视图用法一致)。
+
+**业务规则**:
+- **BR-P1** 计算列口径(与 Excel 公式 1:1,已对 1 万+ 历史行验证):`lbs_good_produced = bone_avg × output`;`standard_lbs_hr = pcs_lbs_per_hour`;`runner_weight_pct = runner_avg`;`runner_regrind_lbs = runner_avg × output`;`pcs_lbs_per_hr = output / work_hours`;`credit = (output/work_hours) / pcs_lbs_per_hour`;`total_carts = COALESCE(cart_to,0) − COALESCE(cart_from,0) + 1`(Excel `=J−I+1` 在空车号行得 1);`week_num = EXTRACT(week)`;描述/操作员名按 FK 取。
+- **BR-P2** 非生产活动行(Material Handler / Meeting / R&D Test / Machine Down 等)是 `prod_product_master` 里 `is_activity=true`、速率为空的真实条目,可照常录入,计算列自然归 0 / NULL。
+
+**权限种子**: 给已有 `production / module_permissions / manage` 的用户授予 `production / daily_report / {view,create,edit,delete}`(cross-join 模式,幂等)。
+
+**前端配套**: `src/lib/permissionStructure.ts`(新增 `daily_report` 资源)、`src/services/productionDailyApi.ts`、`src/pages/production/DailyReportPage.tsx`、`ProductionModule.tsx`(Reporting 区导航)、`src/locales/*/production.json`(`dailyReport` 文案)。
+
+### M-123 `20260610000002_prod_daily_report_seed.sql`
+**用途**: 为 M-122 的四张字典表灌入主数据,使录入页下拉与计算可用。**历史日报流水行不导入**。
+
+**来源**: 由 `scripts/gen_prod_seed.py`(openpyxl)从工作簿生成 —— 客户换新工作簿时重跑脚本即可重生成。
+
+**内容**(全部 `ON CONFLICT (unique key) DO NOTHING`,`created_by='system:M-123'`):
+- `prod_machine` ← Machine DATA C 列(45 台,前缀判 inj/ext/other)
+- `prod_downtime_reason` ← Machine DATA A 列(7 条双语)
+- `prod_operator` ← name item(158 个有名字的工号)
+- `prod_product_master` ← RAW DATA(382 料号,按料号去重保留最后一条)+ Other INF 特殊码(合计 383,其中 44 个 `is_activity`)
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
