@@ -43,7 +43,7 @@
   @media (max-width:680px){ .sheet{ padding:36px 22px; margin:0; border-radius:0; } h1{font-size:27px;} h2{font-size:20px;} }
   .dl-btn {
     position:fixed; top:20px; right:20px; z-index:50; display:inline-flex; align-items:center; gap:8px;
-    background:var(--blue); color:#fff; border:0; font-family:var(--f); font-size:14px; font-weight:700;
+    background:var(--blue); color:#fff; text-decoration:none; border:0; font-family:var(--f); font-size:14px; font-weight:700;
     padding:10px 16px; border-radius:10px; box-shadow:0 6px 18px rgba(37,99,235,.35); cursor:pointer;
     transition:background .15s, transform .1s;
   }
@@ -57,10 +57,10 @@
 </style>
 </head>
 <body>
-<button class="dl-btn no-print" onclick="window.print()" aria-label="Download PDF">
+<a class="dl-btn no-print" href="NPIC-QC-Proposal-EN.pdf" download="NPIC-QC-Proposal-EN.pdf" aria-label="Download PDF">
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
   Download PDF
-</button>
+</a>
 <article class="sheet">
 
   <div class="topbar"><span>Final Implementation Proposal</span><span>Confidential — v2.0</span></div>
