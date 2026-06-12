@@ -5,10 +5,12 @@ import { getPermissionHolders, getUsers, setPermission } from '../../services/au
 import { PERMISSION_STRUCTURE } from '../../lib/permissionStructure';
 import type { UserPermissionGrant, ErpUser } from '../../types/auth';
 import { usePermissions } from '../../contexts/PermissionContext';
+import { useModuleVisibility } from '../../contexts/ModuleVisibilityContext';
 
 export default function PermissionBrowser() {
   const { t } = useTranslation('auth');
   const { can } = usePermissions();
+  const { isVisible } = useModuleVisibility();
   const canManageRoles = can('auth', 'roles', 'manage');
   const [selectedModule, setSelectedModule] = useState('');
   const [selectedResource, setSelectedResource] = useState('');
@@ -87,7 +89,7 @@ export default function PermissionBrowser() {
       {/* Left: module tree */}
       <nav className="w-64 bg-[#faf8f5] border-r border-slate-200 overflow-y-auto py-3">
         <p className="px-4 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('permissionBrowser.modulesAndPermissions')}</p>
-        {Object.entries(PERMISSION_STRUCTURE).map(([modId, mod]) => {
+        {Object.entries(PERMISSION_STRUCTURE).filter(([modId]) => isVisible(modId)).map(([modId, mod]) => {
           const modCollapsed = collapsedModules.has(modId);
           return (
             <div key={modId} className="mb-1">
