@@ -10,6 +10,7 @@ import {
 import { PERMISSION_STRUCTURE } from '../../lib/permissionStructure';
 import type { ErpUser, UserPermissionGrant, NotificationType, UserNotificationSetting } from '../../types/auth';
 import { usePermissions } from '../../contexts/PermissionContext';
+import { useModuleVisibility } from '../../contexts/ModuleVisibilityContext';
 import { useTranslation } from 'react-i18next';
 
 interface Props {
@@ -21,6 +22,8 @@ type LeftPanel = 'account' | string; // 'account' or a module id
 
 export default function UserDetail({ userId, onBack }: Props) {
   const { reload: reloadPermissions } = usePermissions();
+  const { isVisible } = useModuleVisibility();
+  const visibleModuleKeys = Object.keys(PERMISSION_STRUCTURE).filter(isVisible);
   const { t } = useTranslation('auth');
   const [user, setUser] = useState<ErpUser | null>(null);
   const [grants, setGrants] = useState<UserPermissionGrant[]>([]);
@@ -357,20 +360,20 @@ export default function UserDetail({ userId, onBack }: Props) {
             <button
               type="button"
               onClick={() => {
-                const allOn = localModules.size === Object.keys(PERMISSION_STRUCTURE).length;
+                const allOn = localModules.size === visibleModuleKeys.length;
                 if (allOn) {
                   setLocalModules(new Set());
                   if (selectedPanel !== 'account') setSelectedPanel('account');
                 } else {
-                  setLocalModules(new Set(Object.keys(PERMISSION_STRUCTURE)));
+                  setLocalModules(new Set(visibleModuleKeys));
                 }
               }}
               className="text-[9px] font-bold px-2 py-0.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-500 uppercase tracking-widest transition-colors"
             >
-              {localModules.size === Object.keys(PERMISSION_STRUCTURE).length ? t('userDetail.none') : t('userDetail.all')}
+              {localModules.size === visibleModuleKeys.length ? t('userDetail.none') : t('userDetail.all')}
             </button>
           </div>
-          {Object.entries(PERMISSION_STRUCTURE).map(([modId, mod]) => {
+          {Object.entries(PERMISSION_STRUCTURE).filter(([modId]) => isVisible(modId)).map(([modId, mod]) => {
             const enabled = localModules.has(modId);
             return (
               <div key={modId} className="flex items-center gap-2 px-3 py-1.5">

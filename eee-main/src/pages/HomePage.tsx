@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../contexts/PermissionContext';
+import { useModuleVisibility } from '../contexts/ModuleVisibilityContext';
 import { PrinterSettingsPopover } from '../components/PrinterSettingsPopover';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
@@ -231,6 +232,7 @@ interface HomePageProps {
 export default function HomePage({ onNavigate, onLogout, userName, userEmail }: HomePageProps) {
   const { t } = useTranslation('app');
   const { reload, canAccessModule } = usePermissions();
+  const { isVisible } = useModuleVisibility();
   const [reloading, setReloading] = useState(false);
 
   async function handleReload() {
@@ -299,7 +301,7 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
       {/* Module Grid */}
       <main className="flex-1 px-12 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {MODULES.filter((mod) => canAccessModule(mod.id)).map((mod) => {
+          {MODULES.filter((mod) => isVisible(mod.id) && canAccessModule(mod.id)).map((mod) => {
             const Icon = mod.icon;
             const isActive = mod.status === 'active';
 
