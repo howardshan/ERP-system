@@ -158,7 +158,7 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'complete', label: 'Complete', prereq: 'view' },
         ],
       },
-      // M-124 (Phase 2 M1.1) — Work order master data (prod_work_order).
+      // M-125 (Phase 2 M1.1) — Work order master data (prod_work_order).
       // Frontend call site: pages/production/WorkOrderPage.tsx. NOTE: distinct
       // from the `work_orders` (plural) resource below, which is the QC-origin
       // "create batch / add carts" form.

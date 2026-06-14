@@ -1,4 +1,4 @@
--- Migration M-124: Production Phase 2 M1.1 — work order master + prod_run 单一事实源
+-- Migration M-125: Production Phase 2 M1.1 — work order master + prod_run 单一事实源
 --
 -- Phase 2 把生产录入前移到一线、实时化(见 docs/Production模块-Phase2-SPEC.md)。M1.1 是地基:
 --   1) 新建轻量工单主数据 prod_work_order(D1:工单源自外部系统,本期系统内手动维护)。

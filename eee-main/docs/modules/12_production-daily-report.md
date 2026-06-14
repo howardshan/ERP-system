@@ -1,6 +1,6 @@
 # Production · Daily Report 模块(成型生产日报)
 
-> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地(M-122/M-123)。Phase 2 M1.1(工单主数据 + `prod_run` 单一事实源 + 工单驱动录入)已落地(M-124)。
+> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地(M-122/M-123)。Phase 2 M1.1(工单主数据 + `prod_run` 单一事实源 + 工单驱动录入)已落地(M-125)。
 > **依据**: `ERP-system/docs/2026 Daily Report Forming Production.xlsx`(Daily Report sheet)、`ERP-system/docs/Production模块-Phase2-SPEC.md`
 > **入口**: Production 模块侧边栏 → Reporting → Daily Report;Planning → Work Orders
 > **UI 主题**: indigo(随 Production 模块)
@@ -74,7 +74,7 @@
 
 由 `scripts/gen_prod_seed.py`(openpyxl)从工作簿生成幂等 seed:机台 45 / 停机原因 7 / 操作员 158 / 产品 383(含 44 个 activity)。客户换新工作簿时重跑脚本重生成。**历史日报流水行不导入。**
 
-## Phase 2 — M1.1(工单主数据 + prod_run 单一事实源 + 工单驱动录入,M-124)
+## Phase 2 — M1.1(工单主数据 + prod_run 单一事实源 + 工单驱动录入,M-125)
 
 Phase 2 把生产录入前移到一线、实时化(完整规划见 `docs/Production模块-Phase2-SPEC.md`,决策 D1–D10)。M1.1 是地基:
 

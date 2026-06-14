@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-// Production work-order master data — see M-124 (Phase 2 M1.1).
+// Production work-order master data — see M-125 (Phase 2 M1.1).
 // Work orders originate in an external system; for M1 they're maintained
 // in-system by planners and drive the entry autofill (F3) on prod_run.
 

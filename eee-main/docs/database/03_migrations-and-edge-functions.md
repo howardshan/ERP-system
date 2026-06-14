@@ -2052,7 +2052,7 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
-### M-124 `20260613000001_prod_work_order_and_run.sql`
+### M-125 `20260613000001_prod_work_order_and_run.sql`
 **用途**: Production Phase 2 M1.1 地基 —— 新建工单主数据,并把 Phase 1 的 `prod_daily_report` 收敛为单一事实源 `prod_run`(SPEC 方案 A / D3)。
 
 **背景**: Phase 2 要把生产录入前移到一线平板、实时化、与 QC 打通(见 `docs/Production模块-Phase2-SPEC.md` 决策 D1–D10)。M1.1 先落工单主数据 + 工单驱动录入 + 收敛地基,为 M1.2 平板端、M1.3 看板铺路。
@@ -2183,8 +2183,9 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-121 | 20260609000002_qc_recent_passed_inspections.sql |
 | M-122 | 20260610000001_prod_daily_report.sql |
 | M-123 | 20260610000002_prod_daily_report_seed.sql |
-| M-124 | 20260613000001_prod_work_order_and_run.sql |
-| **M-125** | _(下一个)_ |
+| M-124 | 20260611000001_app_module_visibility.sql · 开发者 superuser 面板的模块显隐配置(表 `app_module_visibility` 单行全局配置 + 公开只读 RLS + 校验密钥的 `set_module_visibility(p_hidden,p_secret)` RPC)。前端 `/superuser` 子路由读写,控制 HomePage 入口卡片、模块导航与权限开关的显示。 |
+| M-125 | 20260613000001_prod_work_order_and_run.sql |
+| **M-126** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-// Production run data-entry — see M-124 (Phase 2 M1.1, 方案A 单一事实源).
+// Production run data-entry — see M-125 (Phase 2 M1.1, 方案A 单一事实源).
 // Hand-entered fields live in prod_run (the single source of truth, shared by
 // the manager page and — later — the tablet); the 10 computed columns (BR-P1)
 // come from the view prod_run_view, which we read directly. (Renamed from
