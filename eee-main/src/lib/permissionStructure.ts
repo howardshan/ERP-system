@@ -158,6 +158,19 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'complete', label: 'Complete', prereq: 'view' },
         ],
       },
+      // M-125 (Phase 2 M1.1) — Work order master data (prod_work_order).
+      // Frontend call site: pages/production/WorkOrderPage.tsx. NOTE: distinct
+      // from the `work_orders` (plural) resource below, which is the QC-origin
+      // "create batch / add carts" form.
+      work_order: {
+        label: 'Work Orders (master data)',
+        permissions: [
+          { id: 'view',   label: 'View',   prereq: null },
+          { id: 'create', label: 'Create', prereq: 'view' },
+          { id: 'edit',   label: 'Edit',   prereq: 'view' },
+          { id: 'close',  label: 'Close',  prereq: 'view' },
+        ],
+      },
       // Moved here from `qc` module — see M-094.  Frontend call sites:
       // pages/qc/Production.tsx, pages/qc/LotDetail.tsx.
       work_orders: {

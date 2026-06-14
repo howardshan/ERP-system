@@ -2052,6 +2052,32 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-125 `20260613000001_prod_work_order_and_run.sql`
+**用途**: Production Phase 2 M1.1 地基 —— 新建工单主数据,并把 Phase 1 的 `prod_daily_report` 收敛为单一事实源 `prod_run`(SPEC 方案 A / D3)。
+
+**背景**: Phase 2 要把生产录入前移到一线平板、实时化、与 QC 打通(见 `docs/Production模块-Phase2-SPEC.md` 决策 D1–D10)。M1.1 先落工单主数据 + 工单驱动录入 + 收敛地基,为 M1.2 平板端、M1.3 看板铺路。
+
+**新建 `prod_work_order`**(工单主数据,D1:工单源自外部系统,本期系统内手动维护):`work_order_no` UNIQUE、`product_id`→`prod_product_master`、`machine_id`(可空)、`planned_qty`(可空)、`status`(open/in_progress/closed/cancelled)、`planned_date`、`note`。**无 `process` 字段**(D10:工序由产品决定,经 `product_id` 读 `prod_product_master.process`)。`dev_all` RLS。
+
+**收敛 `prod_daily_report` → `prod_run`**(原地改造,保数据):
+- `DROP VIEW prod_daily_report_view` → `ALTER TABLE ... RENAME TO prod_run` → `operator_id` 改 nullable(M1.2 团队 run 无单一操作员)→ 新增列 `work_order_id`(FK)、`source`(default 'manager',CHECK tablet/manager)、`status`(default 'submitted',CHECK draft/submitted/reviewed)、`final_cart_complete`(default true)、`continues_prev`(default false)、`device_id`(M1.2 再加 FK)。`ADD COLUMN ... DEFAULT` 原子回填既有行。
+- **新计算视图 `prod_run_view`**:BR-P1 的 10 个计算表达式与 M-122 **逐字一致**(回归核心);operator 改 LEFT JOIN、新增 work_order LEFT JOIN,补选工单/新 run 列(含 `process`)。
+- **兼容视图** `CREATE VIEW prod_daily_report AS SELECT * FROM prod_run`(保险;应用层已直接读写 `prod_run`/`prod_run_view`)。
+
+**新视图 `prod_work_order_rollup_view`**(BR-P4 / D8):`run_count`、`total_output=SUM(output_qty)`、`distinct_carts=MAX(cart_to)-MIN(cart_from)+1`(续做交接车去重)。
+
+**权限种子**: 给已有 `production/module_permissions/manage` 用户授予 `production/work_order/{view,create,edit,close}`(cross-join,幂等)。
+
+**业务规则**:
+- **BR-P3** `prod_run` 单一事实源:平板与管理端生产记录统一落 `prod_run`,`source`(tablet/manager)区分来源、`status`(draft/submitted/reviewed)区分流转;`prod_daily_report` 仅为兼容视图。
+- **BR-P4** 工单累计/车数去重:工单实际产出 = 名下各 run `output_qty` 之和;总车数 = `MAX(cart_to)-MIN(cart_from)+1`(跨班续做的交接车按一辆计)。
+
+**设计取舍**: M1.1 保留 `operator_id`(nullable)与 `work_hours` —— 管理页仍是 Phase-1 的"每操作员一行"形态,Credit/Pcs·Hr 仍以 `work_hours` 为分母,口径零变化;D5「工时=Σ打卡」在 M1.2 引入 `prod_line_attendance` 后再切换。不在 M1.1 合并历史行(避免产量重复计)。
+
+**前端配套**: `src/lib/permissionStructure.ts`(新增 `work_order` 资源)、`src/services/productionWorkOrderApi.ts`、`src/services/productionDailyApi.ts`→`productionRunApi.ts`(重指 `prod_run`/`prod_run_view`)、`src/pages/production/{WorkOrderPage,DailyReportPage,ProductionModule}.tsx`、`src/locales/*/production.json`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2153,8 +2179,13 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-117 | 20260527000014_qc_hold_event_hooks.sql |
 | M-118 | 20260527000015_qc_soft_limits.sql |
 | M-119 | 20260527000016_qc_sample_id_from_cart.sql |
-| M-123 | 20260611000001_app_module_visibility.sql · 开发者 superuser 面板的模块显隐配置(表 `app_module_visibility` 单行全局配置 + 公开只读 RLS + 校验密钥的 `set_module_visibility(p_hidden,p_secret)` RPC)。前端 `/superuser` 子路由读写,控制 HomePage 入口卡片、模块导航与权限开关的显示。 |
-| **M-124** | _(下一个)_ |
+| M-120 | 20260609000001_qc_failed_outcome_split.sql |
+| M-121 | 20260609000002_qc_recent_passed_inspections.sql |
+| M-122 | 20260610000001_prod_daily_report.sql |
+| M-123 | 20260610000002_prod_daily_report_seed.sql |
+| M-124 | 20260611000001_app_module_visibility.sql · 开发者 superuser 面板的模块显隐配置(表 `app_module_visibility` 单行全局配置 + 公开只读 RLS + 校验密钥的 `set_module_visibility(p_hidden,p_secret)` RPC)。前端 `/superuser` 子路由读写,控制 HomePage 入口卡片、模块导航与权限开关的显示。 |
+| M-125 | 20260613000001_prod_work_order_and_run.sql |
+| **M-126** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
