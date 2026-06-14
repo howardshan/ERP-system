@@ -171,6 +171,18 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'close',  label: 'Close',  prereq: 'view' },
         ],
       },
+      // M-126 (Phase 2 M1.2a) — Production-line tablet devices (prod_line_device).
+      // Manager-side CRUD: pages/production/DevicePage.tsx. The tablet kiosk
+      // itself (/tablet) authenticates by device code + PIN, not by this grant.
+      device: {
+        label: 'Line Tablet Devices',
+        permissions: [
+          { id: 'view',    label: 'View',    prereq: null },
+          { id: 'create',  label: 'Create',  prereq: 'view' },
+          { id: 'edit',    label: 'Edit',    prereq: 'view' },
+          { id: 'disable', label: 'Disable', prereq: 'view' },
+        ],
+      },
       // Moved here from `qc` module — see M-094.  Frontend call sites:
       // pages/qc/Production.tsx, pages/qc/LotDetail.tsx.
       work_orders: {

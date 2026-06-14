@@ -1,6 +1,6 @@
 # Production · Daily Report 模块(成型生产日报)
 
-> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地(M-122/M-123)。Phase 2 M1.1(工单主数据 + `prod_run` 单一事实源 + 工单驱动录入)已落地(M-125)。
+> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地(M-122/M-123)。Phase 2 M1.1(工单主数据 + `prod_run` 单一事实源 + 工单驱动录入)已落地(M-125)。Phase 2 M1.2a(产线平板 kiosk + 设备登录 + 打卡上岗/下岗)已落地(M-126)。
 > **依据**: `ERP-system/docs/2026 Daily Report Forming Production.xlsx`(Daily Report sheet)、`ERP-system/docs/Production模块-Phase2-SPEC.md`
 > **入口**: Production 模块侧边栏 → Reporting → Daily Report;Planning → Work Orders
 > **UI 主题**: indigo(随 Production 模块)
@@ -92,9 +92,24 @@ Phase 2 把生产录入前移到一线、实时化(完整规划见 `docs/Product
 
 **权限**:新增 `production / work_order / {view, create, edit, close}`。
 
+## Phase 2 — M1.2a(产线平板 kiosk + 设备登录 + 打卡,M-126)
+
+把生产录入前移到一线平板的第一片。平板不是 `erp_user`,走独立设备账号。
+
+**设备鉴权(沿用 `/superuser` + `set_module_visibility` 两个先例)**:
+- 新增 **`/tablet`** kiosk 路径(`src/App.tsx` init 读 `pathname`,镜像 `/superuser`,绕过登录),渲染 `src/pages/tablet/TabletApp.tsx`。
+- 设备登录经 SECURITY DEFINER RPC **`prod_tablet_login(p_code, p_pin)`**(授予 anon)校验、返回绑定产线;登录态存 `sessionStorage`。
+- **`prod_line_device`** 仅对 `authenticated`(管理端)开放,**anon 不可直读 PIN**(BR-P5)。
+
+**打卡(BR-P6)**:平板工作台顶栏显示绑定产线 + 班次切换;扫工牌/选工号 → 上岗(写 `prod_line_attendance.check_in_at`);"当前在岗"列表 = 该 (产线×日期×班次) `check_out_at IS NULL` 的操作员,可逐个下岗。工时 = Σ session 时长(M1.3 切换效率分母)。
+
+**设备管理(管理端)**:`src/pages/production/DevicePage.tsx`(Planning 区)—— 生产管理自助创建/编辑/停用产线平板、设 PIN、绑定产线。权限 `production/device/{view,create,edit,disable}`。
+
+**安全等级**:dev 级(PIN 明文、attendance 走 `dev_all`),与全站一致;生产硬化留后续。
+
 ## 待办 / 后续阶段
 
-- **M1.2** 平板端:`prod_line_attendance`(打卡/工时)、`prod_line_device`、停机事件、续做车交互。
+- **M1.2b** 平板生产录入(扫工单→带出→产出/车号→`prod_run` source=tablet)+ 停机实时(`prod_downtime_event`)+ 跨班续做车(D8)。
 - **M1.3** 实时产量看板 + 工时自动汇总切换(分母改 Σ打卡)。
 - **M2** 生产数据 ↔ QC 数据(工单为键)关联分析/追溯。
 - 分析看板(Daily production Analysis / Analysis)、与生产批次/库存联动、整屏网格批量录入等远期增强。
