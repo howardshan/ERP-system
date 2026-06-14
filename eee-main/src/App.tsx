@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase';
 import { PermissionProvider } from './contexts/PermissionContext';
 import { ModuleVisibilityProvider, useModuleVisibility } from './contexts/ModuleVisibilityContext';
 import { SuperuserApp } from './pages/superuser/SuperuserDashboard';
+import TabletApp from './pages/tablet/TabletApp';
 import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
@@ -34,6 +35,11 @@ export default function App() {
   const isSuperuserRoute = typeof window !== 'undefined'
     && window.location.pathname.replace(/\/+$/, '') === '/superuser';
   if (isSuperuserRoute) return <SuperuserApp />;
+
+  // Production-line tablet kiosk (M-126) — device-account login, not Supabase auth.
+  const isTabletRoute = typeof window !== 'undefined'
+    && window.location.pathname.replace(/\/+$/, '') === '/tablet';
+  if (isTabletRoute) return <TabletApp />;
 
   return <MainApp />;
 }

@@ -8,6 +8,7 @@ import {
   FlaskConical,
   ClipboardList,
   FileText,
+  Tablet,
   HelpCircle,
   ArrowLeft,
   LayoutGrid,
@@ -29,6 +30,7 @@ import SubLotHistoryDrawer from '../qc/SubLotHistoryDrawer';
 import ProductionDashboard from './ProductionDashboard';
 import DailyReportPage from './DailyReportPage';
 import WorkOrderPage from './WorkOrderPage';
+import DevicePage from './DevicePage';
 import { PrinterSettingsPopover } from '../../components/PrinterSettingsPopover';
 
 interface Props {
@@ -78,6 +80,7 @@ export default function ProductionModule({ onHome }: Props) {
   const canManageProducts = can('production', 'products', 'view');
   const canDailyReport    = can('production', 'daily_report', 'view');
   const canWorkOrder      = can('production', 'work_order', 'view');
+  const canDevice         = can('production', 'device', 'view');
 
   const isActive = (id: string) => screen === id || screen.startsWith(id + ':');
   const navigate = (s: string) => setScreen(s);
@@ -120,6 +123,9 @@ export default function ProductionModule({ onHome }: Props) {
     if (screen === 'work-orders') {
       return <WorkOrderPage />;
     }
+    if (screen === 'devices') {
+      return <DevicePage />;
+    }
     return <ProductionDashboard />;
   }
 
@@ -156,11 +162,17 @@ export default function ProductionModule({ onHome }: Props) {
             </>
           )}
 
-          {canWorkOrder && (
+          {(canWorkOrder || canDevice) && (
             <>
               <NavSection title={t('productionModule.sectionPlanning')} />
-              <NavItem icon={FileText} label={t('productionModule.workOrders')}
-                       isActive={isActive('work-orders')} onClick={() => navigate('work-orders')} />
+              {canWorkOrder && (
+                <NavItem icon={FileText} label={t('productionModule.workOrders')}
+                         isActive={isActive('work-orders')} onClick={() => navigate('work-orders')} />
+              )}
+              {canDevice && (
+                <NavItem icon={Tablet} label={t('productionModule.devices')}
+                         isActive={isActive('devices')} onClick={() => navigate('devices')} />
+              )}
             </>
           )}
 

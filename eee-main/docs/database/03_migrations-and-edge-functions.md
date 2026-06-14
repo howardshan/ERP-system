@@ -2078,6 +2078,31 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-126 `20260614000001_prod_tablet_device_attendance.sql`
+**用途**: Production Phase 2 M1.2a —— 产线平板 kiosk(`/tablet`)+ 设备账号登录 + 打卡上岗/下岗。把"现在这条线有哪几个人"跑通,为 M1.2b(平板生产录入/停机)、M1.3(工时汇总/看板)铺路。
+
+**背景**: 平板不是 `erp_user`,走独立设备账号。沿用两个现成先例:`/superuser` kiosk(`App.tsx` init 读 `pathname` 绕过登录)+ `set_module_visibility` 的 SECURITY DEFINER + 校验密钥 RPC。
+
+**新建 `prod_line_device`**(产线平板设备):`code` UNIQUE(登录设备码)、`name`、`machine_id`→`prod_machine`(绑定产线)、`pin`、`active`。RLS **仅 `authenticated`**(管理端 CRUD);**不建 anon 策略** → 平板(anon)不可直读 PIN。
+
+**新建 `prod_line_attendance`**(打卡/上岗登记):`operator_id`、`machine_id`、`report_date`、`shift`、`check_in_at`、`check_out_at`(空=在岗)、`device_id`→`prod_line_device`。索引 `(machine_id, report_date, shift)`。RLS `dev_all`(平板 anon 读写)。
+
+**`prod_run.device_id` 补 FK** → `prod_line_device`(M-125 时为 plain uuid)。
+
+**RPC `prod_tablet_login(p_code, p_pin)`**(`SECURITY DEFINER`,`RETURNS jsonb`,`GRANT … TO anon`):按 `code+pin+active` 校验并返回 `{device_id, code, name, machine_id, machine_code}`,否则 `RAISE 'unauthorized'`。
+
+**权限种子**:给 `production/module_permissions/manage` 用户授予 `production/device/{view,create,edit,disable}`(cross-join,幂等)。**演示设备 seed**:`LINE-INJ01` / PIN `1234`,绑定 Inj 01。
+
+**业务规则**:
+- **BR-P5** 平板设备登录经 `prod_tablet_login`(设备码+PIN)服务端校验;`prod_line_device` 不开放 anon 直读(PIN 不经 REST 暴露);设备绑定一条产线。
+- **BR-P6** 「生产 team」是打卡点:某产线某班"当前在岗" = `prod_line_attendance` 中该 (machine×date×shift) `check_out_at IS NULL` 的操作员集合;工时 = Σ session 时长(M1.3 切换效率分母)。
+
+**设计取舍/安全**:M1.2a 为 dev 级(PIN 明文存库、attendance 走 `dev_all` anon 写),与全站 `dev_all` + `/superuser` 一致。生产硬化(PIN 加盐、逐写 RPC 校验、收紧 RLS)列入后续。
+
+**前端配套**: `src/App.tsx`(`/tablet` 路由,镜像 `/superuser`)、`src/pages/tablet/TabletApp.tsx`(设备登录 + 打卡工作台)、`src/services/{productionTabletApi,productionDeviceApi}.ts`、`src/pages/production/{DevicePage,ProductionModule}.tsx`、`src/lib/permissionStructure.ts`(新增 `device` 资源)、`src/locales/*/production.json`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2185,7 +2210,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-123 | 20260610000002_prod_daily_report_seed.sql |
 | M-124 | 20260611000001_app_module_visibility.sql · 开发者 superuser 面板的模块显隐配置(表 `app_module_visibility` 单行全局配置 + 公开只读 RLS + 校验密钥的 `set_module_visibility(p_hidden,p_secret)` RPC)。前端 `/superuser` 子路由读写,控制 HomePage 入口卡片、模块导航与权限开关的显示。 |
 | M-125 | 20260613000001_prod_work_order_and_run.sql |
-| **M-126** | _(下一个)_ |
+| M-126 | 20260614000001_prod_tablet_device_attendance.sql |
+| **M-127** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
