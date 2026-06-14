@@ -11,19 +11,22 @@ import {
   listProducts, listMachines, listOperators, listDowntimeReasons,
   type DailyReportRow, type DailyReportInput, type Shift,
   type ProductOption, type MachineOption, type OperatorOption, type DowntimeReasonOption,
-} from '../../services/productionDailyApi';
+} from '../../services/productionRunApi';
+import { findWorkOrderByNo } from '../../services/productionWorkOrderApi';
 
 const SHIFTS: Shift[] = ['1st', '2nd', '3rd'];
 
 /** Draft form — numeric fields kept as strings so empty / partial entry works. */
 interface Draft {
-  machine_id: string; product_id: string; operator_id: string; work_order: string;
+  machine_id: string; product_id: string; operator_id: string;
+  work_order: string; work_order_id: string;
   cart_from: string; cart_to: string; output_qty: string; work_hours: string;
   defect_waste_lbs: string; down_hours: string; downtime_reason_id: string; note: string;
 }
 
 const emptyDraft = (): Draft => ({
-  machine_id: '', product_id: '', operator_id: '', work_order: '',
+  machine_id: '', product_id: '', operator_id: '',
+  work_order: '', work_order_id: '',
   cart_from: '', cart_to: '', output_qty: '', work_hours: '',
   defect_waste_lbs: '', down_hours: '', downtime_reason_id: '', note: '',
 });
@@ -31,8 +34,9 @@ const emptyDraft = (): Draft => ({
 const rowToDraft = (r: DailyReportRow): Draft => ({
   machine_id: r.machine_id,
   product_id: r.product_id ?? '',
-  operator_id: r.operator_id,
+  operator_id: r.operator_id ?? '',
   work_order: r.work_order ?? '',
+  work_order_id: r.work_order_id ?? '',
   cart_from: r.cart_from == null ? '' : String(r.cart_from),
   cart_to: r.cart_to == null ? '' : String(r.cart_to),
   output_qty: String(r.output_qty ?? ''),
@@ -151,6 +155,7 @@ export default function DailyReportPage() {
     return {
       report_date: date, shift,
       machine_id: draft.machine_id,
+      work_order_id: draft.work_order_id || null,
       product_id: draft.product_id || null,
       operator_id: draft.operator_id,
       work_order: draft.work_order.trim() || null,
@@ -370,6 +375,29 @@ function EntryDrawer(p: DrawerProps) {
   const { t, draft, setDraft } = p;
   const set = (k: keyof Draft) => (v: string) => setDraft({ ...draft, [k]: v });
 
+  // F3 — work-order-driven autofill. The input accepts a barcode-gun scan
+  // (which types the value + Enter) or manual typing (D9); on resolve we look
+  // up the work order and auto-fill the product (process/rates come from it).
+  const [woStatus, setWoStatus] = useState<'idle' | 'loading' | 'matched' | 'notfound'>(
+    draft.work_order_id ? 'matched' : 'idle');
+  const resolveWO = async () => {
+    const no = draft.work_order.trim();
+    if (!no) { setDraft({ ...draft, work_order_id: '' }); setWoStatus('idle'); return; }
+    setWoStatus('loading');
+    try {
+      const m = await findWorkOrderByNo(no);
+      if (m) {
+        setDraft({ ...draft, work_order_id: m.work_order_id, product_id: m.product_id ?? draft.product_id });
+        setWoStatus('matched');
+      } else {
+        setDraft({ ...draft, work_order_id: '' });
+        setWoStatus('notfound');
+      }
+    } catch {
+      setWoStatus('notfound');
+    }
+  };
+
   // Searchable options. Operators match on badge # or name; items on item # or
   // description (hint is both shown muted and included in the search).
   const machineOpts = useMemo<ComboOption[]>(
@@ -431,7 +459,17 @@ function EntryDrawer(p: DrawerProps) {
                   options={productOpts} placeholder={t('dailyReport.selectPlaceholder')} />
               </Field>
               <Field label={t('dailyReport.colWorkOrder')}>
-                <input className={inputCls} value={draft.work_order} onChange={(e) => set('work_order')(e.target.value)} />
+                <input className={inputCls} value={draft.work_order}
+                  placeholder={t('dailyReport.woScanPlaceholder')}
+                  onChange={(e) => { setWoStatus('idle'); setDraft({ ...draft, work_order: e.target.value, work_order_id: '' }); }}
+                  onBlur={resolveWO}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); resolveWO(); } }} />
+                {woStatus === 'matched' && (
+                  <span className="text-[11px] text-emerald-600 mt-1 inline-block">{t('dailyReport.woMatched')}</span>
+                )}
+                {woStatus === 'notfound' && (
+                  <span className="text-[11px] text-amber-600 mt-1 inline-block">{t('dailyReport.woNotFound')}</span>
+                )}
               </Field>
             </div>
             {p.preview.item_description && (

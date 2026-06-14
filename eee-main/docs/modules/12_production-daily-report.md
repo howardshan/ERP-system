@@ -1,8 +1,8 @@
 # Production · Daily Report 模块(成型生产日报)
 
-> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地。Schema/视图 M-122,主数据 seed M-123。
-> **依据**: `ERP-system/docs/2026 Daily Report Forming Production.xlsx`(Daily Report sheet)
-> **入口**: Production 模块侧边栏 → Reporting → Daily Report
+> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地(M-122/M-123)。Phase 2 M1.1(工单主数据 + `prod_run` 单一事实源 + 工单驱动录入)已落地(M-124)。
+> **依据**: `ERP-system/docs/2026 Daily Report Forming Production.xlsx`(Daily Report sheet)、`ERP-system/docs/Production模块-Phase2-SPEC.md`
+> **入口**: Production 模块侧边栏 → Reporting → Daily Report;Planning → Work Orders
 > **UI 主题**: indigo(随 Production 模块)
 
 ---
@@ -74,9 +74,27 @@
 
 由 `scripts/gen_prod_seed.py`(openpyxl)从工作簿生成幂等 seed:机台 45 / 停机原因 7 / 操作员 158 / 产品 383(含 44 个 activity)。客户换新工作簿时重跑脚本重生成。**历史日报流水行不导入。**
 
+## Phase 2 — M1.1(工单主数据 + prod_run 单一事实源 + 工单驱动录入,M-124)
+
+Phase 2 把生产录入前移到一线、实时化(完整规划见 `docs/Production模块-Phase2-SPEC.md`,决策 D1–D10)。M1.1 是地基:
+
+**1. 工单主数据 `prod_work_order`**(D1:工单源自外部系统,本期系统内手动维护):`work_order_no`(唯一)、`product_id`、`machine_id`、`planned_qty`、`status`(open/in_progress/closed/cancelled)、`planned_date`。**无 `process` 字段**(D10:工序由产品决定,经 `product_id` 读 `prod_product_master.process`)。管理页 `src/pages/production/WorkOrderPage.tsx`(Planning 区),服务 `productionWorkOrderApi.ts`。
+
+**2. 方案 A 收敛(D3)—— `prod_daily_report` → 单一事实源 `prod_run`**:
+- 原地 `RENAME`(保数据);`operator_id` 改 nullable;新增 `work_order_id`、`source`(tablet/manager)、`status`(draft/submitted/reviewed)、`final_cart_complete`、`continues_prev`、`device_id`。
+- 计算视图改为 `prod_run_view`,**BR-P1 的 10 个计算表达式与 M-122 逐字一致**(口径零变化);operator/work_order 均 LEFT JOIN,补出 `process`。
+- `prod_daily_report` 降为兼容视图(`SELECT * FROM prod_run`);应用层直接读写 `prod_run`/`prod_run_view`(服务 `productionDailyApi.ts` → `productionRunApi.ts`)。
+- **BR-P3** prod_run 单一事实源;**BR-P4** 工单累计(SUM output)/ 车数去重(`MAX(cart_to)-MIN(cart_from)+1`),见视图 `prod_work_order_rollup_view`。
+
+**3. 工单驱动录入(F3 / D9)**:Daily Report 录入抽屉的"工单号"框支持**扫码枪扫 + 手输**;失焦/回车调 `findWorkOrderByNo` → 命中即自动带出产品(描述/工序/速率),未命中提示可手选产品(降级)。
+
+**设计取舍**:M1.1 仍保留 `operator_id`(nullable)与 `work_hours`,管理页维持 Phase-1 的"每操作员一行"形态,Credit/Pcs·Hr 仍以 `work_hours` 为分母;D5「工时=Σ打卡」留待 M1.2 引入 `prod_line_attendance` 后切换。**M1.1 不合并历史行**(避免产量重复计)。跨班"续做第 N 车"(D8)的交互 UI 留 M1.2 平板端(列已就绪)。
+
+**权限**:新增 `production / work_order / {view, create, edit, close}`。
+
 ## 待办 / 后续阶段
 
-- 分析看板(Daily production Analysis / Analysis)
-- 与现有工单(work order)、生产批次、库存联动
-- 工人自助上报(替代纸质交接)
-- 录入交互可选增强:接近 Excel 的整屏网格批量录入/粘贴
+- **M1.2** 平板端:`prod_line_attendance`(打卡/工时)、`prod_line_device`、停机事件、续做车交互。
+- **M1.3** 实时产量看板 + 工时自动汇总切换(分母改 Σ打卡)。
+- **M2** 生产数据 ↔ QC 数据(工单为键)关联分析/追溯。
+- 分析看板(Daily production Analysis / Analysis)、与生产批次/库存联动、整屏网格批量录入等远期增强。

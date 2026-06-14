@@ -7,6 +7,7 @@ import {
   Package,
   FlaskConical,
   ClipboardList,
+  FileText,
   HelpCircle,
   ArrowLeft,
   LayoutGrid,
@@ -27,6 +28,7 @@ import TestTypesPage from '../qc/TestTypesPage';
 import SubLotHistoryDrawer from '../qc/SubLotHistoryDrawer';
 import ProductionDashboard from './ProductionDashboard';
 import DailyReportPage from './DailyReportPage';
+import WorkOrderPage from './WorkOrderPage';
 import { PrinterSettingsPopover } from '../../components/PrinterSettingsPopover';
 
 interface Props {
@@ -75,6 +77,7 @@ export default function ProductionModule({ onHome }: Props) {
   const canViewTrace      = can('production', 'trace', 'view');
   const canManageProducts = can('production', 'products', 'view');
   const canDailyReport    = can('production', 'daily_report', 'view');
+  const canWorkOrder      = can('production', 'work_order', 'view');
 
   const isActive = (id: string) => screen === id || screen.startsWith(id + ':');
   const navigate = (s: string) => setScreen(s);
@@ -114,6 +117,9 @@ export default function ProductionModule({ onHome }: Props) {
     if (screen === 'daily-report') {
       return <DailyReportPage />;
     }
+    if (screen === 'work-orders') {
+      return <WorkOrderPage />;
+    }
     return <ProductionDashboard />;
   }
 
@@ -147,6 +153,14 @@ export default function ProductionModule({ onHome }: Props) {
             <>
               <NavSection title={t('productionModule.sectionFloor')} />
               <NavItem icon={Factory} label={t('productionModule.production')} isActive={isActive('production')} onClick={() => navigate('production')} />
+            </>
+          )}
+
+          {canWorkOrder && (
+            <>
+              <NavSection title={t('productionModule.sectionPlanning')} />
+              <NavItem icon={FileText} label={t('productionModule.workOrders')}
+                       isActive={isActive('work-orders')} onClick={() => navigate('work-orders')} />
             </>
           )}
 
