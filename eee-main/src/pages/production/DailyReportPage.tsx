@@ -371,6 +371,29 @@ interface DrawerProps {
   onSave: () => void;
 }
 
+// Defined at module scope (NOT inside EntryDrawer) — a component re-created on
+// each render gets remounted by React, which makes inputs lose focus after
+// every keystroke. Keep these stable.
+const inputCls = 'w-full border border-slate-300 rounded-lg px-2.5 h-9 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400';
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-slate-600">{label}{required && <span className="text-red-500"> *</span>}</span>
+      {children}
+    </label>
+  );
+}
+
+function Calc({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
+      <span className="text-xs text-slate-500">{label}</span>
+      <span className="text-sm font-semibold text-slate-800 tabular-nums">{value}</span>
+    </div>
+  );
+}
+
 function EntryDrawer(p: DrawerProps) {
   const { t, draft, setDraft } = p;
   const set = (k: keyof Draft) => (v: string) => setDraft({ ...draft, [k]: v });
@@ -407,24 +430,6 @@ function EntryDrawer(p: DrawerProps) {
   const productOpts = useMemo<ComboOption[]>(
     () => p.products.map((pr) => ({ value: pr.id, label: pr.item_number, hint: pr.description ?? undefined })),
     [p.products]);
-
-  const labelCls = 'block';
-  const spanCls = 'text-xs font-medium text-slate-600';
-  const inputCls = 'w-full border border-slate-300 rounded-lg px-2.5 h-9 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400';
-
-  const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
-    <label className={labelCls}>
-      <span className={spanCls}>{label}{required && <span className="text-red-500"> *</span>}</span>
-      {children}
-    </label>
-  );
-
-  const Calc = ({ label, value }: { label: string; value: string }) => (
-    <div className="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className="text-sm font-semibold text-slate-800 tabular-nums">{value}</span>
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
