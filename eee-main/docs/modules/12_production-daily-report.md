@@ -1,6 +1,6 @@
 # Production · Daily Report 模块(成型生产日报)
 
-> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地(M-122/M-123)。Phase 2 M1.1(工单主数据 + `prod_run` 单一事实源 + 工单驱动录入)已落地(M-125)。Phase 2 M1.2a(产线平板 kiosk + 设备登录 + 打卡上岗/下岗)已落地(M-126)。
+> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地(M-122/M-123)。Phase 2 M1.1(工单主数据 + `prod_run` 单一事实源 + 工单驱动录入)已落地(M-125)。Phase 2 M1.2a(产线平板 kiosk + 设备登录 + 打卡)已落地(M-126)。Phase 2 M1.2b(平板生产录入 + 跨班续做车 + 停机实时)已落地(M-127)。
 > **依据**: `ERP-system/docs/2026 Daily Report Forming Production.xlsx`(Daily Report sheet)、`ERP-system/docs/Production模块-Phase2-SPEC.md`
 > **入口**: Production 模块侧边栏 → Reporting → Daily Report;Planning → Work Orders
 > **UI 主题**: indigo(随 Production 模块)
@@ -107,9 +107,18 @@ Phase 2 把生产录入前移到一线、实时化(完整规划见 `docs/Product
 
 **安全等级**:dev 级(PIN 明文、attendance 走 `dev_all`),与全站一致;生产硬化留后续。
 
+## Phase 2 — M1.2b(平板生产录入 + 跨班续做车 + 停机实时,M-127)
+
+平板从"只打卡"升级为"能录生产 + 记停机"。平板工作台改为 **Tab**:打卡 | 生产 | 停机(共享顶栏:绑定产线 + 班次切换 + 登出)。
+
+- **生产**:扫/输工单号 → `findWorkOrderByNo` 带出产品;若上一 run 未完成最后一车,`getCarryOverCart` 提示"续做第 N 车?"(`cart_from=N`、`continues_prev=true`,D8);录车号/产出/废品/备注 + `final_cart_complete` → 提交 `submitTabletRun`(写 `prod_run`:`source='tablet'`、`device_id`、`machine_id`=设备线、`operator_id` 空)。下方"本班产出"列表。**与管理端 Daily Report 同写一张 `prod_run`**(方案 A 单一事实源),管理端能看到 tablet 来源的行。
+- **停机(BR-P7)**:`prod_downtime_event` —— "开始停机"(选原因→开 event)/"结束停机"(算 `down_minutes`);或"补录停机"(原因+时长);本班停机列表。
+
+**说明**:平板 run 本期 `work_hours=0`(无单操作员),故 Credit/Pcs·Hr 在平板 run 上暂空,M1.3 切 Σ打卡分母后补齐(D5)。
+
 ## 待办 / 后续阶段
 
-- **M1.2b** 平板生产录入(扫工单→带出→产出/车号→`prod_run` source=tablet)+ 停机实时(`prod_downtime_event`)+ 跨班续做车(D8)。
-- **M1.3** 实时产量看板 + 工时自动汇总切换(分母改 Σ打卡)。
+- **M1.3** 工时自动汇总(分母切 Σ打卡,补齐平板 run 效率)+ 管理端实时产量看板 + 停机/run 审核视图。
+- **M2** 生产数据 ↔ QC 数据(工单为键)关联分析/追溯。
 - **M2** 生产数据 ↔ QC 数据(工单为键)关联分析/追溯。
 - 分析看板(Daily production Analysis / Analysis)、与生产批次/库存联动、整屏网格批量录入等远期增强。

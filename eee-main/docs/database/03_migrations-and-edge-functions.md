@@ -2103,6 +2103,20 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-127 `20260615000001_prod_downtime_event.sql`
+**用途**: Production Phase 2 M1.2b —— 停机实时事件 `prod_downtime_event`,配合平板生产录入,替代纸质 Form 451。
+
+**背景**: M1.2b 把产线平板从"只打卡"升级为"能录生产 + 记停机"。平板生产录入写既有 `prod_run`(`source='tablet'`,无需新表/新列);本迁移只建停机事件表。
+
+**新建 `prod_downtime_event`**:`machine_id`→`prod_machine`、`run_id`→`prod_run`(可选,关联当时 run)、`report_date`、`shift`、`reason_id`→`prod_downtime_reason`、`start_at`/`end_at`(空=进行中)、`down_minutes`(结束算出或补录直填)、`note`、`device_id`→`prod_line_device`。索引 `(machine_id, report_date, shift)`。RLS `dev_all`(平板 anon 读写)。**无新 RPC、无权限种子**。
+
+**业务规则**:
+- **BR-P7** 停机事件:line 级、实时 start/end 打点(结束时 `down_minutes = round((end−start)/60)`)或补录时长;可选 `run_id` 关联当时生产记录。班次停机工时 = Σ `down_minutes`(M1.3 汇总用)。
+
+**前端配套**: `src/services/productionTabletApi.ts`(`submitTabletRun`/`listTabletRuns` + 停机 start/end/add/list/getOpen)、`src/pages/tablet/TabletApp.tsx`(Tab 工作台:打卡 | 生产 | 停机)、`src/locales/*/production.json`。平板生产录入复用 `findWorkOrderByNo`/`getCarryOverCart`(M-125)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2211,7 +2225,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-124 | 20260611000001_app_module_visibility.sql · 开发者 superuser 面板的模块显隐配置(表 `app_module_visibility` 单行全局配置 + 公开只读 RLS + 校验密钥的 `set_module_visibility(p_hidden,p_secret)` RPC)。前端 `/superuser` 子路由读写,控制 HomePage 入口卡片、模块导航与权限开关的显示。 |
 | M-125 | 20260613000001_prod_work_order_and_run.sql |
 | M-126 | 20260614000001_prod_tablet_device_attendance.sql |
-| **M-127** | _(下一个)_ |
+| M-127 | 20260615000001_prod_downtime_event.sql |
+| **M-128** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
