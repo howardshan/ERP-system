@@ -25,7 +25,13 @@ export function ModuleVisibilityProvider({ children }: { children: React.ReactNo
 
   useEffect(() => { reload(); }, [reload]);
 
-  const isVisible = useCallback((moduleId: string) => !hidden.has(moduleId), [hidden]);
+  // Apply the visibility config ONLY in production builds (i.e. the deployed
+  // npicmanage site). The local dev server (`npm run dev`) ignores it so
+  // developers always see every module regardless of what's hidden on prod.
+  const isVisible = useCallback(
+    (moduleId: string) => import.meta.env.DEV || !hidden.has(moduleId),
+    [hidden],
+  );
 
   return (
     <ModuleVisibilityContext.Provider value={{ hidden, isVisible, reload, loaded }}>
