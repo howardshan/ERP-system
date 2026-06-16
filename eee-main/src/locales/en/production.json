@@ -186,6 +186,7 @@
     "submitRun": "Submit",
     "saving": "Saving…",
     "runSaved": "Run saved.",
+    "noAttendanceWarn": "No one is clocked in on this line this shift — clock in on the Attendance tab so hours can be attributed.",
     "shiftOutputTitle": "This shift's output",
     "noRuns": "No runs logged yet this shift.",
     "cartsShort": "carts",

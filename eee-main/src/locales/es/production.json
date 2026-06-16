@@ -186,6 +186,7 @@
     "submitRun": "Enviar",
     "saving": "Enviando…",
     "runSaved": "Registro guardado.",
+    "noAttendanceWarn": "Nadie ha registrado entrada en esta línea este turno — registra entrada en la pestaña Asistencia para poder atribuir las horas.",
     "shiftOutputTitle": "Producción de este turno",
     "noRuns": "Sin registros en este turno.",
     "cartsShort": "carros",

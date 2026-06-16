@@ -186,6 +186,7 @@
     "submitRun": "提交",
     "saving": "提交中…",
     "runSaved": "已提交。",
+    "noAttendanceWarn": "本线本班暂无人上岗 —— 请先到「打卡」页上岗,以便后续归集工时。",
     "shiftOutputTitle": "本班产出",
     "noRuns": "本班次暂无生产记录。",
     "cartsShort": "车",
