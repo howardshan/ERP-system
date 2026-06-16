@@ -2117,6 +2117,20 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-128 `20260616000001_prod_run_cart_overlap_guard.sql`
+**用途**: 在数据库层强制 **BR-P4 车号去重**。M1.2b 做了"续做车提示"却漏了"重叠校验",导致同一工单可录出重叠车号(如 1–5 后又录 3–6,3/4/5 算两次)。
+
+**做法**: `BEFORE INSERT/UPDATE ON prod_run` 触发器 `prod_run_check_cart_overlap()`,一处生效覆盖平板与管理端两条写入路径。
+- **只管 team/平板 run**(`operator_id IS NULL`)+ 有工单 + 有车号段;管理端"每操作员"行(`operator_id` 非空)沿用 Phase-1 语义、可共享车号,故豁免。
+- 规则:同一工单内新车号须接在已有最大 `cart_to` 之后;若 `continues_prev` 则 `cart_from` 须正好 = 那辆未完成的交接车;`cart_to >= cart_from`。冲突 `RAISE EXCEPTION`(前端 catch 显示)。
+- **既往数据不回溯**(只拦新增/修改)。
+
+**业务规则**: **BR-P4** 由本触发器强制(此前仅在文档/视图口径中描述)。
+
+**前端配套**: 无需改写入逻辑(`submitTabletRun` / 管理端 insert 的报错经现有 catch 直接展示);`src/pages/production/DailyReportPage.tsx` 顺带给 team/tablet 行(operator 空)加 "Team · TABLET" 标识,避免误读为缺数据(Q1/Q2 澄清:平板 run 按 team 归属、不挂单个操作员,符合 D2/D5)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2226,7 +2240,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-125 | 20260613000001_prod_work_order_and_run.sql |
 | M-126 | 20260614000001_prod_tablet_device_attendance.sql |
 | M-127 | 20260615000001_prod_downtime_event.sql |
-| **M-128** | _(下一个)_ |
+| M-128 | 20260616000001_prod_run_cart_overlap_guard.sql |
+| **M-129** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

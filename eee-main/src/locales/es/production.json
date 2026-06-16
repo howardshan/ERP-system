@@ -91,7 +91,8 @@
     "required": "Obligatorio",
     "woScanPlaceholder": "Escanea o escribe el n.º de orden",
     "woMatched": "✓ Orden encontrada — producto cargado",
-    "woNotFound": "Orden no encontrada — selecciona el producto manualmente"
+    "woNotFound": "Orden no encontrada — selecciona el producto manualmente",
+    "teamRun": "Línea"
   },
   "workOrder": {
     "title": "Órdenes de trabajo",

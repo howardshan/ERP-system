@@ -91,7 +91,8 @@
     "required": "Required",
     "woScanPlaceholder": "Scan or type work order #",
     "woMatched": "✓ Work order matched — product filled in",
-    "woNotFound": "Work order not found — select product manually"
+    "woNotFound": "Work order not found — select product manually",
+    "teamRun": "Team"
   },
   "workOrder": {
     "title": "Work Orders",
