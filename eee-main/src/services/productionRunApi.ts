@@ -60,7 +60,7 @@ export interface DailyReportInput {
   machine_id: string;
   work_order_id?: string | null;
   product_id?: string | null;
-  operator_id: string;
+  operator_id: string | null;   // null = team run (tablet); set = manager per-operator row
   work_order?: string | null;
   cart_from?: number | null;
   cart_to?: number | null;
@@ -116,6 +116,23 @@ export async function listOperators(): Promise<OperatorOption[]> {
     .order('badge_no');
   if (error) throw new Error(error.message);
   return (data ?? []) as OperatorOption[];
+}
+
+/** One operator's attendance on a line for a date+shift (open or closed session). */
+export interface ShiftAttendanceRow { machine_id: string; badge_no: number | null; name: string | null }
+
+/** Everyone who clocked in on any line for a given date + shift — used to show the
+ *  "team" behind team/tablet runs in the manager Daily Report. */
+export async function listShiftAttendance(date: string, shift: Shift): Promise<ShiftAttendanceRow[]> {
+  const { data, error } = await supabase
+    .from('prod_line_attendance')
+    .select('machine_id, operator:prod_operator(badge_no, name)')
+    .eq('report_date', date)
+    .eq('shift', shift)
+    .order('check_in_at');
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as Array<{ machine_id: string; operator: { badge_no: number; name: string } | null }>)
+    .map((r) => ({ machine_id: r.machine_id, badge_no: r.operator?.badge_no ?? null, name: r.operator?.name ?? null }));
 }
 
 export async function listDowntimeReasons(): Promise<DowntimeReasonOption[]> {

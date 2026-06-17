@@ -113,7 +113,8 @@ Phase 2 把生产录入前移到一线、实时化(完整规划见 `docs/Product
 
 - **生产**:扫/输工单号 → `findWorkOrderByNo` 带出产品;若上一 run 未完成最后一车,`getCarryOverCart` 提示"续做第 N 车?"(`cart_from=N`、`continues_prev=true`,D8);录车号/产出/废品/备注 + `final_cart_complete` → 提交 `submitTabletRun`(写 `prod_run`:`source='tablet'`、`device_id`、`machine_id`=设备线、`operator_id` 空)。下方"本班产出"列表。**与管理端 Daily Report 同写一张 `prod_run`**(方案 A 单一事实源,管理端按同一 日期+班次 即可看到 tablet 来源的行)。
   - **软提醒(不硬拦)**:本线本班无人上岗时,生产页显示琥珀提醒"请先打卡"(忘打卡不应丢产量;但工时归集靠在岗,故提醒)。
-  - **车号去重(BR-P4,M-128)**:`prod_run` 触发器在写入时校验同一工单内 team run 车号不重叠(续做的交接车除外);冲突直接报错。管理端 Daily Report 给 team/平板行(operator 空)标 "Team · TABLET",表示"整线产出、不挂单个操作员"(D2/D5),非缺数据。
+  - **车号去重(BR-P4,M-128)**:`prod_run` 触发器在写入时校验同一工单内 team run 车号不重叠(续做的交接车除外);冲突直接报错。
+  - **管理端 Daily Report 信息补全**:列表新增「工单」列;「操作员/整线」列对 team/平板行(operator 空)展示 **TABLET + 当班在岗成员**(成员来自 `prod_line_attendance`,按 机台×日期×班次 取,经 `listShiftAttendance`),表示"整线产出、不挂单个操作员"(D2/D5),非缺数据;详情抽屉显示 日期·班次 上下文、工单号、整线成员;编辑 team 行时不再强制选操作员(保持 `operator_id` 空)。
 - **停机(BR-P7)**:`prod_downtime_event` —— "开始停机"(选原因→开 event)/"结束停机"(算 `down_minutes`);或"补录停机"(原因+时长);本班停机列表。
 
 **说明**:平板 run 本期 `work_hours=0`(无单操作员),故 Credit/Pcs·Hr 在平板 run 上暂空,M1.3 切 Σ打卡分母后补齐(D5)。

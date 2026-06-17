@@ -92,7 +92,10 @@
     "woScanPlaceholder": "Escanea o escribe el n.º de orden",
     "woMatched": "✓ Orden encontrada — producto cargado",
     "woNotFound": "Orden no encontrada — selecciona el producto manualmente",
-    "teamRun": "Línea"
+    "teamRun": "Línea",
+    "colOperatorTeam": "Operador / Línea",
+    "teamMembersLabel": "Miembros de la línea (en turno)",
+    "noTeamMembers": "Nadie registró entrada en este turno"
   },
   "workOrder": {
     "title": "Órdenes de trabajo",
