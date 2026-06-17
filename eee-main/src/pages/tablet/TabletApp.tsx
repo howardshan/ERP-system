@@ -7,15 +7,14 @@ import { cn } from '../../lib/utils';
 import { Combobox, type ComboOption } from '../../components/ui/Combobox';
 import {
   tabletLogin, listOnShift, clockIn, clockOut,
-  submitTabletRun, listTabletRuns,
+  submitTabletRun, listTabletRuns, findCartForForming,
   getOpenDowntime, listDowntimeToday, startDowntime, endDowntime, addDowntime,
-  type TabletSession, type AttendanceRow, type Shift, type DowntimeEventRow,
+  type TabletSession, type AttendanceRow, type Shift, type DowntimeEventRow, type CartForming,
 } from '../../services/productionTabletApi';
 import {
   listOperators, listDowntimeReasons,
   type OperatorOption, type DowntimeReasonOption, type DailyReportRow,
 } from '../../services/productionRunApi';
-import { findWorkOrderByNo, getCarryOverCart, type WorkOrderLookup } from '../../services/productionWorkOrderApi';
 
 const SESSION_KEY = 'erp_tablet_device';
 const SHIFTS: Shift[] = ['1st', '2nd', '3rd'];
@@ -252,17 +251,12 @@ function AttendancePanel({ session, date, shift }: PanelProps) {
 
 function ProductionPanel({ session, date, shift }: PanelProps) {
   const { t } = useTranslation('production');
-  const [wo, setWo] = useState('');
-  const [woStatus, setWoStatus] = useState<'idle' | 'matched' | 'notfound'>('idle');
-  const [lookup, setLookup] = useState<WorkOrderLookup | null>(null);
-  const [cartFrom, setCartFrom] = useState('');
-  const [cartTo, setCartTo] = useState('');
+  const [code, setCode] = useState('');
+  const [cartStatus, setCartStatus] = useState<'idle' | 'matched' | 'notfound'>('idle');
+  const [cart, setCart] = useState<CartForming | null>(null);
   const [output, setOutput] = useState('');
   const [defect, setDefect] = useState('');
   const [note, setNote] = useState('');
-  const [finalComplete, setFinalComplete] = useState(true);
-  const [continuesPrev, setContinuesPrev] = useState(false);
-  const [carry, setCarry] = useState<number | null>(null);
   const [runs, setRuns] = useState<DailyReportRow[]>([]);
   const [onShiftCount, setOnShiftCount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -276,45 +270,41 @@ function ProductionPanel({ session, date, shift }: PanelProps) {
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [shift]);
 
   const reset = () => {
-    setWo(''); setWoStatus('idle'); setLookup(null); setCartFrom(''); setCartTo('');
-    setOutput(''); setDefect(''); setNote(''); setFinalComplete(true); setContinuesPrev(false); setCarry(null);
+    setCode(''); setCartStatus('idle'); setCart(null); setOutput(''); setDefect(''); setNote('');
   };
 
-  const resolveWO = async () => {
-    const no = wo.trim();
-    if (!no) { setLookup(null); setWoStatus('idle'); setCarry(null); return; }
+  // Scan a cart sticker (sub_lot_code) → resolve cart + work order + product rates.
+  const resolveCart = async () => {
+    const c = code.trim();
+    if (!c) { setCart(null); setCartStatus('idle'); return; }
     try {
-      const m = await findWorkOrderByNo(no);
-      if (m) {
-        setLookup(m); setWoStatus('matched');
-        const c = await getCarryOverCart(m.work_order_id);
-        if (c) { setCarry(c.continueCart); setCartFrom(String(c.continueCart)); setContinuesPrev(true); }
-        else { setCarry(null); setContinuesPrev(false); }
-      } else { setLookup(null); setWoStatus('notfound'); setCarry(null); }
-    } catch { setWoStatus('notfound'); }
+      const found = await findCartForForming(c);
+      setCart(found);
+      setCartStatus('matched');
+    } catch {
+      setCart(null);
+      setCartStatus('notfound');
+    }
   };
 
   const out = numOrNull(output) ?? 0;
-  const cf = intOrNull(cartFrom) ?? 0;
-  const ct = intOrNull(cartTo) ?? 0;
-  const totalCarts = ct - cf + 1;
-  const lbsGood = (lookup?.bone_avg ?? 0) * out;
+  const lbsGood = (cart?.bone_avg ?? 0) * out;
 
   const submit = async () => {
+    if (!cart) return;
     setBusy(true); setError(''); setMsg('');
     try {
       await submitTabletRun({
         report_date: date, shift, machine_id: session.machine_id, device_id: session.device_id,
-        work_order_id: lookup?.work_order_id ?? null,
-        product_id: lookup?.product_id ?? null,
-        cart_from: intOrNull(cartFrom), cart_to: intOrNull(cartTo),
+        sub_lot_id: cart.sub_lot_id,
+        work_order_id: cart.work_order_id ?? null,
+        product_id: cart.product_id ?? null,
+        cart_from: cart.seq, cart_to: cart.seq,
         output_qty: numOrNull(output) ?? 0,
         defect_waste_lbs: numOrNull(defect),
         note: note.trim() || null,
-        final_cart_complete: finalComplete,
-        continues_prev: continuesPrev,
       });
-      setMsg(t('tablet.runSaved'));
+      setMsg(t('tablet.cartSaved', { cart: cart.sub_lot_code }));
       reset();
       load();
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
@@ -329,59 +319,57 @@ function ProductionPanel({ session, date, shift }: PanelProps) {
       )}
 
       <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5 space-y-4">
+        {/* scan cart */}
         <div>
-          <label className="text-sm font-bold text-slate-500 uppercase tracking-widest">{t('dailyReport.colWorkOrder')}</label>
-          <input value={wo} placeholder={t('dailyReport.woScanPlaceholder')}
-            onChange={(e) => { setWoStatus('idle'); setWo(e.target.value); setLookup(null); setCarry(null); }}
-            onBlur={resolveWO}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); resolveWO(); } }}
+          <label className="text-sm font-bold text-slate-500 uppercase tracking-widest">{t('tablet.scanCart')}</label>
+          <input value={code} placeholder={t('tablet.scanCartPlaceholder')} autoFocus
+            onChange={(e) => { setCartStatus('idle'); setCode(e.target.value); setCart(null); }}
+            onBlur={resolveCart}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); resolveCart(); } }}
             className={cn(bigInput, 'mt-1')} />
-          {woStatus === 'matched' && lookup && (
-            <p className="text-sm text-emerald-600 mt-1">✓ {lookup.item_number} · {lookup.description}</p>
-          )}
-          {woStatus === 'notfound' && <p className="text-sm text-amber-600 mt-1">{t('dailyReport.woNotFound')}</p>}
-          {carry != null && (
-            <p className="text-sm text-indigo-700 bg-indigo-50 rounded-lg px-3 py-2 mt-2">{t('tablet.carryOver', { cart: carry })}</p>
-          )}
+          {cartStatus === 'notfound' && <p className="text-sm text-amber-600 mt-1">{t('tablet.cartNotFound')}</p>}
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <Field label={t('dailyReport.colCartFrom')}>
-            <input inputMode="numeric" value={cartFrom} onChange={(e) => setCartFrom(e.target.value)} className={bigInput} />
-          </Field>
-          <Field label={t('dailyReport.colCartTo')}>
-            <input inputMode="numeric" value={cartTo} onChange={(e) => setCartTo(e.target.value)} className={bigInput} />
-          </Field>
-          <Field label={t('dailyReport.colTotalCarts')}>
-            <div className={cn(bigInput, 'flex items-center bg-slate-50 text-slate-700 tabular-nums')}>{fmt(totalCarts, 0)}</div>
-          </Field>
-        </div>
+        {cart && (
+          <>
+            {/* resolved cart context */}
+            <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-bold text-slate-800">{cart.sub_lot_code}</span>
+                <span className="text-xs text-slate-500">{t('tablet.cartSeq', { seq: cart.seq ?? '—' })}</span>
+              </div>
+              <p className="text-sm text-slate-600">{cart.work_order_barcode ?? '—'}
+                {cart.item_number ? <> · <span className="font-mono">{cart.item_number}</span> {cart.description}</> : null}</p>
+              {!cart.work_order_id && (
+                <p className="text-xs text-amber-600">{t('tablet.cartWoNotInMaster')}</p>
+              )}
+              {cart.already_formed && (
+                <p className="text-xs text-rose-600 font-semibold">{t('tablet.cartAlreadyFormed')}</p>
+              )}
+            </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          <Field label={t('dailyReport.colOutput')}>
-            <input inputMode="decimal" value={output} onChange={(e) => setOutput(e.target.value)} className={bigInput} />
-          </Field>
-          <Field label={t('dailyReport.colDefect')}>
-            <input inputMode="decimal" value={defect} onChange={(e) => setDefect(e.target.value)} className={bigInput} />
-          </Field>
-          <Field label={t('dailyReport.colLbsGood')}>
-            <div className={cn(bigInput, 'flex items-center bg-slate-50 text-slate-700 tabular-nums')}>{fmt(lbsGood)}</div>
-          </Field>
-        </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label={t('dailyReport.colOutput')}>
+                <input inputMode="decimal" value={output} autoFocus onChange={(e) => setOutput(e.target.value)} className={bigInput} />
+              </Field>
+              <Field label={t('dailyReport.colDefect')}>
+                <input inputMode="decimal" value={defect} onChange={(e) => setDefect(e.target.value)} className={bigInput} />
+              </Field>
+              <Field label={t('dailyReport.colLbsGood')}>
+                <div className={cn(bigInput, 'flex items-center bg-slate-50 text-slate-700 tabular-nums')}>{fmt(lbsGood)}</div>
+              </Field>
+            </div>
 
-        <Field label={t('dailyReport.colNote')}>
-          <input value={note} onChange={(e) => setNote(e.target.value)} className={bigInput} />
-        </Field>
+            <Field label={t('dailyReport.colNote')}>
+              <input value={note} onChange={(e) => setNote(e.target.value)} className={bigInput} />
+            </Field>
 
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={finalComplete} onChange={(e) => setFinalComplete(e.target.checked)} className="w-5 h-5" />
-          <span className="text-base text-slate-700">{t('tablet.finalCartComplete')}</span>
-        </label>
-
-        <button onClick={submit} disabled={busy || out <= 0}
-          className="w-full h-14 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-base font-bold flex items-center justify-center gap-2">
-          <Check size={20} /> {busy ? t('tablet.saving') : t('tablet.submitRun')}
-        </button>
+            <button onClick={submit} disabled={busy || out <= 0 || cart.already_formed}
+              className="w-full h-14 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-base font-bold flex items-center justify-center gap-2">
+              <Check size={20} /> {busy ? t('tablet.saving') : t('tablet.submitCart')}
+            </button>
+          </>
+        )}
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -395,11 +383,10 @@ function ProductionPanel({ session, date, shift }: PanelProps) {
             {runs.map((r) => (
               <li key={r.id} className="px-5 py-3 flex items-center justify-between text-sm">
                 <span className="flex items-center gap-2">
-                  <span className="font-mono text-slate-400">{r.item_number ?? '—'}</span>
-                  <span className="text-slate-700">{r.item_description ?? ''}</span>
-                  {r.source === 'tablet' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold">TABLET</span>}
+                  <span className="font-mono text-slate-700">{r.sub_lot_code ?? r.item_number ?? '—'}</span>
+                  <span className="text-slate-500">{r.item_description ?? ''}</span>
                 </span>
-                <span className="tabular-nums text-slate-600">{fmt(r.output_qty, 0)} · {fmt(r.total_carts, 0)} {t('tablet.cartsShort')}</span>
+                <span className="tabular-nums text-slate-600">{fmt(r.output_qty, 0)}</span>
               </li>
             ))}
           </ul>

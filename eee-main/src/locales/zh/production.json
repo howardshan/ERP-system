@@ -92,7 +92,11 @@
     "woScanPlaceholder": "扫码或键入工单号",
     "woMatched": "✓ 已匹配工单 — 已带出产品",
     "woNotFound": "未找到工单 — 请手动选择产品",
-    "teamRun": "整线"
+    "teamRun": "整线",
+    "colOperatorTeam": "操作员 / 整线",
+    "colCart": "车号",
+    "teamMembersLabel": "整线成员(当班在岗)",
+    "noTeamMembers": "本班次无人上岗"
   },
   "workOrder": {
     "title": "工单",
@@ -188,6 +192,14 @@
     "saving": "提交中…",
     "runSaved": "已提交。",
     "noAttendanceWarn": "本线本班暂无人上岗 —— 请先到「打卡」页上岗,以便后续归集工时。",
+    "scanCart": "扫车",
+    "scanCartPlaceholder": "扫码或键入车号",
+    "cartNotFound": "未找到该车 —— 请核对车贴/批次。",
+    "cartSeq": "第 {{seq}} 车",
+    "cartWoNotInMaster": "工单不在主数据 —— 暂无标准速率,产出仍会记录。",
+    "cartAlreadyFormed": "该车已录过成型。",
+    "submitCart": "提交本车",
+    "cartSaved": "车 {{cart}} 已提交。",
     "shiftOutputTitle": "本班产出",
     "noRuns": "本班次暂无生产记录。",
     "cartsShort": "车",

@@ -2131,6 +2131,25 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-129 `20260617000001_prod_cart_forming.sql`
+**用途**: Production Phase 2 M2.1 —— 成型录入改为**逐车**,直接挂到已有的 QC 车(`qc_drying_sub_lot`),把 生产↔QC 打通。
+
+**背景**: M1.2b 的平板成型是"扫工单 + 车号范围 + 汇总",更像事后报告。真实流程是逐车:每辆车有车贴(`sub_lot_code`,QC 建批次时生成)。系统已把"车"做成带条码的一等实体(`qc_drying_sub_lot`),但 Phase 2 另起炉灶用车号范围,两套平行。本期统一到那辆车上。
+
+**改动**:
+- **`prod_run` 加 `sub_lot_id`**(→ `qc_drying_sub_lot`)+ `WHERE sub_lot_id IS NOT NULL` 部分唯一索引(一辆车只一条成型 run,防重)。**成型一辆车 = 一条 `prod_run`**(`cart_from=cart_to=车序号`、`source='tablet'`、`operator_id` 空)。
+- **`prod_run_view` 重建**:`LEFT JOIN qc_drying_sub_lot` 补 `sub_lot_id`/`sub_lot_code`;BR-P1 的 10 个计算表达式与 M-125 **逐字一致**(md5 校验相同)。
+- **RPC `prod_find_cart_for_forming(p_code)`**(`SECURITY DEFINER`,授予 `anon`):扫车贴 → 解析 `qc_drying_sub_lot` →(**工单桥**)`qc_production_lot.work_order_barcode = prod_work_order.work_order_no` → `product_id` → `prod_product_master`,一次返回车 + 工单 + 产品 + 标准速率 + `already_formed`。平板(anon)无需直读 qc 表。
+
+**业务规则**:
+- **BR-P8** 成型逐车:一辆车一条 `prod_run`,`sub_lot_id` 直链 QC 车;产品与标准速率经**工单桥**(`prod_work_order → prod_product_master`)取得 —— 绕开两套产品主数据差异(`qc_product_sku.code` 为 `SKU-NNNN`,与 `prod_product_master.item_number` 不同,无法按码 join,但工单号一致即可);一辆车只一条成型 run。
+
+**设计取舍/依赖**: 工单桥靠 `work_order_barcode = work_order_no` 字符串匹配(运营约定:QC 建批次与 `prod_work_order` 用同一套工单号)。不匹配时降级(产出仍录、速率空)。不改 QC 建批次/车贴流程,不动 `qc_drying_sub_lot` schema(仅 `prod_run` 外链)。生产↔QC 由共享车天然打通。
+
+**前端配套**: `src/services/productionTabletApi.ts`(`findCartForForming` + `submitTabletRun` 带 `sub_lot_id`)、`src/pages/tablet/TabletApp.tsx`(生产页改逐车扫码)、`src/services/productionRunApi.ts`(`DailyReportRow` 加 `sub_lot_*`)、`src/pages/production/DailyReportPage.tsx`(「车号」列)、`src/locales/*/production.json`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2241,7 +2260,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-126 | 20260614000001_prod_tablet_device_attendance.sql |
 | M-127 | 20260615000001_prod_downtime_event.sql |
 | M-128 | 20260616000001_prod_run_cart_overlap_guard.sql |
-| **M-129** | _(下一个)_ |
+| M-129 | 20260617000001_prod_cart_forming.sql |
+| **M-130** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
