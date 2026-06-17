@@ -103,15 +103,44 @@ export async function clockOut(attendanceId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-// ── Production run (M1.2b) ────────────────────────────────────────────────────
+// ── Cart-by-cart forming (M2.1) ──────────────────────────────────────────────
+
+/** Resolved by scanning a cart sticker (sub_lot_code) — the cart + its work
+ *  order + forming product/rates (via the work-order bridge to prod_product_master). */
+export interface CartForming {
+  sub_lot_id: string;
+  sub_lot_code: string;
+  status: string;
+  seq: number | null;
+  work_order_barcode: string | null;
+  work_order_id: string | null;
+  product_id: string | null;
+  item_number: string | null;
+  description: string | null;
+  bone_avg: number | null;
+  pcs_lbs_per_hour: number | null;
+  runner_avg: number | null;
+  already_formed: boolean;
+}
+
+/** Scan a cart's barcode → cart + work order + product rates. Throws if not found. */
+export async function findCartForForming(code: string): Promise<CartForming> {
+  const { data, error } = await supabase.rpc('prod_find_cart_for_forming', { p_code: code.trim() });
+  if (error) throw new Error(error.message);
+  return data as CartForming;
+}
+
+// ── Production run (M1.2b / M2.1) ─────────────────────────────────────────────
 
 /** Hand-entered fields for a tablet run. Per-line/team: no operator (work hours
- *  come from attendance in M1.3), source='tablet', stamped with the device. */
+ *  come from attendance in M1.3), source='tablet', stamped with the device.
+ *  M2.1: a forming run is one cart — sub_lot_id links it to the QC cart. */
 export interface TabletRunInput {
   report_date: string;
   shift: Shift;
   machine_id: string;
   device_id: string;
+  sub_lot_id?: string | null;
   work_order_id?: string | null;
   product_id?: string | null;
   cart_from?: number | null;
@@ -131,6 +160,7 @@ export async function submitTabletRun(input: TabletRunInput): Promise<string> {
       shift: input.shift,
       machine_id: input.machine_id,
       device_id: input.device_id,
+      sub_lot_id: input.sub_lot_id ?? null,
       source: 'tablet',
       operator_id: null,            // team run — labor comes from attendance (M1.3)
       work_order_id: input.work_order_id ?? null,

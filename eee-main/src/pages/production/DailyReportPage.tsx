@@ -233,6 +233,7 @@ export default function DailyReportPage() {
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className={cn(th, 'text-left')}>{t('dailyReport.colMachine')}</th>
               <th className={cn(th, 'text-left')}>{t('dailyReport.colWorkOrder')}</th>
+              <th className={cn(th, 'text-left')}>{t('dailyReport.colCart')}</th>
               <th className={cn(th, 'text-left')}>{t('dailyReport.colItem')}</th>
               <th className={cn(th, 'text-left')}>{t('dailyReport.colDescription')}</th>
               <th className={cn(th, 'text-left')}>{t('dailyReport.colOperatorTeam')}</th>
@@ -250,6 +251,7 @@ export default function DailyReportPage() {
                   onClick={() => (canEdit ? openEdit(r) : undefined)}>
                 <td className={cn(td, 'font-medium whitespace-nowrap')}>{r.machine_code}</td>
                 <td className={cn(td, 'font-mono text-xs whitespace-nowrap')}>{r.work_order_no ?? r.work_order ?? '—'}</td>
+                <td className={cn(td, 'font-mono text-xs whitespace-nowrap')}>{r.sub_lot_code ?? '—'}</td>
                 <td className={cn(td, 'font-mono text-xs whitespace-nowrap')}>{r.item_number ?? '—'}</td>
                 <td className={cn(td, 'max-w-[220px] truncate')} title={r.item_description ?? ''}>
                   {r.item_description ?? '—'}
@@ -287,12 +289,12 @@ export default function DailyReportPage() {
               </tr>
             ))}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={11} className="px-4 py-12 text-center text-sm text-slate-400">
+              <tr><td colSpan={12} className="px-4 py-12 text-center text-sm text-slate-400">
                 {t('dailyReport.empty')}
               </td></tr>
             )}
             {loading && (
-              <tr><td colSpan={11} className="px-4 py-12 text-center text-sm text-slate-400">
+              <tr><td colSpan={12} className="px-4 py-12 text-center text-sm text-slate-400">
                 {t('dailyReport.loading')}
               </td></tr>
             )}

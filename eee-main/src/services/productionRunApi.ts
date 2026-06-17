@@ -27,6 +27,8 @@ export interface DailyReportRow {
   operator_id: string | null;
   badge_no: number | null;
   operator_name: string | null;
+  sub_lot_id: string | null;
+  sub_lot_code: string | null;
   work_order: string | null;
   cart_from: number | null;
   cart_to: number | null;
