@@ -264,11 +264,15 @@ function ProductionPanel({ session, date, shift }: PanelProps) {
   const [continuesPrev, setContinuesPrev] = useState(false);
   const [carry, setCarry] = useState<number | null>(null);
   const [runs, setRuns] = useState<DailyReportRow[]>([]);
+  const [onShiftCount, setOnShiftCount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
 
-  const load = () => { listTabletRuns(session.machine_id, date, shift).then(setRuns).catch((e) => setError(e.message)); };
+  const load = () => {
+    listTabletRuns(session.machine_id, date, shift).then(setRuns).catch((e) => setError(e.message));
+    listOnShift(session.machine_id, date, shift).then((a) => setOnShiftCount(a.length)).catch(() => {});
+  };
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [shift]);
 
   const reset = () => {
@@ -320,6 +324,9 @@ function ProductionPanel({ session, date, shift }: PanelProps) {
     <>
       {msg && <p className="text-emerald-700 bg-emerald-50 p-3 rounded-xl mb-4 text-sm">{msg}</p>}
       {error && <p className="text-red-600 bg-red-50 p-3 rounded-xl mb-4 text-sm">{error}</p>}
+      {onShiftCount === 0 && (
+        <p className="text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-xl mb-4 text-sm">{t('tablet.noAttendanceWarn')}</p>
+      )}
 
       <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5 space-y-4">
         <div>

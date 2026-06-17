@@ -91,7 +91,8 @@
     "required": "Required",
     "woScanPlaceholder": "Scan or type work order #",
     "woMatched": "✓ Work order matched — product filled in",
-    "woNotFound": "Work order not found — select product manually"
+    "woNotFound": "Work order not found — select product manually",
+    "teamRun": "Team"
   },
   "workOrder": {
     "title": "Work Orders",
@@ -186,6 +187,7 @@
     "submitRun": "Submit",
     "saving": "Saving…",
     "runSaved": "Run saved.",
+    "noAttendanceWarn": "No one is clocked in on this line this shift — clock in on the Attendance tab so hours can be attributed.",
     "shiftOutputTitle": "This shift's output",
     "noRuns": "No runs logged yet this shift.",
     "cartsShort": "carts",

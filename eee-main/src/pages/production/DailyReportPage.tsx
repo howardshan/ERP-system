@@ -233,7 +233,14 @@ export default function DailyReportPage() {
                   {r.item_description ?? '—'}
                 </td>
                 <td className={cn(td, 'whitespace-nowrap')}>
-                  <span className="text-slate-400 text-xs mr-1">{r.badge_no}</span>{r.operator_name}
+                  {r.operator_name ? (
+                    <><span className="text-slate-400 text-xs mr-1">{r.badge_no}</span>{r.operator_name}</>
+                  ) : r.source === 'tablet' ? (
+                    <span className="inline-flex items-center gap-1.5 text-slate-500">
+                      {t('dailyReport.teamRun')}
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold">TABLET</span>
+                    </span>
+                  ) : '—'}
                 </td>
                 <td className={cn(td, 'text-right tabular-nums')}>{fmt(r.output_qty, 0)}</td>
                 <td className={cn(td, 'text-right tabular-nums')}>{fmt(r.work_hours)}</td>
