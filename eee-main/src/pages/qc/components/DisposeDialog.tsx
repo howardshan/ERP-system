@@ -1,6 +1,6 @@
 import React, { FormEvent, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, AlertTriangle, Boxes, Thermometer, RotateCcw, Trash2 } from 'lucide-react';
+import { X, AlertTriangle, Boxes, Thermometer, RotateCcw } from 'lucide-react';
 import { createDispositionGroup, DispositionType } from '../../../services/qcApi';
 import { cn } from '../../../lib/utils';
 
@@ -68,14 +68,9 @@ const OPTIONS: OptionDef[] = [
     accent: 'blue',
     permKey: 'retest',
   },
-  {
-    value: 'scrap',
-    labelKey: 'disposeDialog.option.scrap.label',
-    descKey: 'disposeDialog.option.scrap.description',
-    icon: Trash2,
-    accent: 'red',
-    permKey: 'scrap',
-  },
+  // 'scrap' option removed per operator request (the option key + i18n strings
+  // are retained server-side and in the translation files in case it needs to
+  // be re-enabled later).
 ];
 
 export function DisposeDialog({ open, subLot, subLotIds, subLotCodes, championSubLotId, permissions, onClose, onDisposed }: Props) {
