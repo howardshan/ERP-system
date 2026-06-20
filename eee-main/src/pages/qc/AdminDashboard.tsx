@@ -20,7 +20,8 @@ type Panel = 'pending' | 'hold' | 'passed' | 'rate';
 const DISP_TYPES = [
   { value: 'rework' as const,     labelKey: 'adminDashboard.dispRework' },
   { value: 'grind' as const,      labelKey: 'adminDashboard.dispGrind' },
-  { value: 'scrap' as const,      labelKey: 'adminDashboard.dispScrap' },
+  // 'scrap' option removed per operator request (i18n key + backend RPC remain
+  // so historical data and the dispose_scrap_concession permission still work).
   { value: 'concession' as const, labelKey: 'adminDashboard.dispConcession' },
 ];
 
@@ -41,11 +42,11 @@ export default function AdminDashboard() {
   const [msg, setMsg] = useState('');
 
   const [selectedHold, setSelectedHold] = useState<SubLot | null>(null);
-  const [dispType, setDispType] = useState<'rework' | 'grind' | 'scrap' | 'concession'>('rework');
+  const [dispType, setDispType] = useState<'rework' | 'grind' | 'concession'>('rework');
   const [dispRemark, setDispRemark] = useState('');
 
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
-  const [bulkDispType, setBulkDispType] = useState<'rework' | 'grind' | 'scrap' | 'concession'>('rework');
+  const [bulkDispType, setBulkDispType] = useState<'rework' | 'grind' | 'concession'>('rework');
   const [bulkDispRemark, setBulkDispRemark] = useState('');
   const [busy, setBusy] = useState(false);
 
