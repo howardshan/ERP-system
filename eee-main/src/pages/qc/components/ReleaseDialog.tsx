@@ -22,11 +22,11 @@ interface Props {
   onReleased: () => void;
 }
 
-type Phase = 'yield' | 'pick_packaging' | 'no_packaging';
+type Phase = 'confirm' | 'pick_packaging' | 'no_packaging';
 
-// S4 release dialog. Collects yield → calls release → if back-end raises
-// PACKAGING_REQUIRED for one of the production_lots, switches to a picker
-// that fills packaging_item_id, then retries release. NO_PACKAGING_LINKED
+// Release dialog. M-139: no yield input — confirm releases directly. If the
+// back-end raises PACKAGING_REQUIRED for one of the production_lots, switches to
+// a picker that fills packaging_item_id, then retries release. NO_PACKAGING_LINKED
 // is a hard fail (operator must configure links in ProductManagement).
 export function ReleaseDialog({
   open,
@@ -38,8 +38,7 @@ export function ReleaseDialog({
   onReleased,
 }: Props) {
   const { t } = useTranslation('qc');
-  const [phase, setPhase] = useState<Phase>('yield');
-  const [yieldQty, setYieldQty] = useState('');
+  const [phase, setPhase] = useState<Phase>('confirm');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -52,8 +51,7 @@ export function ReleaseDialog({
 
   useEffect(() => {
     if (open) {
-      setPhase('yield');
-      setYieldQty('');
+      setPhase('confirm');
       setBusy(false);
       setError('');
       setPendingProductionLotId(null);
@@ -72,16 +70,16 @@ export function ReleaseDialog({
     : subLotCodes.length === 1 ? subLotCodes[0]
     : t('releaseDialog.codeSummaryMulti', { code: subLotCodes[0], count: subLotCodes.length });
 
-  // ── Phase: collect yield + submit release ────────────────────────────────
-  const doRelease = async (qty: number) => {
+  // ── Submit release (no yield — M-139) ────────────────────────────────────
+  const doRelease = async () => {
     setBusy(true);
     setError('');
     try {
-      await releasePassedSubLotsGroup(subLotIds, qty);
+      await releasePassedSubLotsGroup(subLotIds);
       onReleased();
     } catch (e) {
       if (e instanceof PackagingRequiredError) {
-        await loadPickerFor(e.productionLotId, qty);
+        await loadPickerFor(e.productionLotId);
       } else if (e instanceof NoPackagingLinkedError) {
         setMissingSkuId(e.skuId);
         setPhase('no_packaging');
@@ -93,18 +91,8 @@ export function ReleaseDialog({
     }
   };
 
-  const onYieldSubmit = (ev: FormEvent) => {
-    ev.preventDefault();
-    const n = Number(yieldQty);
-    if (!Number.isFinite(n) || n <= 0) {
-      setError(t('releaseDialog.errorYieldGtZero'));
-      return;
-    }
-    void doRelease(n);
-  };
-
   // ── Phase: load picker for the production_lot that needs packaging_item ──
-  const loadPickerFor = async (productionLotId: string, _yieldForRetry: number) => {
+  const loadPickerFor = async (productionLotId: string) => {
     setError('');
     try {
       const pl = await getProductionLotSku(productionLotId);
@@ -138,11 +126,6 @@ export function ReleaseDialog({
       setError(t('releaseDialog.errorSelectPackaging'));
       return;
     }
-    const qty = Number(yieldQty);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      setError(t('releaseDialog.errorYieldInvalid'));
-      return;
-    }
     setBusy(true);
     setError('');
     try {
@@ -153,10 +136,10 @@ export function ReleaseDialog({
       setPendingProductionLotId(null);
       setPendingItemChoices([]);
       setChosenItemId(null);
-      // Retry release with the same yield. If ANOTHER production_lot in the
-      // group also lacks a packaging_item_id, doRelease will catch a fresh
-      // PackagingRequiredError and flip us back to pick_packaging for that one.
-      await doRelease(qty);
+      // Retry release. If ANOTHER production_lot in the group also lacks a
+      // packaging_item_id, doRelease will catch a fresh PackagingRequiredError
+      // and flip us back to pick_packaging for that one.
+      await doRelease();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('releaseDialog.errorSavePackagingFailed'));
       setBusy(false);
@@ -195,45 +178,25 @@ export function ReleaseDialog({
             </p>
           )}
 
-          {phase === 'yield' && (
-            <form onSubmit={onYieldSubmit} className="space-y-3">
-              <label className="block">
-                <span className="text-sm font-medium text-slate-700">
-                  {t('releaseDialog.yieldLabel')} <span className="text-rose-600">*</span>
-                </span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={yieldQty}
-                  onChange={(e) => setYieldQty(e.target.value)}
-                  autoFocus
-                  disabled={busy}
-                  className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100"
-                  placeholder={t('releaseDialog.yieldPlaceholder')}
-                />
-                <span className="text-xs text-slate-500 mt-1 block">
-                  {t('releaseDialog.yieldHint')}{totalCarts > 1 && t('releaseDialog.yieldHintMulti', { count: totalCarts })}
-                </span>
-              </label>
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={busy}
-                  className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                >
-                  {t('releaseDialog.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
-                >
-                  {busy ? t('releaseDialog.releasing') : t('releaseDialog.release')}
-                </button>
-              </div>
-            </form>
+          {phase === 'confirm' && (
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={busy}
+                className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {t('releaseDialog.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void doRelease()}
+                disabled={busy}
+                className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium"
+              >
+                {busy ? t('releaseDialog.releasing') : t('releaseDialog.release')}
+              </button>
+            </div>
           )}
 
           {phase === 'pick_packaging' && (
@@ -260,7 +223,7 @@ export function ReleaseDialog({
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => setPhase('yield')}
+                  onClick={() => setPhase('confirm')}
                   disabled={busy}
                   className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >

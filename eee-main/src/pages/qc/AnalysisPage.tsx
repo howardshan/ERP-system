@@ -792,6 +792,7 @@ function CombinedMetricsChart({
       return byDate.get(d)!;
     };
     for (const r of dryRows) {
+      if (!r.date) continue;  // skip null-date rows (e.g. carts still drying, out_time NULL)
       const p = ensure(r.date);
       if (r.avg_dry_minutes != null) {
         p.values.avg_dry = r.avg_dry_minutes / 1440;  // express as days
@@ -799,6 +800,7 @@ function CombinedMetricsChart({
       }
     }
     for (const r of outRows) {
+      if (!r.date) continue;
       const p = ensure(r.date);
       p.values.pass = r.pass_count;
       p.values.fail = r.fail_count;
@@ -809,7 +811,7 @@ function CombinedMetricsChart({
         p.labels.pass_rate = `${r.pass_count}/${r.sub_lot_count}`;
       }
     }
-    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+    return Array.from(byDate.values()).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
   };
 
   const current  = build(dry, outcomes);

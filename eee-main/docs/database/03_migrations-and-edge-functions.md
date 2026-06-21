@@ -2254,6 +2254,102 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-137 `20260621000004_qc_sampling_method_2_middle_tail.sql`
+**用途**: 重定义抽样 **method_2** 并设为默认;**redry 保留原代表样**。
+
+**method_2 新规则**(从最大号往下,N=`sample_every_n_carts`):
+- 每 N 车一组,代表样取最大号。
+- 当尾部剩余车数 R 满足 `N < R < 2N` 时,把尾部**均分两组**:上半组(代表样取最大号)+ 下半组(代表样取下半组最大号 = 整条尾部「中间偏小」的那辆)。拆分点 = 最大号以下那些车的中位。
+- 例:T=10、N=3 → 第1组{10,9,8}→10、第2组{7,6,5}→7、第3组{4,3}→4、第4组{2,1}→2。
+
+**method_1 不变**(按 N 分块、余数单独成组、代表样取最大号)。**默认由 method_1 改为 method_2**(RPC 参数默认值 + 前端 `BulkCheckOutDialog`/`qcApi` 默认 + 单选框顺序)。
+
+**redry 规则**(与方法无关,全局):redry 的车**沿用其原组的代表样**(之前取哪辆 redry 后还取哪辆)—— 不重新分块、不按方法重选。每个原组一组,代表样 = 之前的 champion(在 Step 1 清除 `is_test_champion` 前先快照),仅当原 champion 不在被 redry 的车里时回退取最大号。
+
+**重构**: 组创建抽到 `qc__assign_test_group`(SECURITY INVOKER),fresh(Step 2a)与 redry(Step 2b)共用,避免逻辑漂移。
+
+**业务规则**: 见 [09_qc.md](../modules/09_qc.md) **BR-Q77**。
+
+**前端配套**: `src/lib/qcSampling.ts`(method_2 尾部均分,与 SQL 镜像)、`src/pages/qc/components/BulkCheckOutDialog.tsx`(默认 method_2、单选项顺序、redry 预览改为「保留原代表样、单组不分块」)、`src/services/qcApi.ts`(默认 method_2)、method2 标题/描述 i18n(en/zh/es)。
+
+---
+
+### M-138 `20260621000005_qc_submit_inspection_multi_test.sql`
+**用途**: **多测试项检测**——一次录入并提交一个产品的全部测试读数(如 Aw + MC%),全部录完才判定合格/不合格。
+
+**背景**: 一个 SKU 可配多个 `qc_inspection_template`(测试项),但旧 `qc_submit_inspection` 只收单个 `p_aw`、只取第一个模板,导致只按一项判定。
+
+**改动**(`CREATE OR REPLACE`,新增可选参数 `p_values jsonb`,签名向后兼容):
+- `p_values` = `{ "<template_id>": <numeric>, ... }`(按 `qc_inspection_template.id` 键)。给出时进入**多测试模式**:
+  - 该 SKU 的**每个**模板都必须有读数,否则 `RAISE`。
+  - 每项按各自 hard/soft 限分档;整体 `in_hard` = 全部在 hard、`in_soft` = 全部在 soft;`suggested` = 全部在 hard 才 pass。
+  - 主管越权闸沿用整体 `in_soft`(逻辑同 M-118)。
+  - `values_json` 存 `{ readings:{id:{item,value,unit,in_hard,in_soft,limits,soft_limits}}, suggested, in_hard, in_soft, aw }`(`aw` = 水活度项读数,供报表向后兼容)。
+- `p_values` 为空时走**旧单 `p_aw` 路径**,行为不变(批量提交)。
+
+**业务规则**: 见 [09_qc.md](../modules/09_qc.md) **BR-Q78**。
+
+**前端配套**: `src/services/qcApi.ts`(`inspectionTemplatesForSubLot` 加载全部模板 + `submitInspectionMulti`)、`src/pages/qc/TestingPage.tsx`(检测改为**可收起/展开的多测试卡片**,默认收起、任意顺序录入,全部录完才解锁 合格/不合格;`qc_overview` 计数无需改——champion 在全部录完提交前仍处 pending/inspecting)、看板「等待 Aw 结果」文案改为「等待结果」(`awaitingWaResult` en/zh/es)。
+
+---
+
+### M-139 `20260621000006_qc_release_yield_optional.sql`
+**用途**: 放行 yield 改为**可选**——放行对话框删掉「每车实际产出」输入,确认即放行。
+
+**背景**: 产出数量改到后续环节(如打包)再记;S4(M-116)强制 yield>0 不再需要。
+
+**改动**(`CREATE OR REPLACE`,签名不变):
+- `p_yield_quantity` 为 NULL/0 → 只把车次置 `closed`、写 `released` 事件,**跳过 `wh_sync_release_from_qc`**(不过账 ERP 数量)。
+- `p_yield_quantity` > 0 → 行为同 M-116(过账 ERP 余额,BR-W3)。
+- idempotent 短路(已 closed/dispatched = no-op)保留。
+
+**业务规则**: 见 [09_qc.md](../modules/09_qc.md) **BR-Q68 / BR-W3**(已更新为 yield 可选)。
+
+**前端配套**: `src/services/qcApi.ts`(`releasePassedSubLot` yield 可选、`releasePassedSubLotsGroup` 去掉 yield 参数)、`src/pages/qc/components/ReleaseDialog.tsx`(删除 yield 输入,初始相位改为 `confirm` 确认放行;PACKAGING_REQUIRED 选择器流程保留)。
+
+---
+
+### M-140 `20260621000007_qc_failed_open_any_disposition.sql`
+**用途**: 「今天不合格 · N 仍待处理」改为:**任意类型的后续处置**(retest/redry/room_temp/scrap/grind/concession/rework)都算已处理,不再只认 terminal 处置。
+
+**背景**: M-120 的 `failed_today_open` 只认 terminal 处置,操作员做了 `retest`(复检)后该 fail 仍显示「仍待处理」,但它早已从 Needs-Attention 列表消失 —— 两处口径不一致,令人困惑。
+
+**改动**(`CREATE OR REPLACE`,两函数均逐字复刻 M-120、仅去掉 `d.type IN (...)` 限制):
+- `qc_overview.failed_today_open`:后续存在**任意**处置即不计入 open(与 Needs-Attention 同口径)。
+- `qc_recent_failed_inspections` 的 `outcome` 标签:`disposed` = 后续存在任意处置。
+- retest 再次失败会产生新 fail 行,重新计为 open,指标自洽。
+
+**业务规则**: 见 [09_qc.md](../modules/09_qc.md) BR-Q69(已更新口径)。
+
+---
+
+### M-142 `20260621000009_qc_analysis_scope_by_activity.sql`
+**用途**: 修复数据分析页「首次检测」统计 —— 复烘车的首检 fail 只在日期范围「全部」显示、`月/周/日` 显示 0。
+
+**根因**: 线上 `qc_analysis_metrics` 的范围过滤只看 `out_time`(`NOT range_active OR out_time IN range`)。失败后被复烘的车 `out_time` 重置为 NULL(正在重新烘干),于是任何带日期的范围都把它排除,首检结果(fail)只有「全部」(无范围)才算进。与运营预期不符:首检结果应按**检测发生的时间**计,与是否在烘干房无关。
+
+**改动**(`CREATE OR REPLACE`,仅放宽范围谓词):cart 在范围内的判定改为 `out_time / in_time / 检测 submitted_at / 处置 created_at` **任一在范围内**。`avg_dry_minutes` 仍 `WHERE out_time IS NOT NULL`,干燥时间统计不受影响。验证:`月` 范围 `first_fail_count` 由 0 → 2。
+
+**前端配套**: `src/pages/qc/AnalysisPage.tsx` —— `CombinedMetricsChart` 的 `build()` 跳过 `date=NULL` 的序列行并空安全排序,修复点「不合格」开启图表时 `null.localeCompare` 崩溃白屏(复烘车 out_time=NULL 产生空日期行)。
+
+---
+
+### M-143 `20260621000010_qc_analysis_outcomes_by_inspection_date.sql`
+**用途**: 修复「Daily trend」图表与「按工单」明细仍显示 fail=0(磁贴 M-142 已修但这两个 RPC 没修)。
+
+**根因**: `qc_analysis_outcomes_daily` / `qc_analysis_outcomes_by_work_order` 整个按 `out_time` 取数**并按 out_time 定日期**。复烘车 `out_time=NULL` → 不计入、也无法落在检测当天。
+
+**改动**: 两 RPC 改为按 sku/lot/dryer 取 scope(不再 out_time 门槛)、按**首检 `submitted_at` 定日期/范围**。结果与磁贴一致(06-21 fail=2/pass=5)。附带:首检都有 submitted_at,不再产生空日期行。
+
+### M-144 `20260621000011_qc_recovery_detail_group_result.sql`
+**用途**: 返工(重新烘干/复检/常温)详情面板「复检结果」让**非 champion 车继承同组 champion 的结果**。
+
+**根因**: `qc_analysis_recovery_detail` 的 `next_result`/`next_aw`/`dwell` 只查该车自己处置后的下一次检测。复烘的非 champion(如 test001-003,champion 是 004)自己没检测 → 显示「待定」,而 004 显示「不合格」。
+
+**改动**: 用 `LEFT JOIN LATERAL` 取「该车自己 OR 同组 champion」处置后最早的检测作为复检结果;并把范围过滤从 out_time-only 放宽为活动任一在范围内。验证:test001-003 01:41 那次处置现继承 champion 结果 `fail`/`aw 0.6`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2372,7 +2468,15 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-134 | 20260621000001_qc_packaging_optional_at_creation.sql · 建车 `packaging_item_id` 改回可选(撤销 S4 §5.6),留空时 ERP 批次放行时懒建 |
 | M-135 | 20260621000002_qc_bulk_checkin_atomic_capacity.sql · 批量入仓容量校验改全有或全无(超容整批拒绝 `OVER_CAPACITY`,不再静默部分填充) |
 | M-136 | 20260621000003_qc_move_dryer_atomic_capacity.sql · 移房容量校验改全有或全无(超容整批拒绝,同 M-135) |
-| **M-137** | _(下一个)_ |
+| M-137 | 20260621000004_qc_sampling_method_2_middle_tail.sql · 重定义 method_2(尾部均分、下半组取中间偏小)并设默认;redry 保留原代表样;抽组逻辑抽成 `qc__assign_test_group` |
+| M-138 | 20260621000005_qc_submit_inspection_multi_test.sql · 多测试项检测(`qc_submit_inspection` 加 `p_values jsonb`,全部测试项录完才判定;整体 hard/soft 分档) |
+| M-139 | 20260621000006_qc_release_yield_optional.sql · 放行 yield 可选(删掉每车产出输入;空 yield 不过账 ERP 数量) |
+| M-140 | 20260621000007_qc_failed_open_any_disposition.sql · 「仍待处理」改为任意处置即算已处理(对齐 Needs-Attention 口径) |
+| M-141 | 20260621000008_qc_redry_resample_when_split.sql · 复烘车非同批同房则用 method_2 重取样(否则保留原代表样);重取样新代表样的样品号仍加 R |
+| M-142 | 20260621000009_qc_analysis_scope_by_activity.sql · 分析页范围过滤改为「出库/入库/检测/处置任一在范围内」即计入(修复复烘车 out_time=NULL 导致首检 fail 只在「全部」显示) |
+| M-143 | 20260621000010_qc_analysis_outcomes_by_inspection_date.sql · 日趋势图/按工单明细改为按「首检时间」取数定日期(原按 out_time,复烘车 out_time=NULL 导致图表/明细 fail=0) |
+| M-144 | 20260621000011_qc_recovery_detail_group_result.sql · 返工详情「复检结果」非 champion 车继承同组 champion 结果 + 范围过滤放宽 |
+| **M-145** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

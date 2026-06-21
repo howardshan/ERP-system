@@ -23,18 +23,23 @@ export interface PlannedGroup<T> {
  * @param method    'method_1' (chunk-by-N, remainder solo) or 'method_2'
  *                  (merge remainder into the last big group).
  *
- * Algorithm (mirrors the SQL exactly):
- *   T = ascCarts.length, N = max(1, sampleN), R = T mod N.
- *   Work in **descending** order (highest cart first).
+ * Algorithm (mirrors the SQL exactly). Work in **descending** order
+ * (highest cart first); N = max(1, sampleN).
  *
- *   Method 1, or Method 2 with R==0 / T<=N:
+ *   Method 1:
  *     Chunk every N carts from the top; remainder is its own group.
  *     Champion = first item of each chunk (= highest sub_lot_code).
  *
- *   Method 2 with R>0 and T>N:
- *     First `floor(T/N) - 1` chunks of N (champion = highest in chunk).
- *     Last chunk of `N + R` carts (champion = the "middle-large" one,
- *     i.e. ascending position floor(K/2)+1, 1-indexed).
+ *   Method 2 (default):
+ *     Chunk every N from the top (champion = highest), EXCEPT when the
+ *     remaining count R of the tail satisfies N < R < 2N. Then split the tail
+ *     EVENLY into an upper group (champion = highest) and a lower group
+ *     (champion = highest of the lower half = the middle, smaller-if-two cart).
+ *     e.g. T=10, N=3 → 第1组{10,9,8}→10, 第2组{7,6,5}→7,
+ *                      第3组{4,3}→4,      第4组{2,1}→2.
+ *
+ * NOTE: redry buckets do NOT use this planner — they keep the original
+ * champion (see BulkCheckOutDialog + qc_check_out_sub_lots_bulk Step 2b).
  */
 export function planSamplingGroups<T extends { sub_lot_code: string }>(
   ascCarts: T[],
@@ -45,7 +50,6 @@ export function planSamplingGroups<T extends { sub_lot_code: string }>(
   if (T === 0) return [];
 
   const N = Math.max(1, sampleN | 0);
-  const R = T % N;
 
   // Work in descending order: highest sub_lot_code first.
   const desc = ascCarts.slice().sort((a, b) =>
@@ -54,25 +58,27 @@ export function planSamplingGroups<T extends { sub_lot_code: string }>(
 
   const groups: PlannedGroup<T>[] = [];
 
-  if (method === 'method_2' && T > N && R > 0) {
-    // Method 2: merge remainder into the last (lowest-numbered) chunk.
-    const fullChunks = Math.floor(T / N) - 1;
-
-    for (let i = 0; i < fullChunks; i++) {
-      const members = desc.slice(i * N, (i + 1) * N);
-      // Champion = first element of the descending chunk = highest in chunk.
+  if (method === 'method_2') {
+    // Chunk by N (champion = highest). When the tail's remaining count R is
+    // N < R < 2N, split the tail evenly into an upper group (champion = highest)
+    // and a lower group (champion = highest of the lower half = the middle,
+    // smaller-if-two, cart of the tail). Split point = middle of the carts below
+    // the top one.
+    let i = 0;
+    while (i < T) {
+      const remaining = T - i;
+      if (remaining > N && remaining < 2 * N) {
+        const split = (i + 1) + Math.floor((remaining - 1) / 2);   // 0-based split index
+        groups.push({ members: desc.slice(i, split), championIndex: 0 });
+        groups.push({ members: desc.slice(split, T), championIndex: 0 });
+        break;
+      }
+      const members = desc.slice(i, Math.min(i + N, T));
       groups.push({ members, championIndex: 0 });
+      i += N;
     }
-
-    const tail = desc.slice(fullChunks * N, T);  // last big chunk, length N+R
-    const K = tail.length;
-    // Champion = ascending position floor(K/2)+1 (1-indexed).
-    //          = descending position (K - floor(K/2)) (1-indexed)
-    //          = descending index   (K - floor(K/2) - 1) (0-indexed).
-    const championIndex = K - Math.floor(K / 2) - 1;
-    groups.push({ members: tail, championIndex });
   } else {
-    // Method 1, or Method 2 with R==0 / T<=N: chunk by N, remainder solo.
+    // Method 1: chunk by N, remainder solo, champion = highest in each.
     for (let i = 0; i < T; i += N) {
       const members = desc.slice(i, Math.min(i + N, T));
       groups.push({ members, championIndex: 0 });
