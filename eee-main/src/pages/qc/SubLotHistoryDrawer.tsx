@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, MapPin, FlaskConical, ClipboardCheck, Thermometer, Activity } from 'lucide-react';
-import { subLotFullHistory, formatQcDateTime, SubLotFullHistory } from '../../services/qcApi';
+import { subLotFullHistory, formatQcDateTime, SubLotFullHistory, InspectionReading } from '../../services/qcApi';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -29,6 +29,25 @@ function fmtMin(m: number | null | undefined): string {
   const h = Math.floor(v / 60);
   const r = v % 60;
   return r === 0 ? `${h}h` : `${h}h ${r}m`;
+}
+
+/**
+ * M-146: turn a multi-test `readings` array into a single human-readable line.
+ * Single-reading rows fall back to the compact `<unit> <value>` form (e.g.
+ * "Aw 0.6") so legacy inspections look the same as before. Multi-reading rows
+ * use `<item_name>: <value> <unit>` per entry, joined by ", ".
+ * Returns null when there are no readings — caller can fall back to plain Aw.
+ */
+function formatReadings(readings: InspectionReading[] | undefined): string | null {
+  if (!readings || readings.length === 0) return null;
+  const piece = (r: InspectionReading, multi: boolean) => {
+    const v = r.value ?? '—';
+    if (!multi && r.unit) return `${r.unit} ${v}`;       // compact: "Aw 0.6"
+    if (r.unit === '%') return `${r.item_name}: ${v}%`;  // suffix-style for %
+    if (r.unit) return `${r.item_name}: ${v} ${r.unit}`; // "Water Activity: 0.6 Aw"
+    return `${r.item_name}: ${v}`;
+  };
+  return readings.map(r => piece(r, readings.length > 1)).join(', ');
 }
 
 export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
@@ -59,18 +78,29 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
       });
     }
     for (const s of data.samples) {
+      const readings = formatReadings(s.readings);
+      const resultLine = s.status === 'voided'
+        ? t('subLotHistoryDrawer.voided')
+        : s.result
+          ? readings
+            ? t('subLotHistoryDrawer.resultReadings', { result: s.result.toUpperCase(), readings })
+            : t('subLotHistoryDrawer.resultAw', { result: s.result.toUpperCase(), aw: s.aw ?? '—' })
+          : t('subLotHistoryDrawer.pendingResult');
       items.push({
         ts: s.taken_at,
         kind: 'sample',
         title: t('subLotHistoryDrawer.sampleTaken', { sampleId: s.sample_id }),
-        description: s.status === 'voided' ? t('subLotHistoryDrawer.voided') : s.result ? t('subLotHistoryDrawer.resultAw', { result: s.result.toUpperCase(), aw: s.aw ?? '—' }) : t('subLotHistoryDrawer.pendingResult'),
+        description: resultLine,
       });
     }
     for (const ir of data.inspections) {
+      const readings = formatReadings(ir.readings);
       items.push({
         ts: ir.submitted_at,
         kind: 'inspection',
-        title: t('subLotHistoryDrawer.inspectionResult', { result: ir.result.toUpperCase(), aw: ir.aw ?? '—' }),
+        title: readings
+          ? t('subLotHistoryDrawer.inspectionResultReadings', { result: ir.result.toUpperCase(), readings })
+          : t('subLotHistoryDrawer.inspectionResult', { result: ir.result.toUpperCase(), aw: ir.aw ?? '—' }),
         description: [ir.sample_id ? t('subLotHistoryDrawer.sampleLabel', { sampleId: ir.sample_id }) : null, ir.remark ? t('subLotHistoryDrawer.remarkLabel', { remark: ir.remark }) : null]
           .filter(Boolean).join(' · ') || undefined,
       });
