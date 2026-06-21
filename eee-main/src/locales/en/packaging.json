@@ -31,5 +31,23 @@
     "dispatchPermissionTitle": "Missing packaging.outbound.dispatch permission",
     "dispatching": "Dispatching…",
     "dispatch": "Dispatch"
+  },
+  "packing": {
+    "enter": "Packing mode",
+    "title": "Packing Mode",
+    "stepScanWo": "Scan the work order QR to begin",
+    "woLabel": "Work order",
+    "changeWo": "Change WO",
+    "exit": "Exit",
+    "waitingWo": "Waiting for work order scan…",
+    "keepScanning": "Keep scanning cart QR codes",
+    "woCaptured": "Work order captured",
+    "alreadyScanned": "Already scanned",
+    "notFound": "Cart not found",
+    "dispatched": "Dispatched",
+    "dispatchFailed": "Dispatch failed",
+    "dispatchedCount": "{{count}} dispatched",
+    "cameraError": "Cannot access camera",
+    "cameraHint": "Allow camera access and use HTTPS or localhost."
   }
 }

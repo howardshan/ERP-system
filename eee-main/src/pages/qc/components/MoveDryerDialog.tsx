@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ArrowRightLeft, AlertTriangle } from 'lucide-react';
-import { moveSubLotsDryer, MoveDryerResult, SubLot } from '../../../services/qcApi';
+import { moveSubLotsDryer, MoveDryerResult, SubLot, listDryRooms } from '../../../services/qcApi';
+import { ErrorDialog } from './ErrorDialog';
 
 interface Props {
   open: boolean;
@@ -11,22 +12,30 @@ interface Props {
   onSuccess: (result: MoveDryerResult) => void;
 }
 
-/** All dryers 1..5 except the current one. */
-const ALL_DRYERS = [1, 2, 3, 4, 5];
-
 export function MoveDryerDialog({
   open, selectedSubLots, currentDryer, onClose, onSuccess,
 }: Props) {
   const { t } = useTranslation('qc');
-  const otherDryers = ALL_DRYERS.filter(d => d !== currentDryer);
-  const [target, setTarget] = useState<number | null>(otherDryers[0] ?? null);
+  // Dryers are data-driven (qc_dry_room) — reflects however many rooms exist now.
+  const [allDryers, setAllDryers] = useState<number[]>([]);
+  const [target, setTarget] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [capacityError, setCapacityError] = useState<string | null>(null);
+
+  const otherDryers = allDryers.filter(d => d !== currentDryer);
 
   useEffect(() => {
     if (open) {
-      setTarget(otherDryers[0] ?? null);
       setError('');
+      listDryRooms()
+        .then(rooms => {
+          const nums = rooms.map(r => r.dryer_number).sort((a, b) => a - b);
+          setAllDryers(nums);
+          const others = nums.filter(d => d !== currentDryer);
+          setTarget(others[0] ?? null);
+        })
+        .catch(() => { setAllDryers([]); setTarget(null); });
     }
   }, [open, currentDryer]);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -46,12 +55,21 @@ export function MoveDryerDialog({
       setBusy(false);
       onSuccess(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('moveDryerDialog.moveFailed'));
+      const raw = e instanceof Error ? e.message : '';
+      // Capacity is all-or-nothing (M-136): nothing moved. Show a clear prompt and
+      // keep the dialog open so the operator can pick another dryer or re-select.
+      const m = raw.match(/OVER_CAPACITY\|free=([\d.]+)\|need=([\d.]+)\|carts=(\d+)/);
+      if (m) {
+        setCapacityError(t('moveDryerDialog.overCapacity', { free: m[1], need: m[2], carts: m[3] }));
+      } else {
+        setError(raw || t('moveDryerDialog.moveFailed'));
+      }
       setBusy(false);
     }
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <button
         type="button"
@@ -79,7 +97,7 @@ export function MoveDryerDialog({
           <p className="text-xs text-slate-500">
             {t('moveDryerDialog.descriptionBefore')}<code className="font-mono">drying</code>{t('moveDryerDialog.descriptionAfter')}
           </p>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-2 max-h-56 overflow-auto">
             {otherDryers.map(d => (
               <button
                 key={d}
@@ -123,5 +141,13 @@ export function MoveDryerDialog({
         </footer>
       </div>
     </div>
+
+    <ErrorDialog
+      open={!!capacityError}
+      title={t('errorDialog.capacityTitle')}
+      message={capacityError ?? ''}
+      onClose={() => setCapacityError(null)}
+    />
+    </>
   );
 }

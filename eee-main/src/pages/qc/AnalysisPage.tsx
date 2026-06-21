@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { BarChart3, ChevronRight, Filter, RefreshCw, X } from 'lucide-react';
 import {
   listProducts,
+  listDryRooms,
   listProductionLots,
   analysisMetrics,
   analysisRecoveryDetail,
@@ -77,6 +78,8 @@ export default function AnalysisPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [lots, setLots] = useState<ProductionLot[]>([]);
 
+  const [dryerNums, setDryerNums] = useState<number[]>([]);
+
   const [skuId, setSkuId] = useState<string>('');
   const [dryer, setDryer] = useState<string>('');
   const [lotId, setLotId] = useState<string>('');
@@ -111,8 +114,11 @@ export default function AnalysisPage() {
   const [combinedDayDetailLoading, setCombinedDayDetailLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all([listProducts(), listProductionLots()])
-      .then(([ps, ls]) => { setProducts(ps); setLots(ls); })
+    Promise.all([listProducts(), listProductionLots(), listDryRooms()])
+      .then(([ps, ls, rooms]) => {
+        setProducts(ps); setLots(ls);
+        setDryerNums(rooms.map(r => r.dryer_number).sort((a, b) => a - b));
+      })
       .catch(e => setError(e.message));
   }, []);
 
@@ -343,7 +349,7 @@ export default function AnalysisPage() {
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             >
               <option value="">{t('analysisPage.allDryers')}</option>
-              {[1, 2, 3, 4, 5].map(d => (
+              {dryerNums.map(d => (
                 <option key={d} value={d}>{t('analysisPage.dryer', { n: d })}</option>
               ))}
             </select>
@@ -786,6 +792,7 @@ function CombinedMetricsChart({
       return byDate.get(d)!;
     };
     for (const r of dryRows) {
+      if (!r.date) continue;  // skip null-date rows (e.g. carts still drying, out_time NULL)
       const p = ensure(r.date);
       if (r.avg_dry_minutes != null) {
         p.values.avg_dry = r.avg_dry_minutes / 1440;  // express as days
@@ -793,6 +800,7 @@ function CombinedMetricsChart({
       }
     }
     for (const r of outRows) {
+      if (!r.date) continue;
       const p = ensure(r.date);
       p.values.pass = r.pass_count;
       p.values.fail = r.fail_count;
@@ -803,7 +811,7 @@ function CombinedMetricsChart({
         p.labels.pass_rate = `${r.pass_count}/${r.sub_lot_count}`;
       }
     }
-    return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+    return Array.from(byDate.values()).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
   };
 
   const current  = build(dry, outcomes);

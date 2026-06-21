@@ -1,4 +1,9 @@
 {
+  "errorDialog": {
+    "title": "Error",
+    "capacityTitle": "Not enough room",
+    "ok": "OK"
+  },
   "adminDashboard": {
     "dispRework": "Rework",
     "dispGrind": "Grind & re-line",
@@ -111,7 +116,17 @@
     "errDisplayNameRequired": "Display name is required",
     "createFailed": "Create failed",
     "updateFailed": "Update failed",
-    "deleteFailed": "Delete failed"
+    "deleteFailed": "Delete failed",
+    "roomSubtitle": "Manage dry rooms and their cart capacity.",
+    "addRoom": "Add dry room",
+    "newRoom": "New dry room",
+    "capacity": "Capacity (carts)",
+    "errCapacityMin": "Capacity must be 0 or more.",
+    "roomAdded": "Dry room {{num}} added.",
+    "roomUpdated": "Capacity updated.",
+    "roomDeleted": "Dry room {{num}} deleted.",
+    "confirmDeleteRoom": "Delete dry room {{num}}?",
+    "roomCount": "{{count}} dry rooms"
   },
   "lotDetail": {
     "checkedInMsg": "Checked in — sub-lot status: Drying",
@@ -341,7 +356,9 @@
     "cancel": "Cancel",
     "checkingIn": "Checking in…",
     "confirmCheckInCount": "Confirm — check in {{count}}",
-    "bulkCheckInFailed": "Bulk check-in failed"
+    "bulkCheckInFailed": "Bulk check-in failed",
+    "timeout": "Request timed out — nothing was checked in. Check your connection and try again.",
+    "overCapacity": "This dryer has only {{free}} space left, but you selected {{carts}} cart(s) ({{need}} units). Nothing was checked in — cancel and select fewer carts, or move some out first."
   },
   "bulkCheckOutDialog": {
     "close": "Close",
@@ -349,8 +366,8 @@
     "cartsToTestingQueue": "{{count}} cart(s) → Testing queue",
     "method1Title": "Method 1 · Chunk by N",
     "method1Description": "Every N carts make a group; any leftover becomes its own group. Champion = highest cart number in each group.",
-    "method2Title": "Method 2 · Merge remainder",
-    "method2Description": "Same as Method 1, but if a remainder exists the leftover folds into the last group and its champion shifts to the middle-large cart.",
+    "method2Title": "Method 2 · Middle tail (default)",
+    "method2Description": "Chunk by N from the top (champion = highest). When the final stretch has between N and 2N carts left, split it into the highest cart (alone) plus the rest, whose champion is the middle cart (the smaller one if two). e.g. 10 carts, N=3 → 10, 7, 4, 2.",
     "mixedSelection": "Mixed selection",
     "newCarts": "new cart(s)",
     "and": "and",
@@ -560,7 +577,8 @@
     "cancel": "Cancel",
     "moving": "Moving…",
     "moveTo": "Move to Dryer {{n}}",
-    "moveFailed": "Move failed"
+    "moveFailed": "Move failed",
+    "overCapacity": "This dryer has only {{free}} space left, but you selected {{carts}} cart(s) ({{need}} units). Nothing was moved — pick another dryer or select fewer carts."
   },
   "permissionDenied": {
     "title": "No access",
@@ -604,7 +622,8 @@
     "skuCode": "SKU code",
     "autoPlaceholder": "Auto",
     "skuCodeHint": "Leave blank to auto-generate a SKU code.",
-    "productName": "Product name"
+    "productName": "Product name",
+    "unitsPerCart": "Units per cart"
   },
   "production": {
     "errNoPermission": "You do not have permission to create production batches.",
@@ -660,8 +679,8 @@
     "testingPipelineHelp": "Carts moving through QC testing — awaiting a sample, awaiting a water-activity result, and today's pass/fail counts.",
     "awaitingSample": "Awaiting sample",
     "awaitingSampleHelp": "Carts that have finished drying and are waiting for a sample to be pulled for testing.",
-    "awaitingWaResult": "Awaiting Aw result",
-    "awaitingWaResultHelp": "Samples that have been pulled and are waiting for a water-activity (Aw) reading.",
+    "awaitingWaResult": "Awaiting results",
+    "awaitingWaResultHelp": "Samples that have been pulled and are waiting for test results — every configured test must be entered before pass/fail.",
     "passedTodayLabel": "Passed today ({{pct}}%)",
     "passedToday": "Passed today",
     "passedTodayHelp": "Inspections that passed today. Click to see the most recent passed inspections.",
@@ -803,6 +822,9 @@
     "hard": "Hard",
     "headerTesting": "Testing",
     "measureTitle": "Measure {{item}}",
+    "measureMultiTitle": "Enter test results",
+    "testsProgress": "{{done}} / {{total}} tests done",
+    "completeAllTests": "Complete every test before judging pass or fail",
     "nothingToTest": "Nothing to test.",
     "optional": "(optional)",
     "outBandHint": "Reading is outside soft tolerance — must FAIL (no one can override).",

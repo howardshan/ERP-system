@@ -1,17 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { CheckCircle2, XCircle, FlaskConical, History, RotateCcw, Hourglass, Users, LayoutDashboard, ListChecks } from 'lucide-react';
+import { CheckCircle2, XCircle, FlaskConical, History, RotateCcw, Hourglass, Users, LayoutDashboard, ListChecks, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import TestingDashboard from './TestingDashboard';
 import {
   listPendingInspections,
-  inspectionTemplateForSubLot,
+  inspectionTemplatesForSubLot,
   takeSample,
-  submitInspection,
+  submitInspectionMulti,
   listSamplesForSubLot,
   getGroupMembers,
   formatQcDateTime,
   Sample,
   SubLot,
+  TestTemplateLimits,
 } from '../../services/qcApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { NumericKeypad } from './components/NumericKeypad';
@@ -217,21 +218,14 @@ function TestWorkflow({
   const [phase, setPhase] = useState<Phase>('idle');
   const [activeSample, setActiveSample] = useState<Sample | null>(null);
   const [allSamples, setAllSamples] = useState<Sample[]>([]);
-  const [limits, setLimits] = useState<{
-    item_name: string;
-    lower_limit: number;
-    upper_limit: number;
-    soft_lower_limit: number;
-    soft_upper_limit: number;
-  } | null>(null);
-  const [aw, setAw] = useState('');
+  // M-138: a SKU can have several tests (e.g. Aw + MC%). Load them all; the
+  // operator enters a reading per test (any order, collapsible cards) and may
+  // only pick PASS/FAIL once every test has a reading.
+  const [templates, setTemplates] = useState<TestTemplateLimits[]>([]);
+  const [readings, setReadings] = useState<Record<string, string>>({});  // template id → raw input
+  const [expandedId, setExpandedId] = useState<string | null>(null);     // open card (default all collapsed)
   const [busy, setBusy] = useState(false);
-  const [judged, setJudged] = useState<'pass' | 'fail' | null>(null);      // system suggestion (reference)
-  const [decision, setDecision] = useState<'pass' | 'fail' | null>(null);  // operator's final call
-  // M-118: which band the current reading sits in. 'hard' = auto pass,
-  // 'soft' = supervisor decides, 'out' = forced FAIL. null = no reading or
-  // no template loaded yet.
-  const [band, setBand] = useState<'hard' | 'soft' | 'out' | null>(null);
+  const [decision, setDecision] = useState<'pass' | 'fail' | null>(null); // operator's final call (overall)
   const [remark, setRemark] = useState('');
   const [finalResult, setFinalResult] = useState<'pass' | 'fail' | null>(null);
   const [groupMembers, setGroupMembers] = useState<Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>>([]);
@@ -245,10 +239,10 @@ function TestWorkflow({
     }
   }, [subLot.test_group_id]);
 
-  // Load template + existing samples
+  // Load templates + existing samples
   useEffect(() => {
-    inspectionTemplateForSubLot(subLot.id)
-      .then(d => setLimits(d.template))
+    inspectionTemplatesForSubLot(subLot.id)
+      .then(d => setTemplates(d.templates))
       .catch(e => onError(e.message));
     listSamplesForSubLot(subLot.id)
       .then(rows => {
@@ -265,26 +259,37 @@ function TestWorkflow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subLot.id]);
 
-  // M-118: live three-band classification.
-  // - Reading in hard range → auto PASS (operator default; supervisor may flip)
-  // - Reading in soft band  → supervisor must explicitly pick PASS or FAIL
-  // - Reading outside soft  → forced FAIL (Pass button is disabled for everyone)
+  // M-138: per-test band + overall verdict across all tests.
+  const bandOf = (raw: string | undefined, tmpl: TestTemplateLimits): 'hard' | 'soft' | 'out' | null => {
+    if (raw == null || raw === '') return null;
+    const v = parseFloat(raw);
+    if (!Number.isFinite(v)) return null;
+    if (v >= tmpl.lower_limit && v <= tmpl.upper_limit) return 'hard';
+    if (v >= tmpl.soft_lower_limit && v <= tmpl.soft_upper_limit) return 'soft';
+    return 'out';
+  };
+
+  const { allEntered, overallBand } = useMemo(() => {
+    if (templates.length === 0) return { allEntered: false, overallBand: null as 'hard' | 'soft' | 'out' | null };
+    const bands = templates.map(t => bandOf(readings[t.id], t));
+    const entered = bands.every(b => b !== null);
+    let ob: 'hard' | 'soft' | 'out' | null = null;
+    if (entered) ob = bands.includes('out') ? 'out' : bands.includes('soft') ? 'soft' : 'hard';
+    return { allEntered: entered, overallBand: ob };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates, readings]);
+
+  const judged: 'pass' | 'fail' | null = overallBand ? (overallBand === 'hard' ? 'pass' : 'fail') : null;
+
+  // Default decision once every test has a reading: hard → pass, out → forced
+  // fail, soft → unset (supervisor consciously decides).
   useEffect(() => {
     if (phase !== 'measure') return;
-    if (!aw) { setJudged(null); setDecision(null); setBand(null); return; }
-    const v = parseFloat(aw);
-    if (!Number.isFinite(v) || !limits) { setJudged(null); setBand(null); return; }
-    const inHard = v >= limits.lower_limit      && v <= limits.upper_limit;
-    const inSoft = v >= limits.soft_lower_limit && v <= limits.soft_upper_limit;
-    const sug: 'pass' | 'fail' = inHard ? 'pass' : 'fail';
-    setJudged(sug);
-    setBand(inHard ? 'hard' : inSoft ? 'soft' : 'out');
-    // Default decision: hard → pass, out → fail (forced), soft → unset so
-    // supervisor consciously picks one (no silent default in the discretion zone).
-    if (inHard) setDecision('pass');
-    else if (!inSoft) setDecision('fail');
+    if (!allEntered) { setDecision(null); return; }
+    if (overallBand === 'hard') setDecision('pass');
+    else if (overallBand === 'out') setDecision('fail');
     else setDecision(null);
-  }, [aw, limits, phase]);
+  }, [allEntered, overallBand, phase]);
 
   const handleTakeSample = async () => {
     setBusy(true);
@@ -305,18 +310,19 @@ function TestWorkflow({
   };
 
   const handleRedo = () => {
-    // Clear the WA reading so the operator can re-enter without losing the sample.
-    setAw('');
-    setJudged(null);
+    // Clear all readings so the operator can re-enter without losing the sample.
+    setReadings({});
     setDecision(null);
+    setExpandedId(templates[0]?.id ?? null);
   };
 
   const handleConfirm = async () => {
-    if (!activeSample || !aw || !decision) return;
+    if (!activeSample || !allEntered || !decision) return;
     setBusy(true);
     try {
-      const v = parseFloat(aw);
-      const res = await submitInspection(subLot.id, v, activeSample.id, decision, remark.trim() || null);
+      const values: Record<string, number> = {};
+      for (const tmpl of templates) values[tmpl.id] = parseFloat(readings[tmpl.id]);
+      const res = await submitInspectionMulti(subLot.id, values, activeSample.id, decision, remark.trim() || null);
       setFinalResult(res.result as 'pass' | 'fail');
       setPhase('done');
     } catch (e) {
@@ -437,54 +443,78 @@ function TestWorkflow({
       })()}
 
       {/* Step 2: enter reading → system suggests → operator decides + remark */}
-      {phase === 'measure' && activeSample && (
-        <Step number={2} title={t('testingPage.measureTitle', { item: limits?.item_name ?? t('testingPage.waterActivity') })} active>
+      {phase === 'measure' && activeSample && (() => {
+        const doneCount = templates.filter(t => bandOf(readings[t.id], t) !== null).length;
+        const hasTmpl = templates.length > 0;
+        const passDisabled = !allEntered || (hasTmpl && (overallBand === 'out' || (overallBand === 'soft' && !canSupervise)));
+        const failDisabled = !allEntered || (hasTmpl && !canSupervise && overallBand !== 'out');
+        return (
+        <Step number={2} title={t('testingPage.measureMultiTitle')} active>
           <div className="flex items-center gap-3 mb-3 flex-wrap">
             <span className="text-[11px] text-slate-500">{t('testingPage.sample')}</span>
             <code className="text-xs font-mono font-bold text-slate-900">{activeSample.sample_id}</code>
-            {limits && (
-              <>
-                <span className="text-[11px] text-slate-400">·</span>
-                <span className="text-[11px] text-slate-500">
-                  {t('testingPage.hard')} <code className="font-mono text-emerald-700">[{limits.lower_limit}, {limits.upper_limit}]</code>
-                </span>
-                {(limits.soft_lower_limit < limits.lower_limit || limits.soft_upper_limit > limits.upper_limit) && (
-                  <span className="text-[11px] text-slate-500">
-                    {t('testingPage.soft')} <code className="font-mono text-amber-700">[{limits.soft_lower_limit}, {limits.soft_upper_limit}]</code>
-                  </span>
-                )}
-                {band && (
-                  <span className={cn(
-                    'text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded',
-                    band === 'hard' ? 'bg-emerald-100 text-emerald-700'
-                      : band === 'soft' ? 'bg-amber-100 text-amber-800'
-                      : 'bg-red-100 text-red-700',
-                  )}>
-                    {band === 'hard' ? t('testingPage.bandInHardRange')
-                      : band === 'soft' ? t('testingPage.bandSoftSupervisor')
-                      : t('testingPage.bandOutsideTolerance')}
-                  </span>
-                )}
-              </>
-            )}
+            <span className="text-[11px] text-slate-400">·</span>
+            <span className={cn('text-[11px] font-bold', allEntered ? 'text-emerald-700' : 'text-slate-500')}>
+              {t('testingPage.testsProgress', { done: doneCount, total: templates.length })}
+            </span>
           </div>
 
-          {/* Reading — coloured by the operator's decision */}
-          <div className={cn(
-            'rounded-2xl border-2 p-5 text-center mb-3 transition-colors',
-            decision === 'pass' ? 'border-emerald-400 bg-emerald-50'
-              : decision === 'fail' ? 'border-red-400 bg-red-50'
-              : 'border-slate-200 bg-white',
-          )}>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{limits?.item_name ?? t('testingPage.awShort')}</p>
-            <p className={cn(
-              'text-5xl font-bold tabular-nums my-2',
-              decision === 'pass' ? 'text-emerald-700' : decision === 'fail' ? 'text-red-700' : 'text-slate-900',
-            )}>
-              {aw || '—'}
-            </p>
-            {judged && (
-              <p className="text-[11px] text-slate-500">
+          {/* One collapsible card per test (default collapsed). Enter readings in
+              any order; PASS/FAIL only unlocks once every test has a reading. */}
+          <div className="space-y-2">
+            {templates.map(tmpl => {
+              const b = bandOf(readings[tmpl.id], tmpl);
+              const open = expandedId === tmpl.id;
+              const raw = readings[tmpl.id] ?? '';
+              const hasSoft = tmpl.soft_lower_limit < tmpl.lower_limit || tmpl.soft_upper_limit > tmpl.upper_limit;
+              const valColor = b === 'hard' ? 'text-emerald-700' : b === 'soft' ? 'text-amber-700' : b === 'out' ? 'text-red-700' : 'text-slate-400';
+              return (
+                <div key={tmpl.id} className={cn('border-2 rounded-xl overflow-hidden', open ? 'border-blue-300' : 'border-slate-200')}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(open ? null : tmpl.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-slate-50"
+                  >
+                    {open ? <ChevronDown size={15} className="text-slate-400 shrink-0" /> : <ChevronRight size={15} className="text-slate-400 shrink-0" />}
+                    <span className={cn('flex items-center justify-center w-5 h-5 rounded-full shrink-0',
+                      b ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-300')}>
+                      {b ? <Check size={12} /> : <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />}
+                    </span>
+                    <span className="font-bold text-sm text-slate-900 flex-1 min-w-0 truncate">
+                      {tmpl.item_name}{tmpl.unit ? ` (${tmpl.unit})` : ''}
+                    </span>
+                    <span className={cn('font-mono text-sm tabular-nums', valColor)}>{raw || '—'}</span>
+                    {b && (
+                      <span className={cn('text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded shrink-0',
+                        b === 'hard' ? 'bg-emerald-100 text-emerald-700' : b === 'soft' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-700')}>
+                        {b === 'hard' ? t('testingPage.bandInHardRange') : b === 'soft' ? t('testingPage.bandSoftSupervisor') : t('testingPage.bandOutsideTolerance')}
+                      </span>
+                    )}
+                  </button>
+                  {open && (
+                    <div className="px-3 pb-3 pt-1 border-t border-slate-100">
+                      <div className="flex items-center gap-3 mb-2 flex-wrap text-[11px] text-slate-500">
+                        <span>{t('testingPage.hard')} <code className="font-mono text-emerald-700">[{tmpl.lower_limit}, {tmpl.upper_limit}]</code></span>
+                        {hasSoft && <span>{t('testingPage.soft')} <code className="font-mono text-amber-700">[{tmpl.soft_lower_limit}, {tmpl.soft_upper_limit}]</code></span>}
+                      </div>
+                      <div className={cn('rounded-2xl border-2 p-4 text-center mb-3',
+                        b === 'hard' ? 'border-emerald-300 bg-emerald-50' : b === 'soft' ? 'border-amber-300 bg-amber-50' : b === 'out' ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white')}>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{tmpl.item_name}</p>
+                        <p className={cn('text-4xl font-bold tabular-nums my-1', valColor)}>{raw || '—'}</p>
+                      </div>
+                      <NumericKeypad value={raw} onChange={v => setReadings(r => ({ ...r, [tmpl.id]: v }))} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Operator's final judgment — only after every test has a reading. */}
+          <div className="mt-4">
+            <p className="text-xs font-bold text-slate-700 mb-1.5">{t('testingPage.finalJudgment')}</p>
+            {allEntered && judged && (
+              <p className="text-[11px] text-slate-500 mb-1.5">
                 {t('testingPage.systemSuggests')}{' '}
                 <span className={cn('font-bold', judged === 'pass' ? 'text-emerald-700' : 'text-red-700')}>
                   {judged === 'pass' ? t('testingPage.pass') : t('testingPage.fail')}
@@ -492,71 +522,46 @@ function TestWorkflow({
                 {decision && decision !== judged && <span className="text-amber-600 font-medium"> {t('testingPage.overridden')}</span>}
               </p>
             )}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDecision('pass')}
+                disabled={passDisabled}
+                title={!allEntered ? t('testingPage.completeAllTests')
+                  : overallBand === 'out' ? t('testingPage.titleMustFail')
+                  : overallBand === 'soft' && !canSupervise ? t('testingPage.titleSupervisorRequired')
+                  : undefined}
+                className={cn(
+                  'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                  decision === 'pass' ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 text-slate-700 hover:border-emerald-400',
+                )}
+              >
+                {t('testingPage.passBtn')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDecision('fail')}
+                disabled={failDisabled}
+                title={!allEntered ? t('testingPage.completeAllTests')
+                  : overallBand !== 'out' && !canSupervise ? t('testingPage.titleSupervisorRequiredFail') : undefined}
+                className={cn(
+                  'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                  decision === 'fail' ? 'border-red-500 bg-red-600 text-white' : 'border-slate-200 text-slate-700 hover:border-red-400',
+                )}
+              >
+                {t('testingPage.failBtn')}
+              </button>
+            </div>
+            {!allEntered && (
+              <p className="mt-1.5 text-[11px] text-slate-500">{t('testingPage.completeAllTests')}</p>
+            )}
+            {allEntered && overallBand === 'soft' && !canSupervise && (
+              <p className="mt-1.5 text-[11px] text-amber-700">{t('testingPage.softBandHint')}</p>
+            )}
+            {allEntered && overallBand === 'out' && (
+              <p className="mt-1.5 text-[11px] text-red-700">{t('testingPage.outBandHint')}</p>
+            )}
           </div>
-          <NumericKeypad value={aw} onChange={setAw} />
-
-          {/* Operator's final judgment.
-              M-118 disable matrix:
-                            hard               soft               out
-              Pass button:  on / supervisor‑   supervisor‑only    DISABLED
-              Fail button:  supervisor‑only    supervisor‑only    on
-              Without a template, both buttons stay on (legacy fallback).
-              "supervisor-" prefix above means: enabled, but RPC also rejects
-              non-supervisors who try to override — the disabled state here is
-              purely a UX hint so non-supervisors don't get backend errors. */}
-          {(() => {
-            const hasTmpl = !!limits;
-            const passDisabled = !aw || (hasTmpl && (
-              band === 'out' || (band === 'soft' && !canSupervise)
-            ));
-            // Fail is the override direction inside hard, and the discretion
-            // call inside soft — both require supervisor. Outside soft, FAIL
-            // is the only allowed verdict so we leave the button enabled.
-            const failDisabled = !aw || (hasTmpl && !canSupervise && band !== 'out');
-            return (
-              <div className="mt-4">
-                <p className="text-xs font-bold text-slate-700 mb-1.5">{t('testingPage.finalJudgment')}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDecision('pass')}
-                    disabled={passDisabled}
-                    title={hasTmpl && band === 'out' ? t('testingPage.titleMustFail')
-                      : hasTmpl && band === 'soft' && !canSupervise ? t('testingPage.titleSupervisorRequired')
-                      : undefined}
-                    className={cn(
-                      'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-                      decision === 'pass' ? 'border-emerald-500 bg-emerald-600 text-white' : 'border-slate-200 text-slate-700 hover:border-emerald-400',
-                    )}
-                  >
-                    {t('testingPage.passBtn')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDecision('fail')}
-                    disabled={failDisabled}
-                    title={hasTmpl && band !== 'out' && !canSupervise ? t('testingPage.titleSupervisorRequiredFail') : undefined}
-                    className={cn(
-                      'px-4 py-3 rounded-lg text-sm font-bold border-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
-                      decision === 'fail' ? 'border-red-500 bg-red-600 text-white' : 'border-slate-200 text-slate-700 hover:border-red-400',
-                    )}
-                  >
-                    {t('testingPage.failBtn')}
-                  </button>
-                </div>
-                {hasTmpl && band === 'soft' && !canSupervise && (
-                  <p className="mt-1.5 text-[11px] text-amber-700">
-                    {t('testingPage.softBandHint')}
-                  </p>
-                )}
-                {hasTmpl && band === 'out' && (
-                  <p className="mt-1.5 text-[11px] text-red-700">
-                    {t('testingPage.outBandHint')}
-                  </p>
-                )}
-              </div>
-            );
-          })()}
 
           {/* Remark (optional) */}
           <div className="mt-3">
@@ -575,7 +580,7 @@ function TestWorkflow({
             <button
               type="button"
               onClick={handleRedo}
-              disabled={!aw || busy}
+              disabled={doneCount === 0 || busy}
               className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-lg text-sm font-bold border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-40"
             >
               <RotateCcw size={13} /> {t('testingPage.redoTest')}
@@ -583,7 +588,7 @@ function TestWorkflow({
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={busy || !canSubmit || !decision || !aw}
+              disabled={busy || !canSubmit || !decision || !allEntered}
               className={cn(
                 'px-4 py-3 rounded-lg text-sm font-bold text-white disabled:opacity-50 transition-colors',
                 decision === 'pass'
@@ -595,13 +600,16 @@ function TestWorkflow({
             >
               {busy
                 ? t('testingPage.submitting')
-                : decision
-                  ? t('testingPage.confirmPersist', { verdict: decision === 'pass' ? t('testingPage.pass') : t('testingPage.fail') })
-                  : t('testingPage.choosePassOrFail')}
+                : !allEntered
+                  ? t('testingPage.completeAllTests')
+                  : decision
+                    ? t('testingPage.confirmPersist', { verdict: decision === 'pass' ? t('testingPage.pass') : t('testingPage.fail') })
+                    : t('testingPage.choosePassOrFail')}
             </button>
           </div>
         </Step>
-      )}
+        );
+      })()}
 
       {/* Step 3: result screen */}
       {phase === 'done' && finalResult === 'pass' && (
