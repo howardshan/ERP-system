@@ -2350,6 +2350,41 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-145 `20260621000012_qc_sub_lot_history_all_groups.sql`
+**用途**: Sub-lot History 抽屉/Batch Trace 详情:samples 和 inspections 只显示最近一次循环的问题。
+
+**根因**: M-109 版的 `qc_sub_lot_full_history` 用 `s.test_group_id`(车的**当前** group)做 group 范围匹配。`qc_check_out_sub_lots_bulk` 在每次 redry 出烘干时 (Step 2a/2b) 会重写 `qc_drying_sub_lot.test_group_id` 给新 group,旧 group 的 id 就从这一行丢失了。该车作为非 champion 在历史 group 里的 sample/inspection 因此都查不回来。
+
+**改动**: `qc_sub_lot_full_history` 顶部多一个 `grp_ids uuid[]` 变量:`s.test_group_id` **并上**该车所有 `group_assigned` quality_event 里的 `payload->>'test_group_id'`。samples / inspections 的 WHERE 用 `test_group_id = ANY(grp_ids)` 替换原来的单值匹配。直接的 `drying_sub_lot_id = p_sub_lot_id` 路径保持不变。其余字段、排序、结构与 M-109 完全一致。
+
+**业务规则**:
+- **BR-Q71** Sub-lot 全历史包含其所属**所有历史抽样组**的 sample 和 inspection,不仅是当前 group。
+
+**依赖**: M-109 (20260527000006 `qc_sub_lot_full_history`)。**无 schema 变更,无前端配套**。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
+
+---
+
+### M-146 `20260621000013_qc_sub_lot_history_multi_test_readings.sql`
+**用途**: Sub-lot History 抽屉/Batch Trace 只显示 Aw,不显示 Water Density 等其它读数。
+
+**根因**: M-138 多测项把 `values_json` 改成 `{readings:{tmpl_id:{...}}, aw, ...}` 形式后,`qc_sub_lot_full_history` 仍只读 `values_json->>'aw'`,其它读数被埋。
+
+**改动**:
+- 新增 SQL 辅助函数 `_qc_flatten_readings(values jsonb) RETURNS jsonb`,把 `values_json->'readings'` 里那个 object 摊成 `[{item_name, unit, value, in_hard, in_soft}]` 数组(按 `item_name` 排序);legacy 单 Aw 行回退合成单元素数组,前端可统一迭代。
+- `qc_sub_lot_full_history` 的 inspections 和 samples 行都加一个 `readings` 字段,值即上述辅助返回。其它字段不变。
+
+**前端配套**:
+- [`src/services/qcApi.ts`](../../src/services/qcApi.ts) — 新类型 `InspectionReading`;`SubLotFullHistory.samples[*]` 和 `inspections[*]` 加 `readings?: InspectionReading[]`。
+- [`src/pages/qc/SubLotHistoryDrawer.tsx`](../../src/pages/qc/SubLotHistoryDrawer.tsx) — 新工具函数 `formatReadings`,单读数继续 compact `${unit} ${value}` 形式(向后视觉兼容),多读数用 `${item_name}: ${value} ${unit}` 逗号拼接;`%` 单位走后缀。
+- i18n: `subLotHistoryDrawer.resultReadings` 和 `subLotHistoryDrawer.inspectionResultReadings` 两个新 key(中英已加),takes a `readings` slot;旧的 `resultAw` / `inspectionResult` 保留供回退。
+
+**业务规则**:
+- **BR-Q72** Sub-lot 全历史 timeline 上每条 sample / inspection 显示**所有读数**(Aw + Density + ...),而非仅 Aw;单读数保留 `Aw 0.6` 紧凑形式不变。
+
+**依赖**: M-145 (历史 group)、M-138 (multi-test values_json)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2476,7 +2511,9 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-142 | 20260621000009_qc_analysis_scope_by_activity.sql · 分析页范围过滤改为「出库/入库/检测/处置任一在范围内」即计入(修复复烘车 out_time=NULL 导致首检 fail 只在「全部」显示) |
 | M-143 | 20260621000010_qc_analysis_outcomes_by_inspection_date.sql · 日趋势图/按工单明细改为按「首检时间」取数定日期(原按 out_time,复烘车 out_time=NULL 导致图表/明细 fail=0) |
 | M-144 | 20260621000011_qc_recovery_detail_group_result.sql · 返工详情「复检结果」非 champion 车继承同组 champion 结果 + 范围过滤放宽 |
-| **M-145** | _(下一个)_ |
+| M-145 | 20260621000012_qc_sub_lot_history_all_groups.sql |
+| M-146 | 20260621000013_qc_sub_lot_history_multi_test_readings.sql |
+| **M-147** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

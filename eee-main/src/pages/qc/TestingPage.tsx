@@ -25,6 +25,74 @@ interface Props {
 
 type Phase = 'idle' | 'sample' | 'measure' | 'done';
 
+// ── Per-sub-lot draft persistence (localStorage) ────────────────────────────
+// The Testing workflow component is keyed by sub-lot id so it remounts (losing
+// state) whenever the operator picks a different sub-lot, and the whole page
+// also unmounts whenever they navigate away. Operators reported that partial
+// inputs (e.g. Water Activity entered, Water Density not yet) disappeared in
+// both cases. We persist the in-progress draft — readings + remark + which
+// test card is open — under a single localStorage blob, keyed by sub-lot id.
+// `decision` is intentionally NOT persisted: the auto-judgment effect would
+// race with the restored value, and the effect already re-derives a sensible
+// default from the restored readings on remount.
+// Drafts are cleared after a successful submission (phase = 'done').
+
+const TESTING_DRAFT_KEY = 'qc.testing.draft.v1';
+
+interface TestingDraft {
+  readings: Record<string, string>;
+  remark: string;
+  expandedId: string | null;
+}
+
+const EMPTY_DRAFT: TestingDraft = { readings: {}, remark: '', expandedId: null };
+
+function readDraftMap(): Record<string, TestingDraft> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const blob = window.localStorage.getItem(TESTING_DRAFT_KEY);
+    if (!blob) return {};
+    const parsed = JSON.parse(blob);
+    return (parsed && typeof parsed === 'object') ? parsed as Record<string, TestingDraft> : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeDraftMap(map: Record<string, TestingDraft>) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(TESTING_DRAFT_KEY, JSON.stringify(map));
+  } catch {
+    // quota / disabled — silently no-op; worst case drafts don't survive reload
+  }
+}
+
+function loadDraft(subLotId: string): TestingDraft {
+  const map = readDraftMap();
+  const d = map[subLotId];
+  if (!d) return EMPTY_DRAFT;
+  return {
+    readings: d.readings ?? {},
+    remark: typeof d.remark === 'string' ? d.remark : '',
+    expandedId: typeof d.expandedId === 'string' ? d.expandedId : null,
+  };
+}
+
+function saveDraft(subLotId: string, draft: TestingDraft) {
+  const map = readDraftMap();
+  map[subLotId] = draft;
+  writeDraftMap(map);
+}
+
+function clearDraft(subLotId: string) {
+  const map = readDraftMap();
+  if (subLotId in map) {
+    delete map[subLotId];
+    writeDraftMap(map);
+  }
+}
+
 export default function TestingPage({ onOpenHistory }: Props) {
   const { t } = useTranslation('qc');
   const { can } = usePermissions();
@@ -222,11 +290,14 @@ function TestWorkflow({
   // operator enters a reading per test (any order, collapsible cards) and may
   // only pick PASS/FAIL once every test has a reading.
   const [templates, setTemplates] = useState<TestTemplateLimits[]>([]);
-  const [readings, setReadings] = useState<Record<string, string>>({});  // template id → raw input
-  const [expandedId, setExpandedId] = useState<string | null>(null);     // open card (default all collapsed)
+  // Lazy-load the persisted draft for this sub-lot exactly once per mount
+  // (TestWorkflow is keyed by sub-lot id so a switch unmounts → remounts,
+  // re-triggering these initializers with the fresh sub-lot's saved data).
+  const [readings, setReadings] = useState<Record<string, string>>(() => loadDraft(subLot.id).readings);   // template id → raw input
+  const [expandedId, setExpandedId] = useState<string | null>(() => loadDraft(subLot.id).expandedId);     // open card (default all collapsed)
   const [busy, setBusy] = useState(false);
   const [decision, setDecision] = useState<'pass' | 'fail' | null>(null); // operator's final call (overall)
-  const [remark, setRemark] = useState('');
+  const [remark, setRemark] = useState<string>(() => loadDraft(subLot.id).remark);
   const [finalResult, setFinalResult] = useState<'pass' | 'fail' | null>(null);
   const [groupMembers, setGroupMembers] = useState<Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>>([]);
 
@@ -290,6 +361,16 @@ function TestWorkflow({
     else if (overallBand === 'out') setDecision('fail');
     else setDecision(null);
   }, [allEntered, overallBand, phase]);
+
+  // Persist the in-progress draft so it survives sub-lot switches and page
+  // unmounts. Drafts are dropped once the submission lands (phase = 'done').
+  useEffect(() => {
+    if (phase === 'done') {
+      clearDraft(subLot.id);
+      return;
+    }
+    saveDraft(subLot.id, { readings, remark, expandedId });
+  }, [subLot.id, readings, remark, expandedId, phase]);
 
   const handleTakeSample = async () => {
     setBusy(true);
