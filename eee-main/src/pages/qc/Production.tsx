@@ -249,8 +249,8 @@ export default function Production({ onCreated }: Props) {
       setError(t('production.errDryPositive'));
       return;
     }
-    // "Pack into" (final product) is OPTIONAL for now — the packing logic is not
-    // finalized yet. Re-add the requirement here once it's decided.
+    // "Pack into" (final product) is OPTIONAL — when left empty the carts are still
+    // created and the paired ERP lot is filled lazily at release (M-114/M-134).
     setBusy(true);
     try {
       const wo = workOrder.trim();
@@ -531,10 +531,11 @@ export default function Production({ onCreated }: Props) {
             </h2>
 
             {linkedItems.length === 0 ? (
-              <p className="text-xs bg-amber-50 border border-amber-200 text-amber-800 rounded p-2">
-                This SKU has no final-product options configured. Go to{' '}
-                <strong>Production → Products</strong> and add at least one item under{' '}
-                <strong>Final products</strong>, then come back.
+              <p className="text-xs bg-slate-50 border border-slate-200 text-slate-600 rounded p-2">
+                This SKU has no final-product options configured — that's fine, it's
+                optional. You can create the work order now and pick the final product
+                later at release. To offer options here, add items under{' '}
+                <strong>Production → Products → Final products</strong>.
               </p>
             ) : (
               <>

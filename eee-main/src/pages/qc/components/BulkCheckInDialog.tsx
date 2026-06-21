@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, AlertTriangle, CheckCircle2, Boxes } from 'lucide-react';
 import { registerSubLotsBulk, SubLot, BulkCheckInResult } from '../../../services/qcApi';
 import { cn } from '../../../lib/utils';
+import { ErrorDialog } from './ErrorDialog';
 
 interface Props {
   open: boolean;
@@ -19,6 +20,7 @@ export function BulkCheckInDialog({
   const { t } = useTranslation('qc');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [capacityError, setCapacityError] = useState<string | null>(null);
 
   if (!open) return null;
 
@@ -40,12 +42,21 @@ export function BulkCheckInDialog({
       });
       onSuccess(result);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('bulkCheckInDialog.bulkCheckInFailed'));
+      const raw = e instanceof Error ? e.message : '';
+      // Capacity is all-or-nothing (M-135): nothing was checked in. Show a clear
+      // prompt and keep the dialog open so the operator can cancel & re-select.
+      const m = raw.match(/OVER_CAPACITY\|free=([\d.]+)\|need=([\d.]+)\|carts=(\d+)/);
+      if (m) {
+        setCapacityError(t('bulkCheckInDialog.overCapacity', { free: m[1], need: m[2], carts: m[3] }));
+      } else {
+        setError(raw || t('bulkCheckInDialog.bulkCheckInFailed'));
+      }
       setBusy(false);
     }
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <button
         type="button"
@@ -147,5 +158,13 @@ export function BulkCheckInDialog({
         </footer>
       </div>
     </div>
+
+    <ErrorDialog
+      open={!!capacityError}
+      title={t('errorDialog.capacityTitle')}
+      message={capacityError ?? ''}
+      onClose={() => setCapacityError(null)}
+    />
+    </>
   );
 }

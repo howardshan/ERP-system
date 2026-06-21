@@ -1,4 +1,9 @@
 {
+  "errorDialog": {
+    "title": "Error",
+    "capacityTitle": "Espacio insuficiente",
+    "ok": "Aceptar"
+  },
   "adminDashboard": {
     "dispRework": "Retrabajo",
     "dispGrind": "Esmerilar y reforrar",
@@ -351,7 +356,8 @@
     "cancel": "Cancelar",
     "checkingIn": "Registrando…",
     "confirmCheckInCount": "Confirmar — registrar {{count}}",
-    "bulkCheckInFailed": "Error en el registro masivo"
+    "bulkCheckInFailed": "Error en el registro masivo",
+    "overCapacity": "Este secador solo tiene {{free}} lugar(es) libre(s), pero seleccionaste {{carts}} carro(s) ({{need}} unidades). No se registró nada — cancela y selecciona menos carros, o saca algunos primero."
   },
   "bulkCheckOutDialog": {
     "close": "Cerrar",
@@ -570,7 +576,8 @@
     "cancel": "Cancelar",
     "moving": "Moviendo…",
     "moveTo": "Mover al secador {{n}}",
-    "moveFailed": "Error al mover"
+    "moveFailed": "Error al mover",
+    "overCapacity": "El secador solo tiene {{free}} lugar(es) libre(s), pero seleccionaste {{carts}} carro(s) ({{need}} unidades). No se movió nada — elige otro secador o selecciona menos carros."
   },
   "permissionDenied": {
     "title": "Sin acceso",

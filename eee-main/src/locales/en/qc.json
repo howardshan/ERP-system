@@ -1,4 +1,9 @@
 {
+  "errorDialog": {
+    "title": "Error",
+    "capacityTitle": "Not enough room",
+    "ok": "OK"
+  },
   "adminDashboard": {
     "dispRework": "Rework",
     "dispGrind": "Grind & re-line",
@@ -351,7 +356,8 @@
     "cancel": "Cancel",
     "checkingIn": "Checking in…",
     "confirmCheckInCount": "Confirm — check in {{count}}",
-    "bulkCheckInFailed": "Bulk check-in failed"
+    "bulkCheckInFailed": "Bulk check-in failed",
+    "overCapacity": "This dryer has only {{free}} space left, but you selected {{carts}} cart(s) ({{need}} units). Nothing was checked in — cancel and select fewer carts, or move some out first."
   },
   "bulkCheckOutDialog": {
     "close": "Close",
@@ -570,7 +576,8 @@
     "cancel": "Cancel",
     "moving": "Moving…",
     "moveTo": "Move to Dryer {{n}}",
-    "moveFailed": "Move failed"
+    "moveFailed": "Move failed",
+    "overCapacity": "This dryer has only {{free}} space left, but you selected {{carts}} cart(s) ({{need}} units). Nothing was moved — pick another dryer or select fewer carts."
   },
   "permissionDenied": {
     "title": "No access",

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { BarChart3, ChevronRight, Filter, RefreshCw, X } from 'lucide-react';
 import {
   listProducts,
+  listDryRooms,
   listProductionLots,
   analysisMetrics,
   analysisRecoveryDetail,
@@ -77,6 +78,8 @@ export default function AnalysisPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [lots, setLots] = useState<ProductionLot[]>([]);
 
+  const [dryerNums, setDryerNums] = useState<number[]>([]);
+
   const [skuId, setSkuId] = useState<string>('');
   const [dryer, setDryer] = useState<string>('');
   const [lotId, setLotId] = useState<string>('');
@@ -111,8 +114,11 @@ export default function AnalysisPage() {
   const [combinedDayDetailLoading, setCombinedDayDetailLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all([listProducts(), listProductionLots()])
-      .then(([ps, ls]) => { setProducts(ps); setLots(ls); })
+    Promise.all([listProducts(), listProductionLots(), listDryRooms()])
+      .then(([ps, ls, rooms]) => {
+        setProducts(ps); setLots(ls);
+        setDryerNums(rooms.map(r => r.dryer_number).sort((a, b) => a - b));
+      })
       .catch(e => setError(e.message));
   }, []);
 
@@ -343,7 +349,7 @@ export default function AnalysisPage() {
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
             >
               <option value="">{t('analysisPage.allDryers')}</option>
-              {[1, 2, 3, 4, 5].map(d => (
+              {dryerNums.map(d => (
                 <option key={d} value={d}>{t('analysisPage.dryer', { n: d })}</option>
               ))}
             </select>

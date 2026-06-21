@@ -27,7 +27,7 @@ const emptyForm = (): ProductInput => ({
   code: '',
   name: '',
   standard_drying_minutes: MINUTES_PER_DAY,
-  sample_every_n_carts: 1,
+  sample_every_n_carts: 3,
   cart_units: 1,
   templates: [],
 });

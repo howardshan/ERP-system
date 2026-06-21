@@ -284,7 +284,7 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       code,
       name: input.name,
       standard_drying_minutes: input.standard_drying_minutes,
-      sample_every_n_carts: input.sample_every_n_carts ?? 1,
+      sample_every_n_carts: input.sample_every_n_carts ?? 3,
       cart_units: input.cart_units ?? 1,
     })
     .select('id, code, name, standard_drying_minutes, sample_every_n_carts, cart_units')

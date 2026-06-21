@@ -2150,6 +2150,110 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-130 `20260620000001_qc_dry_room.sql`
+**用途**: 烘干房模型从「cell 格子」改为「房间 + 车位容量」。新增**烘干房主数据表** `qc_dry_room`,作为烘干的最小单元(房号 + 容量)。
+
+**背景**: 旧模型 `qc_drying_location` 是 5 dryer × 100 cell 的格子,check-in 要选具体格子;运营实际只关心"哪个房、还能放几辆车"。本期废弃 cell 概念,房间直接带容量。
+
+**改动**:
+- **新表 `qc_dry_room`**:`id`、`dryer_number`(unique)、`capacity`(int default 0,check ≥ 0)、时间戳。RLS:authenticated 全权。
+- seed 房 1–5,capacity 100。
+- 仅改 `LocationManagement` 的创建/编辑逻辑(创建 = 房号 + 容量;编辑 = 改容量),不动任何 cell 既有操作。
+
+**前端配套**: `src/services/qcApi.ts`(`DryRoom` 接口 + `listDryRooms`/`createDryRoom`/`updateDryRoomCapacity`/`deleteDryRoom`)、`src/pages/qc/LocationManagement.tsx`(改为房间 CRUD)。
+
+---
+
+### M-131 `20260620000002_qc_capacity_units.sql`
+**用途**: 按**单位车数**强制烘干房容量上限,并给产品加「每辆车折算几个单位」(1 或 1.5)。
+
+**改动**:
+- **`qc_product_sku` 加 `cart_units`** `numeric(6,2) not null default 1 check (> 0)`:产品建档时设定,一辆车按几个容量单位算。
+- `qc_list_products` 返回 `cart_units`。
+- 新辅助函数 `qc_sub_lot_units`(单车折算单位)、`qc_dryer_used_units`(房内已占用单位)、`qc_dryer_capacity`(房容量)。
+- 重写 `qc_register_sub_lots_in_dryer_bulk` / `qc_move_sub_lots_dryer` / `qc_register_in_dryer`:check-in / 移房时按 `used + cart_units > capacity` 拒绝超容,逐车校验。
+
+**业务规则**: **BR-Q(容量)** —— 烘干房放入车数不得超过容量;每辆车占用 = 该产品 `cart_units`。
+
+**前端配套**: `src/services/qcApi.ts`(Product/ProductInput 加 `cart_units`)、`src/pages/qc/ProductManagement.tsx`(「每辆车单位数」DecimalField,默认 1)。
+
+---
+
+### M-132 `20260620000003_qc_rooms_dynamic.sql`
+**用途**: 去掉写死的 `dryer_number BETWEEN 1 AND 5`,烘干房改为**完全数据驱动**(`qc_dry_room` 有几间就是几间),以便后续随意增减房间。
+
+**改动**:
+- seed 房 1–16,capacity 100(`on conflict do nothing`)。
+- **重写 `qc_dry_room_summary`**:从 `qc_dry_room` 枚举,`total_cells` = 容量(单位)、`occupied_count` = 已占用单位,不再 hardcode `generate_series(1,5)`。
+- `qc_register_sub_lots_in_dryer_bulk` / `qc_move_sub_lots_dryer` 的房号校验由 `BETWEEN 1 AND 5` 改为 `EXISTS (SELECT 1 FROM qc_dry_room WHERE dryer_number = …)`。
+
+**前端配套**: `src/pages/qc/AnalysisPage.tsx` —— 烘干房筛选下拉由写死的 `[1,2,3,4,5]` 改为从 `listDryRooms()` 动态加载,自动反映现有(16 间)及后续新增的房间。
+
+**依赖**: M-130(`qc_dry_room`)、M-131(容量单位辅助函数)。
+
+---
+
+### M-133 `20260620000004_qc_sample_default_3.sql`
+**用途**: 抽样率默认改为 **3 取 1**(每 3 辆车取 1 个样)。运营决定不再每车取样。
+
+**改动**:
+- `qc_product_sku.sample_every_n_carts` 列默认值 `1 → 3`(此后新建产品默认 3 取 1)。
+- 把现有 379 个产品全部回填为 3(生产库一次性数据更新;迁移里保留同样的 `update` 以便全新部署对齐,空表上无副作用)。
+
+**前端配套**: `src/pages/qc/ProductManagement.tsx`(`emptyForm` 默认 `sample_every_n_carts: 3`)、`src/services/qcApi.ts`(`createProduct` 兜底 `?? 3`)。`samples_needed = ceil(车数 / n)` 逻辑不变。
+
+---
+
+### M-134 `20260621000001_qc_packaging_optional_at_creation.sql`
+**用途**: 撤销 S4 §5.6(M-115)「建车必须选最终产品」的强制,`packaging_item_id` 改回**可选**。
+
+**背景**: 打包逻辑未定,且 379 个导入产品都没有最终产品(`qc_sku_item`)关联,强制会让**所有工单都建不了**。系统本就支持留空 —— 历史 NULL 行由 M-114 在放行时懒建 ERP 批次。
+
+**改动**(`CREATE OR REPLACE`,签名不变):
+- 删掉 `IF p_packaging_item_id IS NULL THEN RAISE 'PACKAGING_REQUIRED_AT_CREATION'`。
+- `wh_create_lot` + 写回 `lot_id` 包进 `IF p_packaging_item_id IS NOT NULL`:**选了**最终产品 → 行为同 M-115(预建 quarantine ERP 批次);**留空** → 不预建,`lot_id` 留 NULL,放行时由 M-114 懒建/补选。
+- 其余(校验、sub_lot 循环、返回 jsonb)与 M-115 逐字一致。
+
+**业务规则**: 见 [09_qc.md](../modules/09_qc.md) **BR-Q70**(已更新为可选)。
+
+**前端配套**: `src/pages/qc/Production.tsx` —— 撤回上一轮的前端强制(「Pack into」恢复 (optional)、移除提交校验与按钮禁用、无最终产品选项时提示改为"可留空、放行时再选");移除未用的 `errPackagingRequired`/`errPackagingNoOptions` i18n key。
+
+---
+
+### M-135 `20260621000002_qc_bulk_checkin_atomic_capacity.sql`
+**用途**: 批量入仓的容量校验改为**整批全有或全无**,不再静默部分填充。
+
+**背景**: 旧 `qc_register_sub_lots_in_dryer_bulk` 逐车循环,装不下的车塞进 `failed`(reason `over_capacity`),但**仍把装得下的前 N 车入仓**;前端从不读 `failed`,操作员毫无反馈 —— 选了超过容量的车,系统默默填满库存。
+
+**改动**(`CREATE OR REPLACE`,签名不变):
+- **Pass 1** 校验每辆车,记录逐车跳过(`not_found`/`wrong_status`),并累加**合格车**的单位数。
+- **容量闸**: `used + 合格单位 > capacity` → `RAISE 'OVER_CAPACITY|free=..|need=..|carts=..'`(`ERRCODE=check_violation`),**整批中止、一辆都不入**。
+- **Pass 2** 才真正入仓(此时保证装得下)。`not_found`/`wrong_status` 仍逐车跳过,不影响其余车。
+
+**业务规则**: 见 [09_qc.md](../modules/09_qc.md) **BR-Q76**。
+
+**前端配套**:
+- `src/pages/qc/components/BulkCheckInDialog.tsx` —— 捕获 `OVER_CAPACITY` 错误,解析 free/need/carts,弹本地化提示并保留对话框让操作员取消重选;新增 i18n `bulkCheckInDialog.overCapacity`(en/zh/es)。
+- `src/pages/qc/components/MoveDryerDialog.tsx` —— 「移动到」目标烘干房列表由写死的 `[1,2,3,4,5]` 改为 `listDryRooms()` 动态加载(补上 M-132 漏掉的 move 下拉),网格加滚动上限。
+
+---
+
+### M-136 `20260621000003_qc_move_dryer_atomic_capacity.sql`
+**用途**: 移房(move-dryer)的容量校验改为**整批全有或全无**,与 M-135(入仓)同样的修复。
+
+**背景**: `qc_move_sub_lots_dryer` 旧版逐车循环,超过目标房容量的车塞进 `failed`、其余照移;前端 `MoveDryerDialog` 不读 `failed` → 移入超量时静默部分填满目标房。
+
+**改动**(`CREATE OR REPLACE`,签名不变):
+- **Pass 1** 校验每辆车(`not_found`/`wrong_status`/`same_dryer` 逐车记录),累加合格车单位数。
+- **容量闸**: `used + 合格单位 > capacity` → `RAISE 'OVER_CAPACITY|free=..|need=..|carts=..'`(`check_violation`),**整批中止、一辆都不移**。
+- **Pass 2** 才真正移动。
+
+**业务规则**: 见 [09_qc.md](../modules/09_qc.md) **BR-Q76**(已扩展涵盖移房)。
+
+**前端配套**: `src/pages/qc/components/MoveDryerDialog.tsx` —— 捕获 `OVER_CAPACITY` 弹本地化提示、保留对话框让操作员改选烘干房或重选车;新增 i18n `moveDryerDialog.overCapacity`(en/zh/es)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2261,7 +2365,14 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-127 | 20260615000001_prod_downtime_event.sql |
 | M-128 | 20260616000001_prod_run_cart_overlap_guard.sql |
 | M-129 | 20260617000001_prod_cart_forming.sql |
-| **M-130** | _(下一个)_ |
+| M-130 | 20260620000001_qc_dry_room.sql · 烘干房主数据表(房号 + 车位容量),废弃 cell 模型 |
+| M-131 | 20260620000002_qc_capacity_units.sql · 产品 `cart_units`(每车折算单位)+ 按单位强制烘干房容量上限 |
+| M-132 | 20260620000003_qc_rooms_dynamic.sql · 烘干房数据驱动(去掉写死 1..5;seed 16 间;summary/校验改 `qc_dry_room` 枚举) |
+| M-133 | 20260620000004_qc_sample_default_3.sql · 抽样率默认 1→3(3 取 1),现有 379 产品回填为 3 |
+| M-134 | 20260621000001_qc_packaging_optional_at_creation.sql · 建车 `packaging_item_id` 改回可选(撤销 S4 §5.6),留空时 ERP 批次放行时懒建 |
+| M-135 | 20260621000002_qc_bulk_checkin_atomic_capacity.sql · 批量入仓容量校验改全有或全无(超容整批拒绝 `OVER_CAPACITY`,不再静默部分填充) |
+| M-136 | 20260621000003_qc_move_dryer_atomic_capacity.sql · 移房容量校验改全有或全无(超容整批拒绝,同 M-135) |
+| **M-137** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
