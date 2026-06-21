@@ -96,6 +96,7 @@ export interface Product {
   name: string;
   standard_drying_minutes: number | null;
   sample_every_n_carts?: number;  // M-048
+  cart_units?: number;            // M-125: capacity units one cart consumes (e.g. 1 or 1.5)
   templates: InspectionTemplate[];
 }
 
@@ -114,6 +115,7 @@ export interface ProductInput {
   name: string;
   standard_drying_minutes: number | null;
   sample_every_n_carts?: number;  // M-048
+  cart_units?: number;            // M-125: capacity units per cart (default 1)
   templates: TemplateInput[];     // M-087: one entry per required test
 }
 
@@ -223,6 +225,48 @@ export async function deleteLocation(id: string): Promise<{ id: string; code: st
   return rpc('qc_delete_location', { p_id: id });
 }
 
+// ── Dry rooms (room-level capacity; the new smallest unit) ───────────────────
+export interface DryRoom {
+  id: string;
+  dryer_number: number;
+  capacity: number;
+}
+
+export async function listDryRooms(): Promise<DryRoom[]> {
+  const { data, error } = await supabase
+    .from('qc_dry_room')
+    .select('id, dryer_number, capacity')
+    .order('dryer_number');
+  if (error) throw new Error(error.message);
+  return (data ?? []) as DryRoom[];
+}
+
+export async function createDryRoom(input: { dryer_number: number; capacity: number }): Promise<DryRoom> {
+  const { data, error } = await supabase
+    .from('qc_dry_room')
+    .insert({ dryer_number: input.dryer_number, capacity: input.capacity })
+    .select('id, dryer_number, capacity')
+    .single();
+  if (error) throw new Error(error.message);
+  return data as DryRoom;
+}
+
+export async function updateDryRoomCapacity(id: string, capacity: number): Promise<DryRoom> {
+  const { data, error } = await supabase
+    .from('qc_dry_room')
+    .update({ capacity })
+    .eq('id', id)
+    .select('id, dryer_number, capacity')
+    .single();
+  if (error) throw new Error(error.message);
+  return data as DryRoom;
+}
+
+export async function deleteDryRoom(id: string): Promise<void> {
+  const { error } = await supabase.from('qc_dry_room').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 export async function createProduct(input: ProductInput): Promise<Product> {
   for (const t of input.templates) {
     if (t.lower_limit > t.upper_limit) throw new Error('Lower limit cannot exceed upper limit');
@@ -241,8 +285,9 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       name: input.name,
       standard_drying_minutes: input.standard_drying_minutes,
       sample_every_n_carts: input.sample_every_n_carts ?? 1,
+      cart_units: input.cart_units ?? 1,
     })
-    .select('id, code, name, standard_drying_minutes, sample_every_n_carts')
+    .select('id, code, name, standard_drying_minutes, sample_every_n_carts, cart_units')
     .single();
   if (error) throw new Error(error.message);
 
@@ -283,6 +328,7 @@ export async function updateProduct(id: string, input: Partial<ProductInput>): P
   if (input.name !== undefined) skuPatch.name = input.name;
   if (input.standard_drying_minutes !== undefined) skuPatch.standard_drying_minutes = input.standard_drying_minutes;
   if (input.sample_every_n_carts !== undefined) skuPatch.sample_every_n_carts = input.sample_every_n_carts;
+  if (input.cart_units !== undefined) skuPatch.cart_units = input.cart_units;
   if (Object.keys(skuPatch).length > 0) {
     const { error } = await supabase.from('qc_product_sku').update(skuPatch).eq('id', id);
     if (error) throw new Error(error.message);

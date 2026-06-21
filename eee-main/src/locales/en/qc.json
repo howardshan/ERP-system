@@ -111,7 +111,17 @@
     "errDisplayNameRequired": "Display name is required",
     "createFailed": "Create failed",
     "updateFailed": "Update failed",
-    "deleteFailed": "Delete failed"
+    "deleteFailed": "Delete failed",
+    "roomSubtitle": "Manage dry rooms and their cart capacity.",
+    "addRoom": "Add dry room",
+    "newRoom": "New dry room",
+    "capacity": "Capacity (carts)",
+    "errCapacityMin": "Capacity must be 0 or more.",
+    "roomAdded": "Dry room {{num}} added.",
+    "roomUpdated": "Capacity updated.",
+    "roomDeleted": "Dry room {{num}} deleted.",
+    "confirmDeleteRoom": "Delete dry room {{num}}?",
+    "roomCount": "{{count}} dry rooms"
   },
   "lotDetail": {
     "checkedInMsg": "Checked in — sub-lot status: Drying",
@@ -604,7 +614,8 @@
     "skuCode": "SKU code",
     "autoPlaceholder": "Auto",
     "skuCodeHint": "Leave blank to auto-generate a SKU code.",
-    "productName": "Product name"
+    "productName": "Product name",
+    "unitsPerCart": "Units per cart"
   },
   "production": {
     "errNoPermission": "You do not have permission to create production batches.",

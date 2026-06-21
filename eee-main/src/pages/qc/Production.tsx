@@ -249,13 +249,8 @@ export default function Production({ onCreated }: Props) {
       setError(t('production.errDryPositive'));
       return;
     }
-    // M-095: if the SKU has any linked final-product options, the operator
-    // MUST pick one — packaging is intentionally required at lot creation so
-    // it shows up on stickers and downstream packaging routing.
-    if (linkedItems.length > 0 && !packagingItemId) {
-      setError(t('production.errPickFinalProduct'));
-      return;
-    }
+    // "Pack into" (final product) is OPTIONAL for now — the packing logic is not
+    // finalized yet. Re-add the requirement here once it's decided.
     setBusy(true);
     try {
       const wo = workOrder.trim();
@@ -545,13 +540,12 @@ export default function Production({ onCreated }: Props) {
               <>
                 <label className="block">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    Pack into <span className="text-red-500">*</span>
+                    Pack into <span className="text-slate-400 normal-case font-normal">(optional)</span>
                   </span>
                   <select
                     className="mt-1 w-full border rounded-lg px-3 py-2 text-sm bg-white"
                     value={packagingItemId}
                     onChange={e => setPackagingItemId(e.target.value)}
-                    required
                   >
                     <option value="">— Choose a final product —</option>
                     {linkedItems.map(it => (
@@ -572,7 +566,7 @@ export default function Production({ onCreated }: Props) {
 
         {!msg && <button
           type="submit"
-          disabled={busy || disabled || subLotCount === 0 || hasConflict || skuMismatch || (!isAddMode && linkedItems.length > 0 && !packagingItemId)}
+          disabled={busy || disabled || subLotCount === 0 || hasConflict || skuMismatch}
           className={cn(
             'w-full py-3 rounded-xl text-sm font-bold transition-colors',
             disabled || hasConflict || skuMismatch

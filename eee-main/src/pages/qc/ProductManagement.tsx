@@ -28,6 +28,7 @@ const emptyForm = (): ProductInput => ({
   name: '',
   standard_drying_minutes: MINUTES_PER_DAY,
   sample_every_n_carts: 1,
+  cart_units: 1,
   templates: [],
 });
 
@@ -37,6 +38,7 @@ function productToForm(p: Product): ProductInput {
     name: p.name,
     standard_drying_minutes: p.standard_drying_minutes,
     sample_every_n_carts: p.sample_every_n_carts ?? 1,
+    cart_units: p.cart_units ?? 1,
     templates: p.templates
       .filter(t => t.test_type_id != null)
       .map(t => ({
@@ -377,6 +379,10 @@ export default function ProductManagement() {
                           {tr('productManagement.onePerPrefix')} <span className="font-mono font-bold">{p.sample_every_n_carts ?? 1}</span> {tr('productManagement.cartsSuffix')}
                         </dd>
                       </div>
+                      <div>
+                        <dt className="text-slate-500">{tr('productManagement.unitsPerCart')}</dt>
+                        <dd className="text-slate-800"><span className="font-mono font-bold">{p.cart_units ?? 1}</span></dd>
+                      </div>
                       {p.templates.length > 0 && (
                         <div className="sm:col-span-2">
                           <dt className="text-slate-500 mb-1">{tr('productManagement.requiredTests')}</dt>
@@ -497,6 +503,19 @@ function ProductFormFields({
           />
           <span className="mt-0.5 block text-[10px] text-slate-500">
             Groups of N carts; 1 random champion tested per group.
+          </span>
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-slate-700">Units per cart (dryer capacity)</span>
+          <DecimalField
+            className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
+            value={form.cart_units ?? NaN}
+            onChange={(n) =>
+              setForm({ ...form, cart_units: Number.isFinite(n) && n > 0 ? n : undefined })
+            }
+          />
+          <span className="mt-0.5 block text-[10px] text-slate-500">
+            How many capacity units one cart of this product takes (e.g. 1 or 1.5).
           </span>
         </label>
       </div>

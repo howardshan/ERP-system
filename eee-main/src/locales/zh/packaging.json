@@ -31,5 +31,23 @@
     "dispatchPermissionTitle": "缺少 packaging.outbound.dispatch 权限",
     "dispatching": "出库中……",
     "dispatch": "出库"
+  },
+  "packing": {
+    "enter": "打包模式",
+    "title": "打包模式",
+    "stepScanWo": "先扫工单二维码开始",
+    "woLabel": "工单",
+    "changeWo": "换工单",
+    "exit": "退出",
+    "waitingWo": "等待扫描工单…",
+    "keepScanning": "持续扫描车号二维码",
+    "woCaptured": "已识别工单",
+    "alreadyScanned": "已扫过",
+    "notFound": "未找到该车",
+    "dispatched": "已派发",
+    "dispatchFailed": "派发失败",
+    "dispatchedCount": "已派发 {{count}} 车",
+    "cameraError": "无法访问摄像头",
+    "cameraHint": "请允许摄像头权限，并使用 HTTPS 或 localhost。"
   }
 }

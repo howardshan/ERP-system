@@ -111,7 +111,17 @@
     "errDisplayNameRequired": "El nombre para mostrar es obligatorio",
     "createFailed": "Error al crear",
     "updateFailed": "Error al actualizar",
-    "deleteFailed": "Error al eliminar"
+    "deleteFailed": "Error al eliminar",
+    "roomSubtitle": "Administra los cuartos de secado y su capacidad de carros.",
+    "addRoom": "Agregar cuarto de secado",
+    "newRoom": "Nuevo cuarto de secado",
+    "capacity": "Capacidad (carros)",
+    "errCapacityMin": "La capacidad debe ser 0 o más.",
+    "roomAdded": "Cuarto de secado {{num}} agregado.",
+    "roomUpdated": "Capacidad actualizada.",
+    "roomDeleted": "Cuarto de secado {{num}} eliminado.",
+    "confirmDeleteRoom": "¿Eliminar el cuarto de secado {{num}}?",
+    "roomCount": "{{count}} cuartos de secado"
   },
   "lotDetail": {
     "checkedInMsg": "Entrada registrada — estado del sublote: Secando",
@@ -604,7 +614,8 @@
     "skuCode": "Código SKU",
     "autoPlaceholder": "Automático",
     "skuCodeHint": "Déjelo en blanco para generar automáticamente un código SKU.",
-    "productName": "Nombre del producto"
+    "productName": "Nombre del producto",
+    "unitsPerCart": "Unidades por carro"
   },
   "production": {
     "errNoPermission": "No tiene permiso para crear lotes de producción.",

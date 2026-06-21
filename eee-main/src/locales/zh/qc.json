@@ -111,7 +111,17 @@
     "errDisplayNameRequired": "显示名称为必填项",
     "createFailed": "创建失败",
     "updateFailed": "更新失败",
-    "deleteFailed": "删除失败"
+    "deleteFailed": "删除失败",
+    "roomSubtitle": "管理烘干房及其车容量。",
+    "addRoom": "添加烘干房",
+    "newRoom": "新建烘干房",
+    "capacity": "容量（车）",
+    "errCapacityMin": "容量不能小于 0。",
+    "roomAdded": "已添加烘干房 {{num}}。",
+    "roomUpdated": "容量已更新。",
+    "roomDeleted": "已删除烘干房 {{num}}。",
+    "confirmDeleteRoom": "确定删除烘干房 {{num}}？",
+    "roomCount": "{{count}} 个烘干房"
   },
   "lotDetail": {
     "checkedInMsg": "已入库 — 子批次状态：烘干中",
@@ -600,7 +610,8 @@
     "skuCode": "SKU 编码",
     "autoPlaceholder": "自动",
     "skuCodeHint": "留空将自动生成 SKU 编码。",
-    "productName": "产品名称"
+    "productName": "产品名称",
+    "unitsPerCart": "每车单位"
   },
   "production": {
     "errNoPermission": "您没有创建生产批次的权限。",
