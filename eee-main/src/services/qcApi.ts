@@ -1036,6 +1036,19 @@ export async function stopRoomTempDry(subLotId: string): Promise<SubLot> {
 
 // ── Full sub-lot history (timeline view) ─────────────────────────────────────
 
+/**
+ * M-146: one flattened reading from a multi-test inspection. The SQL helper
+ * sorts these by `item_name` so the order is stable across reads. Legacy
+ * single-Aw inspections come back as a one-element array with `unit: 'Aw'`.
+ */
+export interface InspectionReading {
+  item_name: string;          // e.g. "Water Activity", "Water Density"
+  unit: string | null;        // e.g. "Aw", "%"
+  value: number | null;
+  in_hard?: boolean | null;   // within hard limits
+  in_soft?: boolean | null;   // within soft limits
+}
+
 export interface SubLotFullHistory {
   sub_lot: SubLot;
   spot_history: Array<{
@@ -1054,12 +1067,16 @@ export interface SubLotFullHistory {
     status: SampleStatus;
     aw: number | null;
     result: 'pass' | 'fail' | null;
+    /** M-146: every reading on the linked inspection (Aw + density + …). */
+    readings?: InspectionReading[];
     inspection_record_id: string | null;
   }>;
   inspections: Array<{
     id: string;
     result: 'pass' | 'fail';
     aw: number | null;
+    /** M-146: full per-test reading list; falls back to a single Aw entry for legacy records. */
+    readings?: InspectionReading[];
     remark: string | null;
     submitted_at: string;
     sample_id: string | null;
