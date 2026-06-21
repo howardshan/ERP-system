@@ -96,6 +96,7 @@ export interface Product {
   name: string;
   standard_drying_minutes: number | null;
   sample_every_n_carts?: number;  // M-048
+  cart_units?: number;            // M-125: capacity units one cart consumes (e.g. 1 or 1.5)
   templates: InspectionTemplate[];
 }
 
@@ -114,6 +115,7 @@ export interface ProductInput {
   name: string;
   standard_drying_minutes: number | null;
   sample_every_n_carts?: number;  // M-048
+  cart_units?: number;            // M-125: capacity units per cart (default 1)
   templates: TemplateInput[];     // M-087: one entry per required test
 }
 
@@ -223,6 +225,48 @@ export async function deleteLocation(id: string): Promise<{ id: string; code: st
   return rpc('qc_delete_location', { p_id: id });
 }
 
+// ── Dry rooms (room-level capacity; the new smallest unit) ───────────────────
+export interface DryRoom {
+  id: string;
+  dryer_number: number;
+  capacity: number;
+}
+
+export async function listDryRooms(): Promise<DryRoom[]> {
+  const { data, error } = await supabase
+    .from('qc_dry_room')
+    .select('id, dryer_number, capacity')
+    .order('dryer_number');
+  if (error) throw new Error(error.message);
+  return (data ?? []) as DryRoom[];
+}
+
+export async function createDryRoom(input: { dryer_number: number; capacity: number }): Promise<DryRoom> {
+  const { data, error } = await supabase
+    .from('qc_dry_room')
+    .insert({ dryer_number: input.dryer_number, capacity: input.capacity })
+    .select('id, dryer_number, capacity')
+    .single();
+  if (error) throw new Error(error.message);
+  return data as DryRoom;
+}
+
+export async function updateDryRoomCapacity(id: string, capacity: number): Promise<DryRoom> {
+  const { data, error } = await supabase
+    .from('qc_dry_room')
+    .update({ capacity })
+    .eq('id', id)
+    .select('id, dryer_number, capacity')
+    .single();
+  if (error) throw new Error(error.message);
+  return data as DryRoom;
+}
+
+export async function deleteDryRoom(id: string): Promise<void> {
+  const { error } = await supabase.from('qc_dry_room').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 export async function createProduct(input: ProductInput): Promise<Product> {
   for (const t of input.templates) {
     if (t.lower_limit > t.upper_limit) throw new Error('Lower limit cannot exceed upper limit');
@@ -240,9 +284,10 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       code,
       name: input.name,
       standard_drying_minutes: input.standard_drying_minutes,
-      sample_every_n_carts: input.sample_every_n_carts ?? 1,
+      sample_every_n_carts: input.sample_every_n_carts ?? 3,
+      cart_units: input.cart_units ?? 1,
     })
-    .select('id, code, name, standard_drying_minutes, sample_every_n_carts')
+    .select('id, code, name, standard_drying_minutes, sample_every_n_carts, cart_units')
     .single();
   if (error) throw new Error(error.message);
 
@@ -283,6 +328,7 @@ export async function updateProduct(id: string, input: Partial<ProductInput>): P
   if (input.name !== undefined) skuPatch.name = input.name;
   if (input.standard_drying_minutes !== undefined) skuPatch.standard_drying_minutes = input.standard_drying_minutes;
   if (input.sample_every_n_carts !== undefined) skuPatch.sample_every_n_carts = input.sample_every_n_carts;
+  if (input.cart_units !== undefined) skuPatch.cart_units = input.cart_units;
   if (Object.keys(skuPatch).length > 0) {
     const { error } = await supabase.from('qc_product_sku').update(skuPatch).eq('id', id);
     if (error) throw new Error(error.message);
@@ -748,7 +794,7 @@ export async function checkOutSubLotsBulk(input: {
   return rpc<BulkCheckOutResult>('qc_check_out_sub_lots_bulk', {
     p_sub_lot_ids: input.sub_lot_ids,
     p_out_time: input.out_time ?? null,
-    p_sampling_method: input.sampling_method ?? 'method_1',
+    p_sampling_method: input.sampling_method ?? 'method_2',
   });
 }
 
@@ -818,6 +864,79 @@ export async function submitInspection(
   return rpc<InspectionResult>('qc_submit_inspection', {
     p_sub_lot_id: subLotId,
     p_aw: aw,
+    p_sample_pk: samplePk ?? null,
+    p_result: result ?? null,
+    p_remark: remark ?? null,
+  });
+}
+
+// ── Multi-test inspection (M-138) ───────────────────────────────────────────
+export interface TestTemplateLimits {
+  id: string;                 // qc_inspection_template.id — key for p_values
+  test_type_id: number | null;
+  item_name: string;
+  unit: string | null;
+  lower_limit: number;
+  upper_limit: number;
+  soft_lower_limit: number;
+  soft_upper_limit: number;
+}
+
+/** Load ALL inspection templates (tests) configured for a sub-lot's SKU. */
+export async function inspectionTemplatesForSubLot(subLotId: string): Promise<{
+  sub_lot: SubLot;
+  templates: TestTemplateLimits[];
+}> {
+  const { data: subRow, error: subErr } = await supabase
+    .from('qc_drying_sub_lot')
+    .select('id, production_lot_id')
+    .eq('id', subLotId)
+    .single();
+  if (subErr || !subRow) throw new Error(subErr?.message ?? 'Sub-lot not found');
+
+  const { data: lot, error: lotErr } = await supabase
+    .from('qc_production_lot')
+    .select('sku_id')
+    .eq('id', subRow.production_lot_id)
+    .single();
+  if (lotErr || !lot) throw new Error(lotErr?.message ?? 'Production lot not found');
+
+  const { data: rows, error: tmplErr } = await supabase
+    .from('qc_inspection_template')
+    .select('id, test_type_id, item_name, unit, lower_limit, upper_limit, soft_lower_limit, soft_upper_limit')
+    .eq('sku_id', lot.sku_id)
+    .order('id');
+  if (tmplErr) throw new Error(tmplErr.message);
+
+  const list = await rpc<SubLot[]>('qc_list_sub_lots', { p_production_lot_id: subRow.production_lot_id });
+  const sub_lot = list.find(s => s.id === subLotId);
+  if (!sub_lot) throw new Error('Sub-lot not found');
+
+  const templates: TestTemplateLimits[] = (rows ?? []).map(r => ({
+    id: r.id as string,
+    test_type_id: (r.test_type_id as number | null) ?? null,
+    item_name: r.item_name as string,
+    unit: (r.unit as string | null) ?? null,
+    lower_limit:      Number(r.lower_limit),
+    upper_limit:      Number(r.upper_limit),
+    soft_lower_limit: Number(r.soft_lower_limit),
+    soft_upper_limit: Number(r.soft_upper_limit),
+  }));
+
+  return { sub_lot, templates };
+}
+
+/** Submit one reading per test (keyed by template id) in a single inspection. */
+export async function submitInspectionMulti(
+  subLotId: string,
+  values: Record<string, number>,
+  samplePk?: string | null,
+  result?: 'pass' | 'fail' | null,
+  remark?: string | null,
+): Promise<InspectionResult> {
+  return rpc<InspectionResult>('qc_submit_inspection', {
+    p_sub_lot_id: subLotId,
+    p_values: values,
     p_sample_pk: samplePk ?? null,
     p_result: result ?? null,
     p_remark: remark ?? null,
@@ -1270,14 +1389,13 @@ export class YieldRequiredError extends Error {
  * +yield to LOC-PACK-STAGE via wh_sync_release_from_qc. If sync fails, the
  * whole RPC rolls back and sub_lot stays in 'passed' (BR-W3).
  */
-export async function releasePassedSubLot(subLotId: string, yieldQuantity: number): Promise<SubLot> {
-  if (!yieldQuantity || yieldQuantity <= 0) {
-    throw new YieldRequiredError('请填写有效的产出数量');
-  }
+export async function releasePassedSubLot(subLotId: string, yieldQuantity?: number | null): Promise<SubLot> {
+  // M-139: yield is optional. When omitted, the cart is released without posting
+  // any ERP quantity (the quantity step is captured later, e.g. at packing).
   try {
     return await rpc<SubLot>('qc_release_passed_sub_lot', {
       p_sub_lot_id: subLotId,
-      p_yield_quantity: yieldQuantity,
+      p_yield_quantity: yieldQuantity != null && yieldQuantity > 0 ? yieldQuantity : null,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -1291,15 +1409,11 @@ export async function releasePassedSubLot(subLotId: string, yieldQuantity: numbe
 }
 
 /**
- * Release every cart in a sampling group with the SAME per-cart yield.
- *
- * Front-end typically opens ReleaseDialog once per group and supplies one
- * yield value applied to each cart (group members share the same SKU /
- * packaging item by construction). Per-cart yield variance is rare and can
- * be handled by releasing carts individually.
+ * Release every cart in a sampling group. M-139: no yield is collected — release
+ * just closes the carts (ERP quantity is captured at a later step).
  */
-export async function releasePassedSubLotsGroup(subLotIds: string[], yieldQuantityPerCart: number): Promise<void> {
-  await Promise.all(subLotIds.map(id => releasePassedSubLot(id, yieldQuantityPerCart)));
+export async function releasePassedSubLotsGroup(subLotIds: string[]): Promise<void> {
+  await Promise.all(subLotIds.map(id => releasePassedSubLot(id)));
 }
 
 /** Apply the same disposition to every cart in a sampling group. */

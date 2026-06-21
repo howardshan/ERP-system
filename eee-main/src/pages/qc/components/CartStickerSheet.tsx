@@ -79,10 +79,13 @@ function drawStickerPdfPage(
   doc.setLineWidth(0.4);
   doc.rect(P, P, LW, MM_H - 2 * P);
 
-  // QR code (top of left column) — robust on thermal, orientation-independent
+  // QR code — robust on thermal, orientation-independent. The QR + CART#/code
+  // block is vertically centered within the left column (no top-heavy gap).
   const qrSize = Math.min(LW - 2, 27);
   const qrX = P + (LW - qrSize) / 2;
-  const qrY = P + 2;
+  const blockH = qrSize + 14.5;          // QR + gap + CART# line + code line
+  const colInnerH = MM_H - 2 * P;
+  const qrY = P + Math.max(2, (colInnerH - blockH) / 2);
   const qrImg = qrDataUrl(c.sub_lot_code, dpi, qrSize);
   if (qrImg) {
     doc.addImage(qrImg, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'NONE');

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, AlertTriangle, CheckCircle2, LogOut, FlaskConical, RefreshCw } from 'lucide-react';
 import { checkOutSubLotsBulk, SubLot, BulkCheckOutResult, SamplingMethod } from '../../../services/qcApi';
@@ -26,14 +26,14 @@ interface PreviewBucket {
 
 const METHOD_OPTIONS: { value: SamplingMethod; titleKey: string; descriptionKey: string }[] = [
   {
-    value: 'method_1',
-    titleKey: 'bulkCheckOutDialog.method1Title',
-    descriptionKey: 'bulkCheckOutDialog.method1Description',
-  },
-  {
     value: 'method_2',
     titleKey: 'bulkCheckOutDialog.method2Title',
     descriptionKey: 'bulkCheckOutDialog.method2Description',
+  },
+  {
+    value: 'method_1',
+    titleKey: 'bulkCheckOutDialog.method1Title',
+    descriptionKey: 'bulkCheckOutDialog.method1Description',
   },
 ];
 
@@ -43,7 +43,7 @@ export function BulkCheckOutDialog({
   const { t } = useTranslation('qc');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [samplingMethod, setSamplingMethod] = useState<SamplingMethod>('method_1');
+  const [samplingMethod, setSamplingMethod] = useState<SamplingMethod>('method_2');
 
   // Classify carts
   const freshCarts  = useMemo(() => selectedSubLots.filter(s => !s.test_group_id), [selectedSubLots]);
@@ -108,17 +108,30 @@ export function BulkCheckOutDialog({
     const out: PreviewBucket[] = [];
     for (const { carts, meta } of bucketMap.values()) {
       const asc = carts.slice().sort((a, b) => a.sub_lot_code.localeCompare(b.sub_lot_code));
-      out.push({
-        ...meta,
-        cartCount: asc.length,
-        groups: planSamplingGroups(asc, meta.sampleN, samplingMethod),
-      });
+      let groups: PlannedGroup<SubLot>[];
+      if (meta.isRedry) {
+        // Redry keeps the original champion (whichever cart was sampled before),
+        // as one group — no re-chunking. Mirrors Step 2b in the SQL.
+        const desc = asc.slice().reverse();
+        const ci = Math.max(0, desc.findIndex(c => c.is_test_champion));
+        groups = [{ members: desc, championIndex: ci }];
+      } else {
+        groups = planSamplingGroups(asc, meta.sampleN, samplingMethod);
+      }
+      out.push({ ...meta, cartCount: asc.length, groups });
     }
     return out.sort((a, b) => {
       if (a.isRedry !== b.isRedry) return a.isRedry ? 1 : -1;
       return a.productLotLabel.localeCompare(b.productLotLabel);
     });
   }, [freshCarts, redryCarts, samplingMethod]);
+
+  // Dialog stays mounted across open/close — reset transient state on reopen so
+  // a leftover busy=true (success path doesn't reset it) can't freeze the next
+  // check-out on the spinner.
+  useEffect(() => {
+    if (open) { setBusy(false); setError(''); }
+  }, [open]);
 
   if (!open) return null;
 
@@ -135,6 +148,7 @@ export function BulkCheckOutDialog({
         sub_lot_ids: selectedSubLots.map(s => s.id),
         sampling_method: samplingMethod,
       });
+      setBusy(false);
       onSuccess(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('bulkCheckOutDialog.errorFallback'));

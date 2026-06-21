@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Loader2,
   SendHorizonal,
+  QrCode,
 } from 'lucide-react';
 import {
   getSkusWithStock,
@@ -21,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { PermissionDenied } from '../qc/components/PermissionDenied';
+import { PackingModeDialog } from './PackingModeDialog';
 
 function DaysInStockBadge({ days }: { days: number }) {
   if (days < 10) {
@@ -77,6 +79,7 @@ export default function PackagingPage() {
 
   const [scanInput, setScanInput] = useState('');
   const [scanError, setScanError] = useState('');
+  const [packingOpen, setPackingOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
 
   const loadSkus = async () => {
@@ -294,33 +297,43 @@ export default function PackagingPage() {
 
       {/* Right panel — Cart table */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#faf8f5]">
-        {/* Scan input bar */}
-        <div className="px-6 pt-5 pb-3">
-          {selectedSkuId ? (
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1 max-w-sm">
-                <ScanLine size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  ref={scanRef}
-                  type="text"
-                  value={scanInput}
-                  onChange={e => { setScanInput(e.target.value); setScanError(''); }}
-                  onKeyDown={handleScanKeyDown}
-                  placeholder={t('packagingPage.scanPlaceholder')}
-                  className="w-full pl-9 pr-4 py-2 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white"
-                />
+        {/* Scan input bar + Packing mode entry */}
+        <div className="px-6 pt-5 pb-3 flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            {selectedSkuId ? (
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1 max-w-sm">
+                  <ScanLine size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    ref={scanRef}
+                    type="text"
+                    value={scanInput}
+                    onChange={e => { setScanInput(e.target.value); setScanError(''); }}
+                    onKeyDown={handleScanKeyDown}
+                    placeholder={t('packagingPage.scanPlaceholder')}
+                    className="w-full pl-9 pr-4 py-2 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:border-orange-400 bg-white"
+                  />
+                </div>
+                {scanError && (
+                  <p className="flex items-center gap-1.5 text-xs font-bold text-red-600">
+                    <AlertCircle size={13} />
+                    {scanError}
+                  </p>
+                )}
               </div>
-              {scanError && (
-                <p className="flex items-center gap-1.5 text-xs font-bold text-red-600">
-                  <AlertCircle size={13} />
-                  {scanError}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="h-9 flex items-center">
-              <p className="text-sm text-slate-400">{t('packagingPage.selectToBegin')}</p>
-            </div>
+            ) : (
+              <div className="h-9 flex items-center">
+                <p className="text-sm text-slate-400">{t('packagingPage.selectToBegin')}</p>
+              </div>
+            )}
+          </div>
+          {canDispatch && (
+            <button
+              onClick={() => setPackingOpen(true)}
+              className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-orange-600 hover:bg-orange-500 text-white shadow-sm"
+            >
+              <QrCode size={15} /> {t('packing.enter')}
+            </button>
           )}
         </div>
 
@@ -497,6 +510,14 @@ export default function PackagingPage() {
           </div>
         )}
       </div>
+
+      {packingOpen && (
+        <PackingModeDialog onClose={() => {
+          setPackingOpen(false);
+          loadSkus();
+          if (selectedSkuId) loadCarts(selectedSkuId);
+        }} />
+      )}
     </div>
   );
 }

@@ -31,5 +31,23 @@
     "dispatchPermissionTitle": "Falta el permiso packaging.outbound.dispatch",
     "dispatching": "Despachando…",
     "dispatch": "Despachar"
+  },
+  "packing": {
+    "enter": "Modo empaque",
+    "title": "Modo empaque",
+    "stepScanWo": "Escanea el QR de la orden de trabajo para comenzar",
+    "woLabel": "Orden de trabajo",
+    "changeWo": "Cambiar OT",
+    "exit": "Salir",
+    "waitingWo": "Esperando escaneo de la orden de trabajo…",
+    "keepScanning": "Sigue escaneando los QR de los carros",
+    "woCaptured": "Orden de trabajo capturada",
+    "alreadyScanned": "Ya escaneado",
+    "notFound": "Carro no encontrado",
+    "dispatched": "Despachado",
+    "dispatchFailed": "Error al despachar",
+    "dispatchedCount": "{{count}} despachados",
+    "cameraError": "No se puede acceder a la cámara",
+    "cameraHint": "Permite el acceso a la cámara y usa HTTPS o localhost."
   }
 }
