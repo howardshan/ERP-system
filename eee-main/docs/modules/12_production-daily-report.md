@@ -1,8 +1,8 @@
 # Production · Daily Report 模块(成型生产日报)
 
-> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地。Schema/视图 M-122,主数据 seed M-123。
-> **依据**: `ERP-system/docs/2026 Daily Report Forming Production.xlsx`(Daily Report sheet)
-> **入口**: Production 模块侧边栏 → Reporting → Daily Report
+> **状态**: 第一阶段(1:1 复刻 Excel 录入)已落地(M-122/M-123)。Phase 2 M1.1(工单主数据 + `prod_run` 单一事实源 + 工单驱动录入)已落地(M-125)。M1.2a(平板 kiosk + 设备登录 + 打卡)M-126。M1.2b(平板生产录入 + 停机)M-127,车号去重 M-128。**M2.1 逐车成型录入(挂 QC 车,生产↔QC 打通)已落地(M-129)**。
+> **依据**: `ERP-system/docs/2026 Daily Report Forming Production.xlsx`(Daily Report sheet)、`ERP-system/docs/Production模块-Phase2-SPEC.md`
+> **入口**: Production 模块侧边栏 → Reporting → Daily Report;Planning → Work Orders
 > **UI 主题**: indigo(随 Production 模块)
 
 ---
@@ -74,9 +74,68 @@
 
 由 `scripts/gen_prod_seed.py`(openpyxl)从工作簿生成幂等 seed:机台 45 / 停机原因 7 / 操作员 158 / 产品 383(含 44 个 activity)。客户换新工作簿时重跑脚本重生成。**历史日报流水行不导入。**
 
+## Phase 2 — M1.1(工单主数据 + prod_run 单一事实源 + 工单驱动录入,M-125)
+
+Phase 2 把生产录入前移到一线、实时化(完整规划见 `docs/Production模块-Phase2-SPEC.md`,决策 D1–D10)。M1.1 是地基:
+
+**1. 工单主数据 `prod_work_order`**(D1:工单源自外部系统,本期系统内手动维护):`work_order_no`(唯一)、`product_id`、`machine_id`、`planned_qty`、`status`(open/in_progress/closed/cancelled)、`planned_date`。**无 `process` 字段**(D10:工序由产品决定,经 `product_id` 读 `prod_product_master.process`)。管理页 `src/pages/production/WorkOrderPage.tsx`(Planning 区),服务 `productionWorkOrderApi.ts`。
+
+**2. 方案 A 收敛(D3)—— `prod_daily_report` → 单一事实源 `prod_run`**:
+- 原地 `RENAME`(保数据);`operator_id` 改 nullable;新增 `work_order_id`、`source`(tablet/manager)、`status`(draft/submitted/reviewed)、`final_cart_complete`、`continues_prev`、`device_id`。
+- 计算视图改为 `prod_run_view`,**BR-P1 的 10 个计算表达式与 M-122 逐字一致**(口径零变化);operator/work_order 均 LEFT JOIN,补出 `process`。
+- `prod_daily_report` 降为兼容视图(`SELECT * FROM prod_run`);应用层直接读写 `prod_run`/`prod_run_view`(服务 `productionDailyApi.ts` → `productionRunApi.ts`)。
+- **BR-P3** prod_run 单一事实源;**BR-P4** 工单累计(SUM output)/ 车数去重(`MAX(cart_to)-MIN(cart_from)+1`),见视图 `prod_work_order_rollup_view`。
+
+**3. 工单驱动录入(F3 / D9)**:Daily Report 录入抽屉的"工单号"框支持**扫码枪扫 + 手输**;失焦/回车调 `findWorkOrderByNo` → 命中即自动带出产品(描述/工序/速率),未命中提示可手选产品(降级)。
+
+**设计取舍**:M1.1 仍保留 `operator_id`(nullable)与 `work_hours`,管理页维持 Phase-1 的"每操作员一行"形态,Credit/Pcs·Hr 仍以 `work_hours` 为分母;D5「工时=Σ打卡」留待 M1.2 引入 `prod_line_attendance` 后切换。**M1.1 不合并历史行**(避免产量重复计)。跨班"续做第 N 车"(D8)的交互 UI 留 M1.2 平板端(列已就绪)。
+
+**权限**:新增 `production / work_order / {view, create, edit, close}`。
+
+## Phase 2 — M1.2a(产线平板 kiosk + 设备登录 + 打卡,M-126)
+
+把生产录入前移到一线平板的第一片。平板不是 `erp_user`,走独立设备账号。
+
+**设备鉴权(沿用 `/superuser` + `set_module_visibility` 两个先例)**:
+- 新增 **`/tablet`** kiosk 路径(`src/App.tsx` init 读 `pathname`,镜像 `/superuser`,绕过登录),渲染 `src/pages/tablet/TabletApp.tsx`。
+- 设备登录经 SECURITY DEFINER RPC **`prod_tablet_login(p_code, p_pin)`**(授予 anon)校验、返回绑定产线;登录态存 `sessionStorage`。
+- **`prod_line_device`** 仅对 `authenticated`(管理端)开放,**anon 不可直读 PIN**(BR-P5)。
+
+**打卡(BR-P6)**:平板工作台顶栏显示绑定产线 + 班次切换;扫工牌/选工号 → 上岗(写 `prod_line_attendance.check_in_at`);"当前在岗"列表 = 该 (产线×日期×班次) `check_out_at IS NULL` 的操作员,可逐个下岗。工时 = Σ session 时长(M1.3 切换效率分母)。
+
+**设备管理(管理端)**:`src/pages/production/DevicePage.tsx`(Planning 区)—— 生产管理自助创建/编辑/停用产线平板、设 PIN、绑定产线。权限 `production/device/{view,create,edit,disable}`。
+
+**安全等级**:dev 级(PIN 明文、attendance 走 `dev_all`),与全站一致;生产硬化留后续。
+
+## Phase 2 — M1.2b(平板生产录入 + 跨班续做车 + 停机实时,M-127)
+
+平板从"只打卡"升级为"能录生产 + 记停机"。平板工作台改为 **Tab**:打卡 | 生产 | 停机(共享顶栏:绑定产线 + 班次切换 + 登出)。
+
+- **生产**:扫/输工单号 → `findWorkOrderByNo` 带出产品;若上一 run 未完成最后一车,`getCarryOverCart` 提示"续做第 N 车?"(`cart_from=N`、`continues_prev=true`,D8);录车号/产出/废品/备注 + `final_cart_complete` → 提交 `submitTabletRun`(写 `prod_run`:`source='tablet'`、`device_id`、`machine_id`=设备线、`operator_id` 空)。下方"本班产出"列表。**与管理端 Daily Report 同写一张 `prod_run`**(方案 A 单一事实源,管理端按同一 日期+班次 即可看到 tablet 来源的行)。
+  - **软提醒(不硬拦)**:本线本班无人上岗时,生产页显示琥珀提醒"请先打卡"(忘打卡不应丢产量;但工时归集靠在岗,故提醒)。
+  - **车号去重(BR-P4,M-128)**:`prod_run` 触发器在写入时校验同一工单内 team run 车号不重叠(续做的交接车除外);冲突直接报错。
+  - **管理端 Daily Report 信息补全**:列表新增「工单」列;「操作员/整线」列对 team/平板行(operator 空)展示 **TABLET + 当班在岗成员**(成员来自 `prod_line_attendance`,按 机台×日期×班次 取,经 `listShiftAttendance`),表示"整线产出、不挂单个操作员"(D2/D5),非缺数据;详情抽屉显示 日期·班次 上下文、工单号、整线成员;编辑 team 行时不再强制选操作员(保持 `operator_id` 空)。
+- **停机(BR-P7)**:`prod_downtime_event` —— "开始停机"(选原因→开 event)/"结束停机"(算 `down_minutes`);或"补录停机"(原因+时长);本班停机列表。
+
+**说明**:平板 run 本期 `work_hours=0`(无单操作员),故 Credit/Pcs·Hr 在平板 run 上暂空,M1.3 切 Σ打卡分母后补齐(D5)。
+
+## Phase 2 — M2.1(逐车成型录入,挂 QC 车,生产↔QC 打通,M-129)
+
+把成型录入从"扫工单 + 车号范围 + 汇总"改为**逐车**,并直接挂在已有的 QC 车(`qc_drying_sub_lot`)上。
+
+**架构**:不另起第三套"车"。复用 `prod_run`:**成型一辆车 = 一条 `prod_run`**,加 `sub_lot_id` 链到 QC 车(`cart_from=cart_to=车序号`、`source='tablet'`、`operator_id` 空);部分唯一索引保证一辆车只一条成型 run。
+
+**平板"生产"页(逐车)**:扫车贴(`sub_lot_code`)→ RPC `prod_find_cart_for_forming` 一次带出 车 + 工单 + 产品 + 标准速率(经**工单桥** `qc_production_lot.work_order_barcode = prod_work_order.work_order_no → product_id → prod_product_master`)→ 录该车产出/废品/备注 → 提交 → 下一车。`already_formed` 防重提示;工单不在主数据则降级(产出仍录)。
+
+**管理端 Daily Report**:列表加「车号」列(`sub_lot_code`);逐车后每辆车一行;聚合口径不变。
+
+**生产↔QC 打通(BR-P8)**:`prod_run.sub_lot_id` 直链 QC 车 → 一辆车从成型→烘干→QC→放行全程同一身份,从车可同时看成型产出 + QC 结果。
+
+**设计取舍**:产品/速率经工单桥取得,**不合并**两套产品主数据(`qc_product_sku` 与 `prod_product_master`),也不改 QC 建批次/车贴流程;仅在 `prod_run` 加外链。计算口径 BR-P1 不变(平板 run `work_hours=0`,Credit 仍空,M1.3 补)。
+
 ## 待办 / 后续阶段
 
-- 分析看板(Daily production Analysis / Analysis)
-- 与现有工单(work order)、生产批次、库存联动
-- 工人自助上报(替代纸质交接)
-- 录入交互可选增强:接近 Excel 的整屏网格批量录入/粘贴
+- **M1.3** 工时自动汇总(分母切 Σ打卡,补齐平板 run 效率)+ 管理端实时产量看板 + 停机/run 审核视图。
+- **M2.2** 成型↔QC 专门追溯/分析(从车一屏看 成型 + 烘干 + QC 结果)。
+- **M2** 生产数据 ↔ QC 数据(工单为键)关联分析/追溯。
+- 分析看板(Daily production Analysis / Analysis)、与生产批次/库存联动、整屏网格批量录入等远期增强。

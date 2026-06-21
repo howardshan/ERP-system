@@ -2052,6 +2052,104 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-125 `20260613000001_prod_work_order_and_run.sql`
+**用途**: Production Phase 2 M1.1 地基 —— 新建工单主数据,并把 Phase 1 的 `prod_daily_report` 收敛为单一事实源 `prod_run`(SPEC 方案 A / D3)。
+
+**背景**: Phase 2 要把生产录入前移到一线平板、实时化、与 QC 打通(见 `docs/Production模块-Phase2-SPEC.md` 决策 D1–D10)。M1.1 先落工单主数据 + 工单驱动录入 + 收敛地基,为 M1.2 平板端、M1.3 看板铺路。
+
+**新建 `prod_work_order`**(工单主数据,D1:工单源自外部系统,本期系统内手动维护):`work_order_no` UNIQUE、`product_id`→`prod_product_master`、`machine_id`(可空)、`planned_qty`(可空)、`status`(open/in_progress/closed/cancelled)、`planned_date`、`note`。**无 `process` 字段**(D10:工序由产品决定,经 `product_id` 读 `prod_product_master.process`)。`dev_all` RLS。
+
+**收敛 `prod_daily_report` → `prod_run`**(原地改造,保数据):
+- `DROP VIEW prod_daily_report_view` → `ALTER TABLE ... RENAME TO prod_run` → `operator_id` 改 nullable(M1.2 团队 run 无单一操作员)→ 新增列 `work_order_id`(FK)、`source`(default 'manager',CHECK tablet/manager)、`status`(default 'submitted',CHECK draft/submitted/reviewed)、`final_cart_complete`(default true)、`continues_prev`(default false)、`device_id`(M1.2 再加 FK)。`ADD COLUMN ... DEFAULT` 原子回填既有行。
+- **新计算视图 `prod_run_view`**:BR-P1 的 10 个计算表达式与 M-122 **逐字一致**(回归核心);operator 改 LEFT JOIN、新增 work_order LEFT JOIN,补选工单/新 run 列(含 `process`)。
+- **兼容视图** `CREATE VIEW prod_daily_report AS SELECT * FROM prod_run`(保险;应用层已直接读写 `prod_run`/`prod_run_view`)。
+
+**新视图 `prod_work_order_rollup_view`**(BR-P4 / D8):`run_count`、`total_output=SUM(output_qty)`、`distinct_carts=MAX(cart_to)-MIN(cart_from)+1`(续做交接车去重)。
+
+**权限种子**: 给已有 `production/module_permissions/manage` 用户授予 `production/work_order/{view,create,edit,close}`(cross-join,幂等)。
+
+**业务规则**:
+- **BR-P3** `prod_run` 单一事实源:平板与管理端生产记录统一落 `prod_run`,`source`(tablet/manager)区分来源、`status`(draft/submitted/reviewed)区分流转;`prod_daily_report` 仅为兼容视图。
+- **BR-P4** 工单累计/车数去重:工单实际产出 = 名下各 run `output_qty` 之和;总车数 = `MAX(cart_to)-MIN(cart_from)+1`(跨班续做的交接车按一辆计)。
+
+**设计取舍**: M1.1 保留 `operator_id`(nullable)与 `work_hours` —— 管理页仍是 Phase-1 的"每操作员一行"形态,Credit/Pcs·Hr 仍以 `work_hours` 为分母,口径零变化;D5「工时=Σ打卡」在 M1.2 引入 `prod_line_attendance` 后再切换。不在 M1.1 合并历史行(避免产量重复计)。
+
+**前端配套**: `src/lib/permissionStructure.ts`(新增 `work_order` 资源)、`src/services/productionWorkOrderApi.ts`、`src/services/productionDailyApi.ts`→`productionRunApi.ts`(重指 `prod_run`/`prod_run_view`)、`src/pages/production/{WorkOrderPage,DailyReportPage,ProductionModule}.tsx`、`src/locales/*/production.json`。
+
+---
+
+### M-126 `20260614000001_prod_tablet_device_attendance.sql`
+**用途**: Production Phase 2 M1.2a —— 产线平板 kiosk(`/tablet`)+ 设备账号登录 + 打卡上岗/下岗。把"现在这条线有哪几个人"跑通,为 M1.2b(平板生产录入/停机)、M1.3(工时汇总/看板)铺路。
+
+**背景**: 平板不是 `erp_user`,走独立设备账号。沿用两个现成先例:`/superuser` kiosk(`App.tsx` init 读 `pathname` 绕过登录)+ `set_module_visibility` 的 SECURITY DEFINER + 校验密钥 RPC。
+
+**新建 `prod_line_device`**(产线平板设备):`code` UNIQUE(登录设备码)、`name`、`machine_id`→`prod_machine`(绑定产线)、`pin`、`active`。RLS **仅 `authenticated`**(管理端 CRUD);**不建 anon 策略** → 平板(anon)不可直读 PIN。
+
+**新建 `prod_line_attendance`**(打卡/上岗登记):`operator_id`、`machine_id`、`report_date`、`shift`、`check_in_at`、`check_out_at`(空=在岗)、`device_id`→`prod_line_device`。索引 `(machine_id, report_date, shift)`。RLS `dev_all`(平板 anon 读写)。
+
+**`prod_run.device_id` 补 FK** → `prod_line_device`(M-125 时为 plain uuid)。
+
+**RPC `prod_tablet_login(p_code, p_pin)`**(`SECURITY DEFINER`,`RETURNS jsonb`,`GRANT … TO anon`):按 `code+pin+active` 校验并返回 `{device_id, code, name, machine_id, machine_code}`,否则 `RAISE 'unauthorized'`。
+
+**权限种子**:给 `production/module_permissions/manage` 用户授予 `production/device/{view,create,edit,disable}`(cross-join,幂等)。**演示设备 seed**:`LINE-INJ01` / PIN `1234`,绑定 Inj 01。
+
+**业务规则**:
+- **BR-P5** 平板设备登录经 `prod_tablet_login`(设备码+PIN)服务端校验;`prod_line_device` 不开放 anon 直读(PIN 不经 REST 暴露);设备绑定一条产线。
+- **BR-P6** 「生产 team」是打卡点:某产线某班"当前在岗" = `prod_line_attendance` 中该 (machine×date×shift) `check_out_at IS NULL` 的操作员集合;工时 = Σ session 时长(M1.3 切换效率分母)。
+
+**设计取舍/安全**:M1.2a 为 dev 级(PIN 明文存库、attendance 走 `dev_all` anon 写),与全站 `dev_all` + `/superuser` 一致。生产硬化(PIN 加盐、逐写 RPC 校验、收紧 RLS)列入后续。
+
+**前端配套**: `src/App.tsx`(`/tablet` 路由,镜像 `/superuser`)、`src/pages/tablet/TabletApp.tsx`(设备登录 + 打卡工作台)、`src/services/{productionTabletApi,productionDeviceApi}.ts`、`src/pages/production/{DevicePage,ProductionModule}.tsx`、`src/lib/permissionStructure.ts`(新增 `device` 资源)、`src/locales/*/production.json`。
+
+---
+
+### M-127 `20260615000001_prod_downtime_event.sql`
+**用途**: Production Phase 2 M1.2b —— 停机实时事件 `prod_downtime_event`,配合平板生产录入,替代纸质 Form 451。
+
+**背景**: M1.2b 把产线平板从"只打卡"升级为"能录生产 + 记停机"。平板生产录入写既有 `prod_run`(`source='tablet'`,无需新表/新列);本迁移只建停机事件表。
+
+**新建 `prod_downtime_event`**:`machine_id`→`prod_machine`、`run_id`→`prod_run`(可选,关联当时 run)、`report_date`、`shift`、`reason_id`→`prod_downtime_reason`、`start_at`/`end_at`(空=进行中)、`down_minutes`(结束算出或补录直填)、`note`、`device_id`→`prod_line_device`。索引 `(machine_id, report_date, shift)`。RLS `dev_all`(平板 anon 读写)。**无新 RPC、无权限种子**。
+
+**业务规则**:
+- **BR-P7** 停机事件:line 级、实时 start/end 打点(结束时 `down_minutes = round((end−start)/60)`)或补录时长;可选 `run_id` 关联当时生产记录。班次停机工时 = Σ `down_minutes`(M1.3 汇总用)。
+
+**前端配套**: `src/services/productionTabletApi.ts`(`submitTabletRun`/`listTabletRuns` + 停机 start/end/add/list/getOpen)、`src/pages/tablet/TabletApp.tsx`(Tab 工作台:打卡 | 生产 | 停机)、`src/locales/*/production.json`。平板生产录入复用 `findWorkOrderByNo`/`getCarryOverCart`(M-125)。
+
+---
+
+### M-128 `20260616000001_prod_run_cart_overlap_guard.sql`
+**用途**: 在数据库层强制 **BR-P4 车号去重**。M1.2b 做了"续做车提示"却漏了"重叠校验",导致同一工单可录出重叠车号(如 1–5 后又录 3–6,3/4/5 算两次)。
+
+**做法**: `BEFORE INSERT/UPDATE ON prod_run` 触发器 `prod_run_check_cart_overlap()`,一处生效覆盖平板与管理端两条写入路径。
+- **只管 team/平板 run**(`operator_id IS NULL`)+ 有工单 + 有车号段;管理端"每操作员"行(`operator_id` 非空)沿用 Phase-1 语义、可共享车号,故豁免。
+- 规则:同一工单内新车号须接在已有最大 `cart_to` 之后;若 `continues_prev` 则 `cart_from` 须正好 = 那辆未完成的交接车;`cart_to >= cart_from`。冲突 `RAISE EXCEPTION`(前端 catch 显示)。
+- **既往数据不回溯**(只拦新增/修改)。
+
+**业务规则**: **BR-P4** 由本触发器强制(此前仅在文档/视图口径中描述)。
+
+**前端配套**: 无需改写入逻辑(`submitTabletRun` / 管理端 insert 的报错经现有 catch 直接展示);`src/pages/production/DailyReportPage.tsx` 顺带给 team/tablet 行(operator 空)加 "Team · TABLET" 标识,避免误读为缺数据(Q1/Q2 澄清:平板 run 按 team 归属、不挂单个操作员,符合 D2/D5)。
+
+---
+
+### M-129 `20260617000001_prod_cart_forming.sql`
+**用途**: Production Phase 2 M2.1 —— 成型录入改为**逐车**,直接挂到已有的 QC 车(`qc_drying_sub_lot`),把 生产↔QC 打通。
+
+**背景**: M1.2b 的平板成型是"扫工单 + 车号范围 + 汇总",更像事后报告。真实流程是逐车:每辆车有车贴(`sub_lot_code`,QC 建批次时生成)。系统已把"车"做成带条码的一等实体(`qc_drying_sub_lot`),但 Phase 2 另起炉灶用车号范围,两套平行。本期统一到那辆车上。
+
+**改动**:
+- **`prod_run` 加 `sub_lot_id`**(→ `qc_drying_sub_lot`)+ `WHERE sub_lot_id IS NOT NULL` 部分唯一索引(一辆车只一条成型 run,防重)。**成型一辆车 = 一条 `prod_run`**(`cart_from=cart_to=车序号`、`source='tablet'`、`operator_id` 空)。
+- **`prod_run_view` 重建**:`LEFT JOIN qc_drying_sub_lot` 补 `sub_lot_id`/`sub_lot_code`;BR-P1 的 10 个计算表达式与 M-125 **逐字一致**(md5 校验相同)。
+- **RPC `prod_find_cart_for_forming(p_code)`**(`SECURITY DEFINER`,授予 `anon`):扫车贴 → 解析 `qc_drying_sub_lot` →(**工单桥**)`qc_production_lot.work_order_barcode = prod_work_order.work_order_no` → `product_id` → `prod_product_master`,一次返回车 + 工单 + 产品 + 标准速率 + `already_formed`。平板(anon)无需直读 qc 表。
+
+**业务规则**:
+- **BR-P8** 成型逐车:一辆车一条 `prod_run`,`sub_lot_id` 直链 QC 车;产品与标准速率经**工单桥**(`prod_work_order → prod_product_master`)取得 —— 绕开两套产品主数据差异(`qc_product_sku.code` 为 `SKU-NNNN`,与 `prod_product_master.item_number` 不同,无法按码 join,但工单号一致即可);一辆车只一条成型 run。
+
+**设计取舍/依赖**: 工单桥靠 `work_order_barcode = work_order_no` 字符串匹配(运营约定:QC 建批次与 `prod_work_order` 用同一套工单号)。不匹配时降级(产出仍录、速率空)。不改 QC 建批次/车贴流程,不动 `qc_drying_sub_lot` schema(仅 `prod_run` 外链)。生产↔QC 由共享车天然打通。
+
+**前端配套**: `src/services/productionTabletApi.ts`(`findCartForForming` + `submitTabletRun` 带 `sub_lot_id`)、`src/pages/tablet/TabletApp.tsx`(生产页改逐车扫码)、`src/services/productionRunApi.ts`(`DailyReportRow` 加 `sub_lot_*`)、`src/pages/production/DailyReportPage.tsx`(「车号」列)、`src/locales/*/production.json`。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2153,8 +2251,17 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-117 | 20260527000014_qc_hold_event_hooks.sql |
 | M-118 | 20260527000015_qc_soft_limits.sql |
 | M-119 | 20260527000016_qc_sample_id_from_cart.sql |
-| M-123 | 20260611000001_app_module_visibility.sql · 开发者 superuser 面板的模块显隐配置(表 `app_module_visibility` 单行全局配置 + 公开只读 RLS + 校验密钥的 `set_module_visibility(p_hidden,p_secret)` RPC)。前端 `/superuser` 子路由读写,控制 HomePage 入口卡片、模块导航与权限开关的显示。 |
-| **M-124** | _(下一个)_ |
+| M-120 | 20260609000001_qc_failed_outcome_split.sql |
+| M-121 | 20260609000002_qc_recent_passed_inspections.sql |
+| M-122 | 20260610000001_prod_daily_report.sql |
+| M-123 | 20260610000002_prod_daily_report_seed.sql |
+| M-124 | 20260611000001_app_module_visibility.sql · 开发者 superuser 面板的模块显隐配置(表 `app_module_visibility` 单行全局配置 + 公开只读 RLS + 校验密钥的 `set_module_visibility(p_hidden,p_secret)` RPC)。前端 `/superuser` 子路由读写,控制 HomePage 入口卡片、模块导航与权限开关的显示。 |
+| M-125 | 20260613000001_prod_work_order_and_run.sql |
+| M-126 | 20260614000001_prod_tablet_device_attendance.sql |
+| M-127 | 20260615000001_prod_downtime_event.sql |
+| M-128 | 20260616000001_prod_run_cart_overlap_guard.sql |
+| M-129 | 20260617000001_prod_cart_forming.sql |
+| **M-130** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

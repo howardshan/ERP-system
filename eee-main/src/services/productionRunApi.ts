@@ -1,8 +1,10 @@
 import { supabase } from '../lib/supabase';
 
-// Production "Daily Report" (Forming Production) data-entry — see M-122.
-// The hand-entered fields live in prod_daily_report; the 10 computed columns
-// (BR-P1) come from the view prod_daily_report_view, which we read directly.
+// Production run data-entry — see M-125 (Phase 2 M1.1, 方案A 单一事实源).
+// Hand-entered fields live in prod_run (the single source of truth, shared by
+// the manager page and — later — the tablet); the 10 computed columns (BR-P1)
+// come from the view prod_run_view, which we read directly. (Renamed from
+// productionDailyApi.ts; prod_daily_report is now a back-compat view.)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -15,13 +17,18 @@ export interface DailyReportRow {
   shift: Shift;
   machine_id: string;
   machine_code: string;
+  work_order_id: string | null;
+  work_order_no: string | null;
   product_id: string | null;
   item_number: string | null;
   item_description: string | null;
+  process: string | null;
   is_activity: boolean | null;
-  operator_id: string;
-  badge_no: number;
-  operator_name: string;
+  operator_id: string | null;
+  badge_no: number | null;
+  operator_name: string | null;
+  sub_lot_id: string | null;
+  sub_lot_code: string | null;
   work_order: string | null;
   cart_from: number | null;
   cart_to: number | null;
@@ -32,6 +39,10 @@ export interface DailyReportRow {
   downtime_reason_id: string | null;
   downtime_reason: string | null;
   note: string | null;
+  source: string;
+  run_status: string;
+  final_cart_complete: boolean;
+  continues_prev: boolean;
   // computed (BR-P1)
   standard_lbs_hr: number | null;
   lbs_good_produced: number | null;
@@ -49,8 +60,9 @@ export interface DailyReportInput {
   report_date: string;
   shift: Shift;
   machine_id: string;
+  work_order_id?: string | null;
   product_id?: string | null;
-  operator_id: string;
+  operator_id: string | null;   // null = team run (tablet); set = manager per-operator row
   work_order?: string | null;
   cart_from?: number | null;
   cart_to?: number | null;
@@ -108,6 +120,23 @@ export async function listOperators(): Promise<OperatorOption[]> {
   return (data ?? []) as OperatorOption[];
 }
 
+/** One operator's attendance on a line for a date+shift (open or closed session). */
+export interface ShiftAttendanceRow { machine_id: string; badge_no: number | null; name: string | null }
+
+/** Everyone who clocked in on any line for a given date + shift — used to show the
+ *  "team" behind team/tablet runs in the manager Daily Report. */
+export async function listShiftAttendance(date: string, shift: Shift): Promise<ShiftAttendanceRow[]> {
+  const { data, error } = await supabase
+    .from('prod_line_attendance')
+    .select('machine_id, operator:prod_operator(badge_no, name)')
+    .eq('report_date', date)
+    .eq('shift', shift)
+    .order('check_in_at');
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as Array<{ machine_id: string; operator: { badge_no: number; name: string } | null }>)
+    .map((r) => ({ machine_id: r.machine_id, badge_no: r.operator?.badge_no ?? null, name: r.operator?.name ?? null }));
+}
+
 export async function listDowntimeReasons(): Promise<DowntimeReasonOption[]> {
   const { data, error } = await supabase
     .from('prod_downtime_reason')
@@ -118,12 +147,12 @@ export async function listDowntimeReasons(): Promise<DowntimeReasonOption[]> {
   return (data ?? []) as DowntimeReasonOption[];
 }
 
-// ── Daily report rows ───────────────────────────────────────────────────────
+// ── Run rows ────────────────────────────────────────────────────────────────
 
 /** All rows for one date + shift, with computed columns, machine-ordered. */
 export async function listDailyReports(date: string, shift: Shift): Promise<DailyReportRow[]> {
   const { data, error } = await supabase
-    .from('prod_daily_report_view')
+    .from('prod_run_view')
     .select('*')
     .eq('report_date', date)
     .eq('shift', shift)
@@ -138,6 +167,7 @@ function toRow(input: DailyReportInput) {
     report_date: input.report_date,
     shift: input.shift,
     machine_id: input.machine_id,
+    work_order_id: input.work_order_id ?? null,
     product_id: input.product_id ?? null,
     operator_id: input.operator_id,
     work_order: input.work_order ?? null,
@@ -149,12 +179,13 @@ function toRow(input: DailyReportInput) {
     down_hours: input.down_hours ?? null,
     downtime_reason_id: input.downtime_reason_id ?? null,
     note: input.note ?? null,
+    // source defaults to 'manager' in the DB for these manager-page entries.
   };
 }
 
 export async function createDailyReport(input: DailyReportInput): Promise<string> {
   const { data, error } = await supabase
-    .from('prod_daily_report')
+    .from('prod_run')
     .insert(toRow(input))
     .select('id')
     .single();
@@ -164,13 +195,13 @@ export async function createDailyReport(input: DailyReportInput): Promise<string
 
 export async function updateDailyReport(id: string, input: DailyReportInput): Promise<void> {
   const { error } = await supabase
-    .from('prod_daily_report')
+    .from('prod_run')
     .update({ ...toRow(input), updated_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw new Error(error.message);
 }
 
 export async function deleteDailyReport(id: string): Promise<void> {
-  const { error } = await supabase.from('prod_daily_report').delete().eq('id', id);
+  const { error } = await supabase.from('prod_run').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }

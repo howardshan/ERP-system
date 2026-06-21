@@ -8,22 +8,28 @@ import { usePermissions } from '../../contexts/PermissionContext';
 import { PermissionDenied } from '../qc/components/PermissionDenied';
 import {
   listDailyReports, createDailyReport, updateDailyReport, deleteDailyReport,
-  listProducts, listMachines, listOperators, listDowntimeReasons,
+  listProducts, listMachines, listOperators, listDowntimeReasons, listShiftAttendance,
   type DailyReportRow, type DailyReportInput, type Shift,
   type ProductOption, type MachineOption, type OperatorOption, type DowntimeReasonOption,
-} from '../../services/productionDailyApi';
+} from '../../services/productionRunApi';
+import { findWorkOrderByNo } from '../../services/productionWorkOrderApi';
+
+/** badge·name of a team member, for showing who is behind a team/tablet run. */
+interface Member { badge_no: number | null; name: string | null }
 
 const SHIFTS: Shift[] = ['1st', '2nd', '3rd'];
 
 /** Draft form — numeric fields kept as strings so empty / partial entry works. */
 interface Draft {
-  machine_id: string; product_id: string; operator_id: string; work_order: string;
+  machine_id: string; product_id: string; operator_id: string;
+  work_order: string; work_order_id: string;
   cart_from: string; cart_to: string; output_qty: string; work_hours: string;
   defect_waste_lbs: string; down_hours: string; downtime_reason_id: string; note: string;
 }
 
 const emptyDraft = (): Draft => ({
-  machine_id: '', product_id: '', operator_id: '', work_order: '',
+  machine_id: '', product_id: '', operator_id: '',
+  work_order: '', work_order_id: '',
   cart_from: '', cart_to: '', output_qty: '', work_hours: '',
   defect_waste_lbs: '', down_hours: '', downtime_reason_id: '', note: '',
 });
@@ -31,8 +37,9 @@ const emptyDraft = (): Draft => ({
 const rowToDraft = (r: DailyReportRow): Draft => ({
   machine_id: r.machine_id,
   product_id: r.product_id ?? '',
-  operator_id: r.operator_id,
-  work_order: r.work_order ?? '',
+  operator_id: r.operator_id ?? '',
+  work_order: r.work_order_no ?? r.work_order ?? '',
+  work_order_id: r.work_order_id ?? '',
   cart_from: r.cart_from == null ? '' : String(r.cart_from),
   cart_to: r.cart_to == null ? '' : String(r.cart_to),
   output_qty: String(r.output_qty ?? ''),
@@ -78,6 +85,8 @@ export default function DailyReportPage() {
   const [machines, setMachines] = useState<MachineOption[]>([]);
   const [operators, setOperators] = useState<OperatorOption[]>([]);
   const [reasons, setReasons] = useState<DowntimeReasonOption[]>([]);
+  // machine_id → distinct team members on this date+shift (who's behind team runs)
+  const [teamByMachine, setTeamByMachine] = useState<Map<string, Member[]>>(new Map());
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -108,6 +117,15 @@ export default function DailyReportPage() {
       .then(setRows)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+    listShiftAttendance(date, shift).then((rowsA) => {
+      const m = new Map<string, Member[]>();
+      for (const a of rowsA) {
+        const list = m.get(a.machine_id) ?? [];
+        if (!list.some((x) => x.badge_no === a.badge_no)) list.push({ badge_no: a.badge_no, name: a.name });
+        m.set(a.machine_id, list);
+      }
+      setTeamByMachine(m);
+    }).catch(() => {});
   };
 
   useEffect(() => {
@@ -145,14 +163,21 @@ export default function DailyReportPage() {
   const openEdit = (r: DailyReportRow) => { setError(''); setMsg(''); setDraft(rowToDraft(r)); setDrawer(r.id); };
   const closeDrawer = () => { setDrawer(null); setDraft(emptyDraft()); setError(''); };
 
+  // The row being edited (if any) — used to tell a team/tablet run (no single
+  // operator) apart from a manager per-operator row, and to show its team roster.
+  const editingRow = drawer && drawer !== 'new' ? rows.find((r) => r.id === drawer) ?? null : null;
+  const isTeamRow = !!editingRow && editingRow.source === 'tablet';
+  const teamMembers = editingRow ? (teamByMachine.get(editingRow.machine_id) ?? []) : [];
+
   const buildInput = (): DailyReportInput | null => {
     if (!draft.machine_id) { setError(t('dailyReport.errMachine')); return null; }
-    if (!draft.operator_id) { setError(t('dailyReport.errOperator')); return null; }
+    if (!isTeamRow && !draft.operator_id) { setError(t('dailyReport.errOperator')); return null; }
     return {
       report_date: date, shift,
       machine_id: draft.machine_id,
+      work_order_id: draft.work_order_id || null,
       product_id: draft.product_id || null,
-      operator_id: draft.operator_id,
+      operator_id: isTeamRow ? null : (draft.operator_id || null),
       work_order: draft.work_order.trim() || null,
       cart_from: intOrNull(draft.cart_from),
       cart_to: intOrNull(draft.cart_to),
@@ -207,9 +232,11 @@ export default function DailyReportPage() {
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className={cn(th, 'text-left')}>{t('dailyReport.colMachine')}</th>
+              <th className={cn(th, 'text-left')}>{t('dailyReport.colWorkOrder')}</th>
+              <th className={cn(th, 'text-left')}>{t('dailyReport.colCart')}</th>
               <th className={cn(th, 'text-left')}>{t('dailyReport.colItem')}</th>
               <th className={cn(th, 'text-left')}>{t('dailyReport.colDescription')}</th>
-              <th className={cn(th, 'text-left')}>{t('dailyReport.colOperator')}</th>
+              <th className={cn(th, 'text-left')}>{t('dailyReport.colOperatorTeam')}</th>
               <th className={cn(th, 'text-right')}>{t('dailyReport.colOutput')}</th>
               <th className={cn(th, 'text-right')}>{t('dailyReport.colWorkHours')}</th>
               <th className={cn(th, 'text-right')}>{t('dailyReport.colTotalCarts')}</th>
@@ -223,12 +250,18 @@ export default function DailyReportPage() {
               <tr key={r.id} className="hover:bg-slate-50 cursor-pointer"
                   onClick={() => (canEdit ? openEdit(r) : undefined)}>
                 <td className={cn(td, 'font-medium whitespace-nowrap')}>{r.machine_code}</td>
+                <td className={cn(td, 'font-mono text-xs whitespace-nowrap')}>{r.work_order_no ?? r.work_order ?? '—'}</td>
+                <td className={cn(td, 'font-mono text-xs whitespace-nowrap')}>{r.sub_lot_code ?? '—'}</td>
                 <td className={cn(td, 'font-mono text-xs whitespace-nowrap')}>{r.item_number ?? '—'}</td>
-                <td className={cn(td, 'max-w-[240px] truncate')} title={r.item_description ?? ''}>
+                <td className={cn(td, 'max-w-[220px] truncate')} title={r.item_description ?? ''}>
                   {r.item_description ?? '—'}
                 </td>
-                <td className={cn(td, 'whitespace-nowrap')}>
-                  <span className="text-slate-400 text-xs mr-1">{r.badge_no}</span>{r.operator_name}
+                <td className={cn(td, 'max-w-[220px]')}>
+                  {r.operator_name ? (
+                    <span className="whitespace-nowrap"><span className="text-slate-400 text-xs mr-1">{r.badge_no}</span>{r.operator_name}</span>
+                  ) : r.source === 'tablet' ? (
+                    <TeamCell members={teamByMachine.get(r.machine_id) ?? []} t={t} />
+                  ) : '—'}
                 </td>
                 <td className={cn(td, 'text-right tabular-nums')}>{fmt(r.output_qty, 0)}</td>
                 <td className={cn(td, 'text-right tabular-nums')}>{fmt(r.work_hours)}</td>
@@ -256,12 +289,12 @@ export default function DailyReportPage() {
               </tr>
             ))}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={10} className="px-4 py-12 text-center text-sm text-slate-400">
+              <tr><td colSpan={12} className="px-4 py-12 text-center text-sm text-slate-400">
                 {t('dailyReport.empty')}
               </td></tr>
             )}
             {loading && (
-              <tr><td colSpan={10} className="px-4 py-12 text-center text-sm text-slate-400">
+              <tr><td colSpan={12} className="px-4 py-12 text-center text-sm text-slate-400">
                 {t('dailyReport.loading')}
               </td></tr>
             )}
@@ -320,6 +353,7 @@ export default function DailyReportPage() {
           draft={draft} setDraft={setDraft}
           preview={preview}
           machines={machines} products={products} operators={operators} reasons={reasons}
+          isTeamRow={isTeamRow} teamMembers={teamMembers} date={date} shift={shift}
           error={error}
           busy={busy}
           onClose={closeDrawer}
@@ -327,6 +361,19 @@ export default function DailyReportPage() {
         />
       )}
     </div>
+  );
+}
+
+/** Team/tablet run — shows the TABLET tag + who was on shift on this line. */
+function TeamCell({ members, t }: { members: Member[]; t: (k: string, o?: Record<string, unknown>) => string }) {
+  const names = members.map((m) => m.name).filter(Boolean) as string[];
+  return (
+    <span className="inline-flex items-center gap-1.5 flex-wrap">
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold shrink-0">TABLET</span>
+      {names.length === 0
+        ? <span className="text-slate-400 text-xs">{t('dailyReport.noTeamMembers')}</span>
+        : <span className="text-slate-600 text-sm">{names.join(', ')}</span>}
+    </span>
   );
 }
 
@@ -360,15 +407,65 @@ interface DrawerProps {
   products: ProductOption[];
   operators: OperatorOption[];
   reasons: DowntimeReasonOption[];
+  isTeamRow: boolean;
+  teamMembers: Member[];
+  date: string;
+  shift: Shift;
   error: string;
   busy: boolean;
   onClose: () => void;
   onSave: () => void;
 }
 
+// Defined at module scope (NOT inside EntryDrawer) — a component re-created on
+// each render gets remounted by React, which makes inputs lose focus after
+// every keystroke. Keep these stable.
+const inputCls = 'w-full border border-slate-300 rounded-lg px-2.5 h-9 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400';
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-slate-600">{label}{required && <span className="text-red-500"> *</span>}</span>
+      {children}
+    </label>
+  );
+}
+
+function Calc({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
+      <span className="text-xs text-slate-500">{label}</span>
+      <span className="text-sm font-semibold text-slate-800 tabular-nums">{value}</span>
+    </div>
+  );
+}
+
 function EntryDrawer(p: DrawerProps) {
   const { t, draft, setDraft } = p;
   const set = (k: keyof Draft) => (v: string) => setDraft({ ...draft, [k]: v });
+
+  // F3 — work-order-driven autofill. The input accepts a barcode-gun scan
+  // (which types the value + Enter) or manual typing (D9); on resolve we look
+  // up the work order and auto-fill the product (process/rates come from it).
+  const [woStatus, setWoStatus] = useState<'idle' | 'loading' | 'matched' | 'notfound'>(
+    draft.work_order_id ? 'matched' : 'idle');
+  const resolveWO = async () => {
+    const no = draft.work_order.trim();
+    if (!no) { setDraft({ ...draft, work_order_id: '' }); setWoStatus('idle'); return; }
+    setWoStatus('loading');
+    try {
+      const m = await findWorkOrderByNo(no);
+      if (m) {
+        setDraft({ ...draft, work_order_id: m.work_order_id, product_id: m.product_id ?? draft.product_id });
+        setWoStatus('matched');
+      } else {
+        setDraft({ ...draft, work_order_id: '' });
+        setWoStatus('notfound');
+      }
+    } catch {
+      setWoStatus('notfound');
+    }
+  };
 
   // Searchable options. Operators match on badge # or name; items on item # or
   // description (hint is both shown muted and included in the search).
@@ -380,31 +477,16 @@ function EntryDrawer(p: DrawerProps) {
     () => p.products.map((pr) => ({ value: pr.id, label: pr.item_number, hint: pr.description ?? undefined })),
     [p.products]);
 
-  const labelCls = 'block';
-  const spanCls = 'text-xs font-medium text-slate-600';
-  const inputCls = 'w-full border border-slate-300 rounded-lg px-2.5 h-9 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400';
-
-  const Field = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
-    <label className={labelCls}>
-      <span className={spanCls}>{label}{required && <span className="text-red-500"> *</span>}</span>
-      {children}
-    </label>
-  );
-
-  const Calc = ({ label, value }: { label: string; value: string }) => (
-    <div className="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className="text-sm font-semibold text-slate-800 tabular-nums">{value}</span>
-    </div>
-  );
-
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-slate-900/30" onClick={p.onClose} />
       <aside className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col">
         {/* header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
-          <h2 className="text-base font-bold text-slate-900">{t(p.titleKey)}</h2>
+          <div>
+            <h2 className="text-base font-bold text-slate-900">{t(p.titleKey)}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{p.date} · {t('dailyReport.shift')} {p.shift}{p.isTeamRow && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold">TABLET</span>}</p>
+          </div>
           <button onClick={p.onClose} className="p-1.5 rounded hover:bg-slate-100 text-slate-500" title={t('dailyReport.close')}>
             <X size={18} />
           </button>
@@ -422,16 +504,36 @@ function EntryDrawer(p: DrawerProps) {
                 <Combobox className={inputCls} value={draft.machine_id} onChange={set('machine_id')}
                   options={machineOpts} placeholder={t('dailyReport.selectPlaceholder')} />
               </Field>
-              <Field label={t('dailyReport.colOperator')} required>
-                <Combobox className={inputCls} value={draft.operator_id} onChange={set('operator_id')}
-                  options={operatorOpts} placeholder={t('dailyReport.selectPlaceholder')} />
-              </Field>
+              {p.isTeamRow ? (
+                <Field label={t('dailyReport.teamMembersLabel')}>
+                  <div className="mt-1 min-h-9 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-sm text-slate-700">
+                    {p.teamMembers.length === 0
+                      ? <span className="text-slate-400">{t('dailyReport.noTeamMembers')}</span>
+                      : p.teamMembers.map((m) => `${m.badge_no ?? ''} ${m.name ?? ''}`.trim()).join(', ')}
+                  </div>
+                </Field>
+              ) : (
+                <Field label={t('dailyReport.colOperator')} required>
+                  <Combobox className={inputCls} value={draft.operator_id} onChange={set('operator_id')}
+                    options={operatorOpts} placeholder={t('dailyReport.selectPlaceholder')} />
+                </Field>
+              )}
               <Field label={t('dailyReport.colItem')}>
                 <Combobox className={inputCls} value={draft.product_id} onChange={set('product_id')}
                   options={productOpts} placeholder={t('dailyReport.selectPlaceholder')} />
               </Field>
               <Field label={t('dailyReport.colWorkOrder')}>
-                <input className={inputCls} value={draft.work_order} onChange={(e) => set('work_order')(e.target.value)} />
+                <input className={inputCls} value={draft.work_order}
+                  placeholder={t('dailyReport.woScanPlaceholder')}
+                  onChange={(e) => { setWoStatus('idle'); setDraft({ ...draft, work_order: e.target.value, work_order_id: '' }); }}
+                  onBlur={resolveWO}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); resolveWO(); } }} />
+                {woStatus === 'matched' && (
+                  <span className="text-[11px] text-emerald-600 mt-1 inline-block">{t('dailyReport.woMatched')}</span>
+                )}
+                {woStatus === 'notfound' && (
+                  <span className="text-[11px] text-amber-600 mt-1 inline-block">{t('dailyReport.woNotFound')}</span>
+                )}
               </Field>
             </div>
             {p.preview.item_description && (
