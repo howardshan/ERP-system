@@ -148,6 +148,16 @@
           "2": "Approval Tiers",
           "3": "Audit Trail"
         }
+      },
+      "faq": {
+        "label": "FAQ & Help",
+        "description": "How-to answers for every module of the QC & production system, with search.",
+        "features": {
+          "0": "Searchable Q&A",
+          "1": "All 8 modules",
+          "2": "Trilingual",
+          "3": "Operator guides"
+        }
       }
     }
   },

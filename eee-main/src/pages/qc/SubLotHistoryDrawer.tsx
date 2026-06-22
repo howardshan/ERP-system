@@ -20,6 +20,7 @@ type TimelineItem = {
   payload?: Record<string, unknown>;
   closed_at?: string | null;
   duration_minutes?: number | null;
+  actor?: string | null;   // M-149: account that performed the action
 };
 
 function fmtMin(m: number | null | undefined): string {
@@ -91,6 +92,7 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
         kind: 'sample',
         title: t('subLotHistoryDrawer.sampleTaken', { sampleId: s.sample_id }),
         description: resultLine,
+        actor: s.taken_by,
       });
     }
     for (const ir of data.inspections) {
@@ -103,6 +105,7 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
           : t('subLotHistoryDrawer.inspectionResult', { result: ir.result.toUpperCase(), aw: ir.aw ?? '—' }),
         description: [ir.sample_id ? t('subLotHistoryDrawer.sampleLabel', { sampleId: ir.sample_id }) : null, ir.remark ? t('subLotHistoryDrawer.remarkLabel', { remark: ir.remark }) : null]
           .filter(Boolean).join(' · ') || undefined,
+        actor: ir.inspector,
       });
     }
     for (const d of data.dispositions) {
@@ -114,6 +117,7 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
         kind: 'disposition',
         title: label,
         description: d.remark ?? undefined,
+        actor: d.operator,
       });
     }
     for (const sess of data.room_temp_sessions) {
@@ -125,6 +129,7 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
           ? t('subLotHistoryDrawer.stoppedAfter', { duration: fmtMin(sess.duration_minutes) })
           : t('subLotHistoryDrawer.stillRunning'),
         closed_at: sess.ended_at,
+        actor: sess.ended_by ?? sess.started_by,
       });
     }
     // Events table covers create/move/displaced/check-in/check-out etc.; include for full picture
@@ -133,6 +138,7 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
         ts: ev.created_at,
         kind: 'event',
         title: ev.summary || ev.event_type,
+        actor: ev.actor,
       });
     }
 
@@ -218,6 +224,7 @@ export default function SubLotHistoryDrawer({ subLotId, onClose }: Props) {
                       </span>
                       <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
                         {formatQcDateTime(it.ts)}
+                        {it.actor && <span className="text-slate-500 normal-case"> · {it.actor}</span>}
                       </p>
                       <p className="text-sm font-bold text-slate-900 leading-snug">{it.title}</p>
                       {it.description && (

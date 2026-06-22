@@ -1,0 +1,163 @@
+{
+  "title": "Preguntas frecuentes y ayuda",
+  "subtitle": "Guías paso a paso — solo sigue los clics. Cubre todos los módulos del sistema de QC y producción.",
+  "searchPlaceholder": "Escribe una palabra clave: registrar, muestra, liberar, rechazado…",
+  "resultsCount": "{{count}} resultado(s)",
+  "noResults": "Ninguna pregunta coincide. Prueba otra palabra, p. ej. «imprimir», «mover», «aprobado».",
+  "back": "Volver al inicio",
+  "clear": "Limpiar",
+  "categories": [
+    {
+      "id": "A",
+      "title": "A · Lotes y carros (crear orden / imprimir etiquetas)",
+      "items": [
+        {
+          "q": "¿Cómo creo una orden de trabajo desde cero?",
+          "a": "1. En el inicio, haz clic en la tarjeta azul «Producción».\n2. En el campo «Número de orden», escribe el número de este lote (p. ej. test001).\n3. En «SKU del producto», elige el producto que vas a hacer.\n4. En «Tiempo de secado previsto (días)», pon cuántos días secar (p. ej. 1).\n5. En «Primer carro» pon 1 y en «Último carro» el último (p. ej. 50 para cincuenta carros). Mostrará «50 carro(s): test001-001 … test001-050».\n6. (Opcional) Si conoces el producto final, elígelo en «Producto final»; si no, déjalo vacío y elígelo al liberar.\n7. Haz clic en el botón verde «Crear orden con N carro(s)» abajo.\n8. Un mensaje de éxito significa que está listo — los carros se numeran test001-001, test001-002, …"
+        },
+        {
+          "q": "Después de crear la orden, ¿cómo imprimo las etiquetas (con QR)?",
+          "a": "1. Tras crearla, aparece un botón de impresión / vista previa de etiquetas. Haz clic para abrirlas.\n2. En la vista previa, cada etiqueta tiene un QR a la izquierda y el número de carro debajo (p. ej. test001-001).\n3. Verifica que la impresora esté conectada y pulsa Imprimir. Una etiqueta por carro.\n4. Pega cada etiqueta en su carro correspondiente.\nNota: leer este QR requiere un escáner 2-D (de imagen); una pistola láser 1-D antigua no puede leerlo.\nSi sale borroso, ajusta la resolución (203 / 300 / 600 dpi) en la configuración de impresión para que coincida con tu impresora."
+        },
+        {
+          "q": "¿Es obligatorio llenar «Producto final»?",
+          "a": "No, es opcional.\n• Vacío: crea la orden ahora y elige el producto final luego, al aprobar y liberar el lote.\n• Lleno: queda vinculado al crear.\nAmbas opciones sirven y no afectan la creación de carros."
+        },
+        {
+          "q": "Necesito más carros en una orden existente, ¿cómo?",
+          "a": "1. Abre «Producción».\n2. En «Número de orden» escribe exactamente el mismo número de antes (p. ej. test001).\n3. En Primer/Último carro pon el rango NUEVO (p. ej. si llegó a 50, pon 51 a 60).\n4. Crea. Los nuevos carros test001-051 … test001-060 se añaden a la orden existente — los anteriores no se sobrescriben."
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "title": "B · Secadores (meter carros / mover / ver estado)",
+      "items": [
+        {
+          "q": "¿Cómo meto carros en un secador (registrar)?",
+          "a": "1. Inicio → «Control de calidad» → pestaña superior «Secadores».\n2. Haz clic en la tarjeta del secador que quieras (p. ej. Secador 1).\n3. En la lista «Por registrar» de la izquierda, marca los carros; o pulsa «Escanear para registrar» y escanea cada etiqueta.\n4. Pulsa el botón verde «Registrar en Secador N».\n5. Aparece un cuadro de confirmación — verifica la cantidad y pulsa «Registrar».\n6. «Se registraron X carros en el Secador N» significa éxito; los carros aparecen en «Este secador» a la derecha y empieza su temporizador.\nImportante: cada sala tiene un límite de capacidad. Si tu selección supera el espacio libre, sale «Espacio insuficiente» y NO entra ninguno — selecciona menos carros o saca algunos primero."
+        },
+        {
+          "q": "¿Cómo muevo carros que ya están secando a otro secador?",
+          "a": "1. Control de calidad → Secadores → haz clic en la sala actual.\n2. En «Este secador» a la derecha, marca los carros a mover.\n3. Pulsa el botón «Mover».\n4. En el diálogo, elige el secador destino y confirma.\nMisma regla de capacidad: si el destino no puede con todos los carros, no se mueve ninguno y se te pide otro secador o menos carros."
+        },
+        {
+          "q": "¿Qué significan «Ocupado / Disponible / Próximo fin» en la tarjeta?",
+          "a": "• Ocupado: cuánto hay en la sala ahora (en unidades; un carro suele ser 1 unidad).\n• Disponible: cuánto más cabe.\n• Próximo fin: cuándo terminará el carro más temprano (según el tiempo de secado de la orden).\nLa barra verde muestra qué tan llena está la sala."
+        },
+        {
+          "q": "Pulsé registrar pero solo gira / no entra, ¿qué hago?",
+          "a": "1. La causa más común es que la sala está llena — elige otra sala o menos carros.\n2. Si aparece «Espacio insuficiente: solo quedan X», sigue el aviso: selecciona menos o saca algunos, y reintenta.\n3. Si es un cuelgue de red, tras unos 20 segundos verás «Tiempo agotado, reintenta» — pulsa Cancelar y registra de nuevo (no se duplica)."
+        }
+      ]
+    },
+    {
+      "id": "C",
+      "title": "C · Muestreo e inspección (salida → muestra → resultados → dictamen)",
+      "items": [
+        {
+          "q": "Un carro terminó de secar, ¿cuál es el flujo completo de inspección?",
+          "a": "Paso 1 Salida: Control de calidad → Secadores → abre la sala → marca los carros secos → pulsa «Salida → Pendiente» → elige un método de muestreo (el predeterminado está bien) → confirma. El sistema agrupa los carros y elige el «campeón» (carro representativo) de cada grupo.\nPaso 2 Muestra: ve a la pestaña «Pruebas», haz clic en un carro campeón de la lista izquierda → pulsa «Tomar muestra». El ID de muestra se genera automáticamente (el número del carro).\nPaso 3 Resultados: escribe las lecturas del instrumento (ver el siguiente punto sobre varias pruebas).\nPaso 4 Dictamen: con las lecturas puestas, pulsa «Aprobado» o «Rechazado», añade una nota si hace falta → pulsa «Confirmar».\nPaso 5: el resultado del campeón se aplica automáticamente a todo su grupo."
+        },
+        {
+          "q": "Un producto necesita varias pruebas (p. ej. Aw + Humedad MC%). ¿Cómo las registro?",
+          "a": "1. En la pantalla de pruebas, el centro muestra CADA prueba requerida como una tarjeta desplegable (plegada por defecto).\n2. Abre cualquiera (en cualquier orden) y escribe su valor con el teclado numérico.\n3. Al llenar una prueba, su tarjeta recibe una marca. Arriba dice «X / Y pruebas hechas».\n4. Debes llenar TODAS las pruebas antes de que se activen los botones «Aprobado / Rechazado».\n5. Cuando estén todas, dictamina y confirma."
+        },
+        {
+          "q": "¿Cómo decide el sistema Aprobado o Rechazado? ¿Puedo cambiarlo?",
+          "a": "Cada valor se compara con los límites «duro» y «suave» del producto:\n• Todos dentro del rango duro → sugiere Aprobado; puedes confirmar directo.\n• Cualquier valor fuera del rango suave → Rechazo forzado; el botón Aprobado se desactiva.\n• Un valor en la banda suave (entre duro y suave) → requiere alguien con permiso de «supervisor»; un operador normal no puede.\nAsí que: en casos normales sigue la sugerencia; para valores límite busca un supervisor."
+        },
+        {
+          "q": "¿Por qué algunos IDs de muestra terminan en R o R2?",
+          "a": "R significa «repetición». La primera prueba de un carro usa el ID simple (el número del carro). Si falla y se repite, el nuevo ID añade R (luego R2, …) para que la línea de tiempo distinga la primera prueba de las repeticiones."
+        }
+      ]
+    },
+    {
+      "id": "D",
+      "title": "D · Disposición de no conformes (repetir / re-secar / ambiente / descartar)",
+      "items": [
+        {
+          "q": "Un carro fue rechazado, ¿dónde lo manejo?",
+          "a": "1. Los carros rechazados van a «Retención» y aparecen en las listas del inicio de Control de calidad (panel).\n2. Selecciona el/los carro(s) y elige una disposición:\n  • Repetir prueba: sin re-secar — vuelve a muestrearse y probarse.\n  • Re-secar: vuelve a un secador por más tiempo (escribe un nuevo tiempo de secado).\n  • Secado a temperatura ambiente: reposa fuera del secador; pulsa detener al terminar para devolverlo a pruebas.\n  • Descartar / Moler / Concesión / Retrabajo: terminal (no vuelve al flujo).\n3. Confirma — el sistema lo registra y mueve el carro al siguiente paso."
+        },
+        {
+          "q": "Si el campeón falla, ¿qué pasa con el resto de su grupo?",
+          "a": "El campeón representa a todo el grupo.\n• Campeón rechazado → todo el grupo va a Retención junto.\n• Campeón aprobado → todo el grupo se libera junto.\nAsí que solo dictaminas el campeón; el resto lo sigue automáticamente."
+        },
+        {
+          "q": "Ya hice la disposición, ¿por qué el panel sigue diciendo «aún pendiente»?",
+          "a": "Normalmente no. En cuanto haces CUALQUIER disposición (repetir, re-secar, ambiente, descartar…), el carro/grupo sale del conteo «aún pendiente» y pasa a «resuelto». Si aún aparece, pulsa «Actualizar»."
+        },
+        {
+          "q": "Tras re-secar, ¿se prueba otra vez el mismo carro campeón?",
+          "a": "Depende:\n• Si los carros del grupo volvieron «como un lote al mismo secador», se mantiene el campeón original (lo que se probó antes se prueba de nuevo).\n• Si quedaron en secadores distintos, o no entraron como un lote, el grupo se re-muestrea con el Método 2 para elegir un nuevo campeón.\nEn cualquier caso, el nuevo ID de muestra lleva la marca R."
+        }
+      ]
+    },
+    {
+      "id": "E",
+      "title": "E · Panel de gestión (resumen / liberar)",
+      "items": [
+        {
+          "q": "¿Qué son esas tarjetas del inicio?",
+          "a": "Al entrar a «Control de calidad» ves el panel. Las tarjetas significan:\n• Secando ahora: carros secando en las salas.\n• En espera de muestra: con salida pero sin muestrear.\n• En espera de resultados: muestreados pero sin dictamen.\n• Aprobados hoy / Rechazados hoy: resultados de hoy.\nHaz clic en cualquier tarjeta para desplegar su detalle debajo."
+        },
+        {
+          "q": "¿Qué es exactamente el estado «En espera de resultados»?",
+          "a": "Carros muestreados pero sin veredicto final. Si el producto tiene varias pruebas, el campeón permanece en «En espera de resultados» hasta que registres TODAS las lecturas y envíes — solo entonces pasa a Aprobado o Rechazado."
+        },
+        {
+          "q": "¿Cómo libero un carro aprobado al inventario?",
+          "a": "1. Encuentra el carro/grupo aprobado en las filas aprobadas / la lista «Atención».\n2. Pulsa «Liberar».\n3. Aparece un cuadro de confirmación — verifica y pulsa el verde «Liberar».\n4. El carro se libera al inventario y entra en la cola de empaque.\n(Liberar ya no pide una cantidad producida — solo confirma.)"
+        }
+      ]
+    },
+    {
+      "id": "F",
+      "title": "F · Trazabilidad (historial / quién lo hizo)",
+      "items": [
+        {
+          "q": "¿Cómo veo todo lo que le pasó a un carro?",
+          "a": "1. Haz clic en el carro (en una lista o en la pantalla de pruebas) para abrir su «Línea de tiempo / Historial».\n2. Cada paso — crear, entrada, mover, salida, muestra, inspección, disposición, liberar — aparece en orden cronológico.\n3. Cada entrada también muestra los datos (p. ej. resultado, valor Aw, nota)."
+        },
+        {
+          "q": "¿Puedo ver quién hizo cada paso?",
+          "a": "Sí. Después de la hora en cada entrada se muestra la cuenta (nombre o correo), p. ej. «06/21 01:24 · Howard Shan». Entrada, salida, muestreo, inspección, disposición — cada acción queda ligada a una persona."
+        }
+      ]
+    },
+    {
+      "id": "G",
+      "title": "G · Productos y estándares (límites / tasa de muestreo)",
+      "items": [
+        {
+          "q": "¿Cómo defino el rango aceptable (límites) de un producto?",
+          "a": "1. Control de calidad → «Datos maestros / Productos» (Gestión de productos).\n2. Encuentra y «Edita» el SKU.\n3. En sus plantillas de prueba, por cada prueba pon el límite duro superior/inferior y el suave superior/inferior.\n  • Dentro del duro = aprobado;\n  • Entre suave y duro = requiere supervisor;\n  • Fuera del suave = rechazado.\n4. Guarda."
+        },
+        {
+          "q": "¿Qué son «unidades por carro» y «muestrear cada N carros», y dónde se ponen?",
+          "a": "Se configuran al crear/editar un producto en Gestión de productos:\n• Unidades por carro: cuánta capacidad de secador usa un carro (normalmente 1; uno grande 1.5). Decide cuántos carros cabe una sala.\n• Muestrear cada N carros (tasa): muestrea 1 carro de cada N. Por defecto 3 = 1 por cada 3 carros."
+        },
+        {
+          "q": "¿Cómo agrego una prueba nueva (p. ej. Aw o MC%) a un producto?",
+          "a": "1. En Gestión de productos, edita el producto.\n2. Agrega una plantilla de prueba (elige el tipo, pon los límites superior/inferior).\n3. Tras guardar, la pantalla de pruebas muestra una tarjeta extra para esa prueba en este producto — los inspectores deben llenarla también."
+        }
+      ]
+    },
+    {
+      "id": "H",
+      "title": "H · Cola de liberación de empaque (modo de empaque)",
+      "items": [
+        {
+          "q": "¿Qué carros hay en la cola de empaque?",
+          "a": "Todos los carros aprobados que QC ha «liberado», esperando ser empacados y despachados. Abre la tarjeta «Empaque» en el inicio para verlos."
+        },
+        {
+          "q": "¿Cómo uso el modo de empaque (escaneo con teléfono/tableta)?",
+          "a": "1. Abre «Empaque» → pulsa «Modo de empaque».\n2. Primero escanea una vez el «QR de la orden» con la cámara.\n3. Luego escanea continuamente el QR de cada carro — cada escaneo muestra una confirmación y despacha ese carro a la orden.\n4. Escanéalos uno tras otro; no hace falta confirmar cada uno."
+        }
+      ]
+    }
+  ]
+}
