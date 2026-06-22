@@ -1,0 +1,163 @@
+{
+  "title": "FAQ & Help",
+  "subtitle": "Step-by-step guides — just follow the clicks. Covers every module of the QC & production system.",
+  "searchPlaceholder": "Type a keyword, e.g. check in, sample, release, fail…",
+  "resultsCount": "{{count}} result(s)",
+  "noResults": "No questions match. Try another keyword, e.g. \"print\", \"move\", \"pass\".",
+  "back": "Back to Home",
+  "clear": "Clear",
+  "categories": [
+    {
+      "id": "A",
+      "title": "A · Production Batches & Carts (create order / print labels)",
+      "items": [
+        {
+          "q": "How do I create a work order from scratch?",
+          "a": "1. On the Home screen, click the blue \"Production & Manufacturing\" card.\n2. In the \"Work order number\" field, type this batch's number (e.g. test001).\n3. In \"Product SKU\", pick the product you are making.\n4. In \"Expected drying time (days)\", enter how many days to dry (e.g. 1).\n5. In \"First cart number\" enter 1, and in \"Last cart number\" enter the last cart (e.g. 50 for fifty carts). It will show \"50 cart(s): test001-001 … test001-050\".\n6. (Optional) If you know the final product, pick it in \"Final product\"; if not, leave it blank and choose it later at release.\n7. Click the green \"Create work order with N cart(s)\" button at the bottom.\n8. A success message means it's done — carts are auto-numbered test001-001, test001-002, …"
+        },
+        {
+          "q": "After creating the order, how do I print cart labels (with QR code)?",
+          "a": "1. After it's created, a print button / sticker preview appears. Click it to open the labels.\n2. In the preview, each label has a QR code on the left and the cart number below it (e.g. test001-001).\n3. Make sure the printer is connected, then click Print. One label per cart.\n4. Stick each label onto its matching cart.\nNote: reading this QR needs a 2-D (imager) scanner; an old 1-D red-laser gun cannot read it.\nIf printing looks blurry, set the resolution (203 / 300 / 600 dpi) in printer settings to match your printer."
+        },
+        {
+          "q": "Do I have to fill in \"Final product\"?",
+          "a": "No, it's optional.\n• Leave blank: create the order now, choose the final product later when this batch passes and is released.\n• Fill it: it's bound at creation.\nEither way works and does not affect creating carts."
+        },
+        {
+          "q": "I need more carts on an existing order — how?",
+          "a": "1. Open \"Production & Manufacturing\".\n2. In \"Work order number\" type the exact same number as before (e.g. test001).\n3. In First/Last cart number enter the NEW range (e.g. if it went up to 50, enter 51 to 60).\n4. Click create. New carts test001-051 … test001-060 are appended to the existing order — old carts are not overwritten."
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "title": "B · Dry Rooms (put carts in / move / read status)",
+      "items": [
+        {
+          "q": "How do I put carts into a dryer (check in)?",
+          "a": "1. Home → \"Quality Control\" → top tab \"Dry Rooms\".\n2. Click the dryer card you want (e.g. Dryer 1).\n3. In the left \"To check in\" list, tick the carts to add; or click \"Scan to check in\" and scan each cart label with the scanner.\n4. Click the green \"Check in to Dryer N\".\n5. A confirm box appears — verify the count and click \"Check in\".\n6. \"Checked in X carts to Dryer N\" means success; the carts appear under \"This dryer\" on the right and start their timer.\nImportant: each room has a capacity limit. If your selection exceeds the free space, a \"Not enough room\" message pops up and NOTHING is checked in — select fewer carts, or move some out first."
+        },
+        {
+          "q": "How do I move carts already drying to another dryer?",
+          "a": "1. Quality Control → Dry Rooms → click the current room.\n2. Under \"This dryer\" on the right, tick the carts to move.\n3. Click the \"Move\" button.\n4. In the dialog, pick the target dryer and confirm.\nSame capacity rule: if the target can't hold all selected carts, none are moved and you're asked to pick another dryer or fewer carts."
+        },
+        {
+          "q": "What do \"Occupied / Available / Next finish\" mean on the card?",
+          "a": "• Occupied: how much is in the room now (in units; one cart is usually 1 unit).\n• Available: how much more can fit.\n• Next finish: when the earliest cart is expected to finish (from the expected drying time set on the work order).\nThe green bar shows how full the room is."
+        },
+        {
+          "q": "I clicked check in but it just spins / won't go in — what now?",
+          "a": "1. The most common cause is the room is full — pick another room or fewer carts.\n2. If \"Not enough room: only X space left\" appears, follow it: select fewer or move some out, then retry.\n3. If it's a network hang, after about 20 seconds you'll see \"Request timed out, please retry\" — click Cancel and check in again (it won't double-add)."
+        }
+      ]
+    },
+    {
+      "id": "C",
+      "title": "C · Sampling & Inspection (check out → sample → enter results → judge)",
+      "items": [
+        {
+          "q": "A cart finished drying — what's the full inspection flow?",
+          "a": "Step 1 Check out: Quality Control → Dry Rooms → open the room → tick the dried carts → click \"Check out → Pending\" → pick a sampling method (the default is fine) → confirm. The system groups the carts and picks each group's \"champion\" (representative cart).\nStep 2 Sample: go to the \"Testing\" tab, click a champion cart in the left list → click \"Take sample\". The sample ID is generated automatically (the cart number).\nStep 3 Enter results: type the instrument readings (see the next item about multiple tests).\nStep 4 Judge: after readings are in, click \"Pass\" or \"Fail\", add a remark if needed → click \"Confirm\".\nStep 5: the champion's result is applied automatically to its whole group."
+        },
+        {
+          "q": "A product needs several tests (e.g. Water Activity Aw + Moisture MC%). How do I enter them?",
+          "a": "1. On the testing page, the middle shows EACH required test as a collapsible card (collapsed by default).\n2. Open any one (in any order) and type its value with the number keypad.\n3. When a test is filled, its card gets a check mark. The top shows \"X / Y tests done\".\n4. You must fill EVERY test before the \"Pass / Fail\" buttons light up.\n5. Once all are in, judge and confirm."
+        },
+        {
+          "q": "How does the system decide Pass or Fail? Can I override it?",
+          "a": "Each value is compared to the product's \"hard\" and \"soft\" limits:\n• All values inside the hard range → suggests Pass; you can confirm directly.\n• Any value outside the soft range → forced Fail; the Pass button is disabled.\n• A value in the soft band (between hard and soft) → needs a person with \"supervisor\" rights to judge; a normal operator can't.\nSo: in normal cases follow the suggestion; for borderline values get a supervisor."
+        },
+        {
+          "q": "Why do some sample IDs end in R or R2?",
+          "a": "R means \"retest\". A cart's first test uses the plain sample ID (the cart number). If it fails and is retested, the new sample ID appends R (then R2, …) so the timeline can tell the first test apart from later retests."
+        }
+      ]
+    },
+    {
+      "id": "D",
+      "title": "D · Non-Conforming Disposition (retest / redry / ambient / scrap)",
+      "items": [
+        {
+          "q": "A cart was failed — where do I handle it next?",
+          "a": "1. Failed carts go to \"Hold\" and appear in the lists on the Quality Control home (dashboard).\n2. Select the cart(s) and choose a disposition:\n  • Retest: no re-drying — send back to be re-sampled and tested again.\n  • Redry: send back to a dryer for more drying (enter a new expected drying time).\n  • Ambient/room-temp dry: rest outside the dryer; click stop when done to send it back to testing.\n  • Scrap / Grind / Concession / Rework: terminal (does not return to the flow).\n3. Confirm — the system records it and moves the cart to the next step."
+        },
+        {
+          "q": "If the champion fails, what happens to the rest of its group?",
+          "a": "The champion stands for the whole group.\n• Champion fails → the entire group goes to Hold together.\n• Champion passes → the whole group is released together.\nSo you only judge the champion; the rest follow automatically."
+        },
+        {
+          "q": "I already disposed it — why does the dashboard still say \"still pending\"?",
+          "a": "Normally it won't. As soon as you take ANY disposition (retest, redry, ambient, scrap, …) the cart/group leaves the \"still pending\" count and moves to \"resolved\". If it still shows, click \"Refresh\"."
+        },
+        {
+          "q": "After redry, is the same champion cart tested again?",
+          "a": "It depends:\n• If the group's carts went back in \"as one batch into the same dryer\", the original champion is kept (whatever was tested before is tested again).\n• If they ended up in different dryers, or were not checked in as one batch, the group is re-sampled with Method 2 to pick a new champion.\nEither way, the new retest sample ID carries the R marker."
+        }
+      ]
+    },
+    {
+      "id": "E",
+      "title": "E · Management Dashboard (overview / release)",
+      "items": [
+        {
+          "q": "What are those cards on the home screen?",
+          "a": "Entering \"Quality Control\" shows the dashboard. The cards mean:\n• Currently drying: carts drying in the rooms now.\n• Awaiting sample: checked out but not yet sampled.\n• Awaiting results: sampled but not yet judged.\n• Passed today / Failed today: today's inspection results.\nClick any card to expand its detail list below it."
+        },
+        {
+          "q": "What exactly is the \"Awaiting results\" state?",
+          "a": "Carts that have been sampled but have no final verdict yet. If the product has multiple tests, the champion stays in \"Awaiting results\" until you enter ALL test readings and submit — only then does it become Pass or Fail."
+        },
+        {
+          "q": "How do I release a passed cart to inventory?",
+          "a": "1. Find the passed cart/group in the pass rows / \"Needs attention\" list.\n2. Click \"Release\".\n3. A confirm box appears — verify and click the green \"Release\".\n4. The cart is released to inventory and enters the packaging queue.\n(Release no longer asks for a yield quantity — just confirm.)"
+        }
+      ]
+    },
+    {
+      "id": "F",
+      "title": "F · Batch Traceability (history / who did it)",
+      "items": [
+        {
+          "q": "How do I see everything that happened to one cart?",
+          "a": "1. Click the cart (in a cart list or on the testing page) to open its \"Timeline / History\".\n2. Every step — create, check-in, move, check-out, sample, inspection, disposition, release — is listed in time order.\n3. Each entry also shows the data (e.g. inspection result, Aw value, remark)."
+        },
+        {
+          "q": "Can I see who performed each step?",
+          "a": "Yes. After the time on each timeline entry it shows the account (name or email), e.g. \"06/21 01:24 · Howard Shan\". Check-in, check-out, sampling, inspection, disposition — every action is tied to a person."
+        }
+      ]
+    },
+    {
+      "id": "G",
+      "title": "G · Products & Inspection Standards (limits / sampling rate)",
+      "items": [
+        {
+          "q": "How do I set a product's acceptable range (limits)?",
+          "a": "1. Quality Control → \"Master Data / Products\" (Product Management).\n2. Find and \"Edit\" the product SKU.\n3. In its test templates, for each test enter the hard upper/lower limit and the soft upper/lower limit.\n  • Inside hard = pass;\n  • Between soft and hard = needs supervisor judgment;\n  • Outside soft = fail.\n4. Save."
+        },
+        {
+          "q": "What are \"units per cart\" and \"sample every N carts\", and where do I set them?",
+          "a": "Set them when creating/editing a product in Product Management:\n• Units per cart: how much dryer capacity one cart uses (usually 1; a big cart 1.5). Decides how many carts a room holds.\n• Sample every N carts (sampling rate): sample 1 cart out of every N. Default 3 = 1 per 3 carts."
+        },
+        {
+          "q": "How do I add a new test (e.g. Aw or MC%) to a product?",
+          "a": "1. In Product Management, edit the product.\n2. Add a test template (pick the test type, enter the upper/lower limits).\n3. After saving, the testing page shows an extra card for that test on this product — inspectors must fill it in too."
+        }
+      ]
+    },
+    {
+      "id": "H",
+      "title": "H · Packaging Release Queue (packing mode)",
+      "items": [
+        {
+          "q": "What carts are in the packaging queue?",
+          "a": "All the passed carts that QC has \"released\", waiting to be packed and dispatched. Open the \"Packaging\" card on the Home screen to see them."
+        },
+        {
+          "q": "How do I use packing mode (phone/tablet scanning)?",
+          "a": "1. Open \"Packaging\" → click \"Packing mode\".\n2. First scan the \"work order QR\" once with the camera.\n3. Then keep scanning each cart's QR — every scan flashes a success confirmation and dispatches that cart to the work order.\n4. Scan them one after another; no need to confirm each one."
+        }
+      ]
+    }
+  ]
+}

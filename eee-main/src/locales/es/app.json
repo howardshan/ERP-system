@@ -148,6 +148,16 @@
           "2": "Niveles de aprobación",
           "3": "Registro de auditoría"
         }
+      },
+      "faq": {
+        "label": "Preguntas frecuentes y ayuda",
+        "description": "Respuestas prácticas para cada módulo del sistema de QC y producción, con búsqueda.",
+        "features": {
+          "0": "Preguntas con búsqueda",
+          "1": "Los 8 módulos",
+          "2": "Trilingüe",
+          "3": "Guías para operadores"
+        }
       }
     }
   },

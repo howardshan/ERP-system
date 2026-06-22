@@ -2385,6 +2385,41 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-147 `20260621000014_qc_analysis_result_via_champion_events.sql`
+**用途**: 修复「同组车在多次复烘后结果不一致」—— 首次检测只算 1 车 fail(应 2)、重烘详情非 champion 车显示「待定」。
+
+**根因**: 分析按**当前** test_group 的 champion 给非 champion 车归属结果(sibling_insp)。多次复烘后分组会**碎片化**:原同组的 sibling(如 test001-003)可能在后续循环里变成自己单车一组的 champion,于是与真正取样的车(004)失联,003 继承来的 fail 不再被统计。
+
+**改动**: 4 个分析 RPC(`qc_analysis_metrics` / `qc_analysis_outcomes_daily` / `qc_analysis_outcomes_by_work_order` / `qc_analysis_recovery_detail`)统一改为:单车结果取**自身检测 OR `group_passed_by_champion`/`group_failed_by_champion` 事件**中**最早**的一条。这些事件在每次 champion 判定传播时写给每个组员,不受后续分组拆散影响,因此 sibling 永远正确继承其当时收到的判定。recovery_detail 的「复检结果/AW/停留」也用同一来源(AW 取事件 payload 的 `champion_aw`)。
+
+**验证**: 首次检测 `first_fail_count` 1→2;日趋势/按工单 06-21 fail=2;重烘详情 003 与 004 每个周期结果一致(已完成周期均 `fail/0.6/1m`)。
+
+**关联**: M-142/M-143/M-144 的前序修复(范围、按检测日期、当前组继承)被本迁移的「事件归属」统一取代。
+
+---
+
+### M-148 `20260621000015_qc_retest_group_expand_and_rates.sql`
+**用途**: 修复「复检(retest)只显示/只算 champion 一车」。复检面板/计数现包含同组 sibling。
+
+**根因**: retest 是**组级动作**——`createDispositionGroup` 对 retest 只发一次 `qc_create_disposition`(记在 champion,逐车发会打散重采样的组)。所以 `qc_disposition` 只有 champion(004)一行,sibling(003)没有 retest 处置行 → 复检详情/计数缺 003。(redry/常温是逐车处置,本就齐全。)
+
+**关联信号**: retest 重置组时,每个 sibling 收到 `group_retest_reset` 事件,payload 带该 retest 的 `disposition_id`。
+
+**改动**(`qc_analysis_metrics` + `qc_analysis_recovery_detail`):新增 `dispo_targets` = 处置直接记录的车 **∪** 经 `group_retest_reset.disposition_id` 关联的 sibling。复检明细/计数据此展开到同组车。返工的「复检结果/合格率/停留」改用「自检 OR `group_(passed|failed)_by_champion` 事件」最早一条(redry/常温 sibling 的合格率也随之修对)。
+
+**验证**: 复检详情显示 003 与 004(均 `fail/0.6/6m`);`retest_count` 1→2、`retest_pass_rate` 0%;`redry_count` 仍 4。
+
+### M-149 `20260621000016_qc_history_actor_labels.sql`
+**用途**: 在子批次「时间线」上显示**每个操作由哪个账号执行**。操作者一直存在库里(`actor_auth_id`/`inspector_auth_id`/`taken_by_auth_id`/`operator_auth_id`/`started_by`/`ended_by_auth_id`),但 `qc_sub_lot_full_history` 没返回。
+
+**改动**:
+- 新增 `qc_actor_label(uuid)`(`SECURITY DEFINER`):解析顺序 `erp_user.full_name → erp_user.email → auth.users.email`(DEFINER 以便对不在 erp_user 的账号回退读 auth.users)。
+- `qc_sub_lot_full_history` 每类记录加操作者:events.`actor`、samples.`taken_by`、inspections.`inspector`、dispositions.`operator`、room_temp_sessions.`started_by`/`ended_by`。
+
+**前端配套**: `src/pages/qc/SubLotHistoryDrawer.tsx`(时间线每条时间戳后显示 `· 操作者`)、`src/services/qcApi.ts`(`QualityEvent.actor` + `SubLotFullHistory` 各类型加操作者字段)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2513,7 +2548,10 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-144 | 20260621000011_qc_recovery_detail_group_result.sql · 返工详情「复检结果」非 champion 车继承同组 champion 结果 + 范围过滤放宽 |
 | M-145 | 20260621000012_qc_sub_lot_history_all_groups.sql |
 | M-146 | 20260621000013_qc_sub_lot_history_multi_test_readings.sql |
-| **M-147** | _(下一个)_ |
+| M-147 | 20260621000014_qc_analysis_result_via_champion_events.sql · 4 个分析 RPC 改为按「自检 OR group_(failed\|passed)_by_champion 事件」最早归属单车结果(跨复烘分组拆散仍正确继承首检/复检结果) |
+| M-148 | 20260621000015_qc_retest_group_expand_and_rates.sql · 复检(retest)在分析里扩展到同组 sibling(经 group_retest_reset.disposition_id);返工合格率/复检结果用 champion 事件 |
+| M-149 | 20260621000016_qc_history_actor_labels.sql · 子批次时间线显示操作账号(新 `qc_actor_label`;history RPC 每条事件/取样/检验/处置/常温带操作者名) |
+| **M-150** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

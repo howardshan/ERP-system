@@ -26,6 +26,7 @@ import PackagingModule from './pages/packaging/PackagingModule';
 import ProductionModule from './pages/production/ProductionModule';
 import WarehouseModule from './pages/warehouse/WarehouseModule';
 import AuditLog from './pages/finance/AuditLog';
+import FaqModule from './pages/faq/FaqModule';
 import ProfitLoss from './pages/finance/ProfitLoss';
 import BalanceSheet from './pages/finance/BalanceSheet';
 import AccountSettings from './pages/AccountSettings';
@@ -174,6 +175,10 @@ function AppShell({
 
   if (activeModule === 'docs') {
     return <DocsPage onHome={() => setActiveModule('home')} />;
+  }
+
+  if (activeModule === 'faq') {
+    return <FaqModule onHome={() => setActiveModule('home')} />;
   }
 
   if (activeModule === 'auth') {
