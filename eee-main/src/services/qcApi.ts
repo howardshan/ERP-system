@@ -269,6 +269,103 @@ export async function deleteDryRoom(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// ── Product / Test-Type audit log (M-148, BR-Q80) ─────────────────────────────
+// Mirrors finance_audit_log's logFinanceAction: fire-and-forget, resolves the
+// actor's display name from erp_user, never throws into the calling operation.
+
+export interface ProductAuditLogEntry {
+  id: number;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  actor_auth_id: string | null;
+  actor_name: string;
+  changed_at: string;
+  before_snapshot: Record<string, unknown> | null;
+  after_snapshot: Record<string, unknown> | null;
+  diff: Record<string, { before: unknown; after: unknown }> | null;
+  entry_number: string | null;
+  description: string | null;
+}
+
+function computeProductDiff(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): Record<string, { before: unknown; after: unknown }> | null {
+  const result: Record<string, { before: unknown; after: unknown }> = {};
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  for (const k of keys) {
+    if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) {
+      result[k] = { before: before[k], after: after[k] };
+    }
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+async function logProductAction(params: {
+  entity_type: 'product' | 'test_type' | 'product_import';
+  entity_id: string | number;
+  action: string;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  entry_number?: string | null;
+  description?: string | null;
+}): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: erpRow } = await supabase
+      .from('erp_user')
+      .select('full_name')
+      .eq('auth_user_id', user.id)
+      .single();
+
+    const diff = params.before && params.after
+      ? computeProductDiff(params.before, params.after)
+      : null;
+
+    await supabase.from('qc_product_audit_log').insert({
+      entity_type: params.entity_type,
+      entity_id:   String(params.entity_id),
+      action:      params.action,
+      actor_auth_id: user.id,
+      actor_name:  erpRow?.full_name ?? user.email ?? 'Unknown',
+      before_snapshot: params.before ?? null,
+      after_snapshot:  params.after  ?? null,
+      diff,
+      entry_number: params.entry_number ?? null,
+      description:  params.description  ?? null,
+    });
+  } catch {
+    // Logging must never break the main operation
+  }
+}
+
+export async function getProductAuditLog(params?: {
+  entity_type?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<ProductAuditLogEntry[]> {
+  let query = supabase
+    .from('qc_product_audit_log')
+    .select('*')
+    .order('changed_at', { ascending: false })
+    .range(params?.offset ?? 0, (params?.offset ?? 0) + (params?.limit ?? 100) - 1);
+
+  if (params?.entity_type) query = query.eq('entity_type', params.entity_type);
+  if (params?.search) {
+    const q = params.search.trim();
+    query = query.or(`description.ilike.%${q}%,entry_number.ilike.%${q}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data as ProductAuditLogEntry[];
+}
+
+const PRODUCT_CORE_COLS = 'code, name, standard_drying_minutes, sample_every_n_carts, cart_units';
+
 export async function createProduct(input: ProductInput): Promise<Product> {
   for (const t of input.templates) {
     if (t.lower_limit > t.upper_limit) throw new Error('Lower limit cannot exceed upper limit');
@@ -319,12 +416,30 @@ export async function createProduct(input: ProductInput): Promise<Product> {
     if (tmplErr) throw new Error(tmplErr.message);
   }
 
+  void logProductAction({
+    entity_type: 'product',
+    entity_id: sku.id,
+    action: 'create',
+    after: {
+      code: sku.code, name: sku.name,
+      standard_drying_minutes: sku.standard_drying_minutes,
+      sample_every_n_carts: sku.sample_every_n_carts,
+      cart_units: sku.cart_units,
+    },
+    entry_number: sku.code,
+    description: `Created product ${sku.code} — ${sku.name}`,
+  });
+
   const all = await listProducts();
   const found = all.find(p => p.id === sku.id);
   return found ?? ({ ...sku, templates: [] } as Product);
 }
 
 export async function updateProduct(id: string, input: Partial<ProductInput>): Promise<Product> {
+  // Snapshot core fields before mutating, for the audit diff.
+  const { data: beforeRow } = await supabase
+    .from('qc_product_sku').select(PRODUCT_CORE_COLS).eq('id', id).single();
+
   const skuPatch: Record<string, unknown> = {};
   if (input.code !== undefined) skuPatch.code = input.code;
   if (input.name !== undefined) skuPatch.name = input.name;
@@ -363,18 +478,113 @@ export async function updateProduct(id: string, input: Partial<ProductInput>): P
   const all = await listProducts();
   const found = all.find(p => p.id === id);
   if (!found) throw new Error('Product not found');
+
+  void logProductAction({
+    entity_type: 'product',
+    entity_id: id,
+    action: 'edit',
+    before: beforeRow ?? null,
+    after: {
+      code: found.code, name: found.name,
+      standard_drying_minutes: found.standard_drying_minutes,
+      sample_every_n_carts: found.sample_every_n_carts,
+      cart_units: found.cart_units,
+    },
+    entry_number: found.code,
+    description: `Updated product ${found.code}`,
+  });
+
   return found;
 }
 
 export async function deleteProduct(id: string): Promise<void> {
+  const { data: beforeRow } = await supabase
+    .from('qc_product_sku').select(PRODUCT_CORE_COLS).eq('id', id).single();
   const { error } = await supabase.from('qc_product_sku').delete().eq('id', id);
   if (error) throw new Error(error.message);
+  void logProductAction({
+    entity_type: 'product',
+    entity_id: id,
+    action: 'delete',
+    before: beforeRow ?? null,
+    entry_number: (beforeRow as { code?: string } | null)?.code ?? null,
+    description: `Deleted product ${(beforeRow as { code?: string } | null)?.code ?? id}`,
+  });
 }
 
 export async function deleteProducts(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  const { data: beforeRows } = await supabase
+    .from('qc_product_sku').select('id, code, name').in('id', ids);
   const { error } = await supabase.from('qc_product_sku').delete().in('id', ids);
   if (error) throw new Error(error.message);
+  for (const row of (beforeRows ?? []) as { id: string; code: string; name: string }[]) {
+    void logProductAction({
+      entity_type: 'product',
+      entity_id: row.id,
+      action: 'delete',
+      before: { code: row.code, name: row.name },
+      entry_number: row.code,
+      description: `Deleted product ${row.code}`,
+    });
+  }
+}
+
+// ── Excel import (BR-Q81) ─────────────────────────────────────────────────────
+// Phase 1: core fields only, matched by `code` (S2 WIP code).  A row whose code
+// matches an existing product updates its core fields (templates / final-product
+// links are left untouched); a row with no match (or blank code) creates a new
+// product with no test templates.  Rows are NOT deleted for codes absent from
+// the sheet — import never removes products.  Parsing / validation happens in
+// the UI; this function trusts the rows it's given and records one summary
+// `product_import` audit entry on top of the per-row create/edit entries.
+
+export interface ProductImportRow {
+  code?: string | null;
+  name: string;
+  standard_drying_minutes: number | null;
+  sample_every_n_carts?: number;
+  cart_units?: number;
+}
+
+export interface ProductImportResult { created: number; updated: number; }
+
+export async function importProducts(rows: ProductImportRow[]): Promise<ProductImportResult> {
+  const existing = await listProducts();
+  const byCode = new Map(existing.map(p => [p.code.trim().toLowerCase(), p]));
+  let created = 0;
+  let updated = 0;
+  for (const row of rows) {
+    const code = row.code?.trim();
+    const match = code ? byCode.get(code.toLowerCase()) : undefined;
+    if (match) {
+      await updateProduct(match.id, {
+        name: row.name,
+        standard_drying_minutes: row.standard_drying_minutes,
+        sample_every_n_carts: row.sample_every_n_carts,
+        cart_units: row.cart_units,
+      });
+      updated++;
+    } else {
+      await createProduct({
+        code: code || undefined,
+        name: row.name,
+        standard_drying_minutes: row.standard_drying_minutes,
+        sample_every_n_carts: row.sample_every_n_carts ?? 3,
+        cart_units: row.cart_units ?? 1,
+        templates: [],
+      });
+      created++;
+    }
+  }
+  void logProductAction({
+    entity_type: 'product_import',
+    entity_id: 'import',
+    action: 'import',
+    after: { created, updated, total: rows.length },
+    description: `Imported products from Excel — ${created} created, ${updated} updated`,
+  });
+  return { created, updated };
 }
 
 // M-086: SKU → ERP item links (one-to-many via qc_sku_item junction table).
@@ -443,17 +653,48 @@ export async function createTestType(input: { name: string; unit?: string | null
     .select()
     .single();
   if (error) throw new Error(error.message);
+  void logProductAction({
+    entity_type: 'test_type',
+    entity_id: data.id,
+    action: 'create',
+    after: { name: data.name, unit: data.unit, description: data.description },
+    entry_number: data.name,
+    description: `Created test type ${data.name}`,
+  });
   return data;
 }
 
 export async function updateTestType(id: number, patch: { name?: string; unit?: string | null; description?: string | null; is_active?: boolean }): Promise<void> {
+  const { data: beforeRow } = await supabase
+    .from('qc_test_type').select('name, unit, description, is_active').eq('id', id).single();
   const { error } = await supabase.from('qc_test_type').update(patch).eq('id', id);
   if (error) throw new Error(error.message);
+  const { data: afterRow } = await supabase
+    .from('qc_test_type').select('name, unit, description, is_active').eq('id', id).single();
+  void logProductAction({
+    entity_type: 'test_type',
+    entity_id: id,
+    action: 'edit',
+    before: beforeRow ?? null,
+    after: afterRow ?? null,
+    entry_number: (afterRow as { name?: string } | null)?.name ?? (beforeRow as { name?: string } | null)?.name ?? null,
+    description: `Updated test type ${(afterRow as { name?: string } | null)?.name ?? id}`,
+  });
 }
 
 export async function deleteTestType(id: number): Promise<void> {
+  const { data: beforeRow } = await supabase
+    .from('qc_test_type').select('name, unit, description').eq('id', id).single();
   const { error } = await supabase.from('qc_test_type').delete().eq('id', id);
   if (error) throw new Error(error.message);
+  void logProductAction({
+    entity_type: 'test_type',
+    entity_id: id,
+    action: 'delete',
+    before: beforeRow ?? null,
+    entry_number: (beforeRow as { name?: string } | null)?.name ?? null,
+    description: `Deleted test type ${(beforeRow as { name?: string } | null)?.name ?? id}`,
+  });
 }
 
 // ── Production lots ───────────────────────────────────────────────────────────

@@ -9,6 +9,9 @@ import {
   ArrowLeft,
   BarChart3,
   MapPin,
+  Package,
+  FlaskConical,
+  History,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -25,6 +28,9 @@ import DryRoomDetail from './DryRoomDetail';
 import TestingPage from './TestingPage';
 import RoomTempDryPage from './RoomTempDryPage';
 import SubLotHistoryDrawer from './SubLotHistoryDrawer';
+import ProductManagement from './ProductManagement';
+import TestTypesPage from './TestTypesPage';
+import ProductAuditLog from './ProductAuditLog';
 
 interface Props {
   onHome: () => void;
@@ -74,6 +80,9 @@ export default function QualityControlModule({ onHome }: Props) {
   // the QC dashboard (dashboard.view) or has the explicit analysis.view grant.
   const canViewDashboard  = can('qc', 'dashboard', 'view');
   const canViewAnalysis   = can('qc', 'analysis', 'view') || canViewDashboard;
+  // Products & Test Types master data — edit rights returned to QC (M-147).
+  const canManageProducts = can('qc', 'products', 'view');
+  const canViewProductLog = can('qc', 'products', 'view_log');
 
   const isActive = (id: string) => screen === id || screen.startsWith(id + ':');
 
@@ -164,6 +173,15 @@ export default function QualityControlModule({ onHome }: Props) {
     if (screen === 'analysis') {
       return <AnalysisPage />;
     }
+    if (screen === 'products') {
+      return <ProductManagement module="qc" />;
+    }
+    if (screen === 'test-types') {
+      return <TestTypesPage module="qc" />;
+    }
+    if (screen === 'product-log') {
+      return <ProductAuditLog />;
+    }
     return <QcHome onNavigate={navigate} />;
   }
 
@@ -210,7 +228,19 @@ export default function QualityControlModule({ onHome }: Props) {
           {/* Room Temp Dry is now managed inside Dry Rooms (card on DryRoomsList) — no separate sidebar entry */}
           {/* Production / Batch Trace / Products & Templates moved to the Production module (BR-Q51) */}
 
-          {canViewLocations && <NavSection title={t('qualityControlModule.masterData')} />}
+          {(canViewLocations || canManageProducts || canViewProductLog) && <NavSection title={t('qualityControlModule.masterData')} />}
+          {canManageProducts && (
+            <>
+              <NavItem icon={Package} label={t('qualityControlModule.products')}
+                       isActive={isActive('products')} onClick={() => navigate('products')} />
+              <NavItem icon={FlaskConical} label={t('qualityControlModule.testTypes')}
+                       isActive={isActive('test-types')} onClick={() => navigate('test-types')} />
+            </>
+          )}
+          {canViewProductLog && (
+            <NavItem icon={History} label={t('qualityControlModule.productLog')}
+                     isActive={isActive('product-log')} onClick={() => navigate('product-log')} />
+          )}
           {canViewLocations && (
             <NavItem icon={MapPin} label={t('qualityControlModule.dryerLocations')} isActive={isActive('locations')} onClick={() => navigate('locations')} />
           )}

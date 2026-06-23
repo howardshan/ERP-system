@@ -112,10 +112,10 @@ export default function ProductionModule({ onHome }: Props) {
       );
     }
     if (screen === 'products') {
-      return <ProductManagement />;
+      return <ProductManagement module="production" />;
     }
     if (screen === 'test-types') {
-      return <TestTypesPage />;
+      return <TestTypesPage module="production" />;
     }
     if (screen === 'daily-report') {
       return <DailyReportPage />;

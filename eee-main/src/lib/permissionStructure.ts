@@ -199,13 +199,12 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'reprint_sticker', label: 'Reprint Cart Sticker',             prereq: 'view' },
         ],
       },
+      // M-147 (BR-Q80): edit rights returned to QC (qc.products.*).  Production
+      // keeps only a read-only view of the product master.
       products: {
-        label: 'Products & Inspection Templates',
+        label: 'Products & Inspection Templates (read-only view)',
         permissions: [
-          { id: 'view',   label: 'View',   prereq: null },
-          { id: 'create', label: 'Create', prereq: 'view' },
-          { id: 'edit',   label: 'Edit',   prereq: 'view' },
-          { id: 'delete', label: 'Delete', prereq: 'edit' },
+          { id: 'view', label: 'View', prereq: null },
         ],
       },
       // M-122 — Daily Report data-entry (digitised Forming Production Excel).
@@ -353,7 +352,21 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'view_history', label: 'View Sub-lot Full Timeline', prereq: null },
         ],
       },
-      // products: moved to `production` module — see M-094.
+      // Products master data — edit rights returned to QC (M-147, BR-Q80).
+      // Production keeps a read-only `production.products.view` entry.
+      // Test Types are gated by this same resource (no separate test_types key).
+      products: {
+        label: 'Products & Test Types',
+        permissions: [
+          { id: 'view',     label: 'View',              prereq: null },
+          { id: 'create',   label: 'Create',            prereq: 'view' },
+          { id: 'edit',     label: 'Edit',              prereq: 'view' },
+          { id: 'delete',   label: 'Delete',            prereq: 'edit' },
+          { id: 'export',   label: 'Export to Excel',   prereq: 'view' },
+          { id: 'import',   label: 'Import from Excel',  prereq: 'edit' },
+          { id: 'view_log', label: 'View Change Log',    prereq: 'view' },
+        ],
+      },
       locations: {
         label: 'Dryer Locations (master data)',
         permissions: [
