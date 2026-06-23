@@ -134,6 +134,8 @@ export interface QualityEvent {
   created_at: string;
   sub_lot_code: string | null;
   summary: string;
+  /** M-149: account that performed the action (full name or email). */
+  actor?: string | null;
 }
 
 export interface ProductionLotDetail {
@@ -1311,6 +1313,8 @@ export interface SubLotFullHistory {
     /** M-146: every reading on the linked inspection (Aw + density + …). */
     readings?: InspectionReading[];
     inspection_record_id: string | null;
+    /** M-149: account that took the sample. */
+    taken_by?: string | null;
   }>;
   inspections: Array<{
     id: string;
@@ -1321,6 +1325,8 @@ export interface SubLotFullHistory {
     remark: string | null;
     submitted_at: string;
     sample_id: string | null;
+    /** M-149: account that submitted the inspection. */
+    inspector?: string | null;
   }>;
   dispositions: Array<{
     id: string;
@@ -1328,12 +1334,17 @@ export interface SubLotFullHistory {
     remark: string | null;
     redry_expected_dry_minutes: number | null;
     created_at: string;
+    /** M-149: account that recorded the disposition. */
+    operator?: string | null;
   }>;
   room_temp_sessions: Array<{
     id: string;
     started_at: string;
     ended_at: string | null;
     duration_minutes: number | null;
+    /** M-149: accounts that started / ended the session. */
+    started_by?: string | null;
+    ended_by?: string | null;
   }>;
   events: QualityEvent[];
 }

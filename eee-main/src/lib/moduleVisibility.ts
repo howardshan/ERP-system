@@ -16,6 +16,7 @@ export const ALL_MODULES: ModuleInfo[] = [
   { id: 'docs',       label: '文档' },
   { id: 'auth',       label: '用户与权限' },
   { id: 'sales',      label: '销售与分销' },
+  { id: 'faq',        label: '常见问题' },
 ];
 
 /** Global list of HIDDEN module ids (read by every client). Returns [] if the

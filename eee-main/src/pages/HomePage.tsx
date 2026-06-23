@@ -13,6 +13,7 @@ import {
   ChevronRight,
   RefreshCw,
   Settings,
+  HelpCircle,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../contexts/PermissionContext';
@@ -220,6 +221,24 @@ const MODULES: Module[] = [
     },
     features: ['User Management', 'Role & Permissions', 'Approval Tiers', 'Audit Trail'],
   },
+  {
+    id: 'faq',
+    label: 'FAQ & Help',
+    description: 'How-to answers for every module of the QC & production system, with search.',
+    icon: HelpCircle,
+    status: 'active',
+    color: {
+      bg: 'bg-violet-50',
+      border: 'border-violet-200',
+      icon: 'text-violet-700',
+      iconBg: 'bg-violet-100',
+      badge: 'bg-violet-100 border-violet-200',
+      badgeText: 'text-violet-700',
+      button: 'bg-violet-600 hover:bg-violet-500 text-white',
+      chevron: 'text-violet-500',
+    },
+    features: ['Searchable Q&A', 'All 8 modules', 'Trilingual', 'Operator guides'],
+  },
 ];
 
 interface HomePageProps {
@@ -301,7 +320,7 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
       {/* Module Grid */}
       <main className="flex-1 px-12 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {MODULES.filter((mod) => isVisible(mod.id) && canAccessModule(mod.id)).map((mod) => {
+          {MODULES.filter((mod) => isVisible(mod.id) && (mod.id === 'faq' || canAccessModule(mod.id))).map((mod) => {
             const Icon = mod.icon;
             const isActive = mod.status === 'active';
 

@@ -125,6 +125,7 @@ eee-main/
 | `hr` | `HRModule` | `src/pages/hr/HRModule.tsx` | ✅ 已完成 |
 | `qc` | `QualityControlModule` | `src/pages/qc/QualityControlModule.tsx` | ✅ 已完成（Phase 1 MVP，移植自 qc-demo） |
 | `docs` | `DocsPage` | `src/pages/DocsPage.tsx` | ✅ 已完成 |
+| `faq` | `FaqModule` | `src/pages/faq/FaqModule.tsx` | ✅ 已完成（带搜索的常见问题，覆盖 Phase 1 模块 A–H,三语;**对所有人可见,不走 `canAccessModule`**,`faq` i18n 命名空间) |
 
 ### Workflow 模块内子路由
 

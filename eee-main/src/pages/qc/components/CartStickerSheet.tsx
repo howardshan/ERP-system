@@ -72,20 +72,21 @@ function qrDataUrl(value: string, dpi: number, sizeMm: number): string | null {
 function drawStickerPdfPage(
   doc: jsPDF, c: SubLot, workOrderBarcode: string, skuCode: string | null, skuName: string, dpi: number,
 ) {
-  const P = 3, LW = 30, G = 3, RX = P + LW + G, RW = MM_W - RX - P;
+  // LW = left (QR) column width, G = gap. Column widened to hold a larger QR;
+  // the right table still has ample width (RW ≈ 62mm).
+  const P = 3, LW = 32, G = 1.5, RX = P + LW + G, RW = MM_W - RX - P;
   doc.setDrawColor(0, 0, 0); doc.setTextColor(0, 0, 0); doc.setFillColor(0, 0, 0);
 
   // Left column border
   doc.setLineWidth(0.4);
   doc.rect(P, P, LW, MM_H - 2 * P);
 
-  // QR code — robust on thermal, orientation-independent. The QR + CART#/code
-  // block is vertically centered within the left column (no top-heavy gap).
-  const qrSize = Math.min(LW - 2, 27);
+  // QR code — robust on thermal, orientation-independent. The QR itself is
+  // centered (both axes) within the left column; CART#/code sit just below it.
+  const qrSize = Math.min(LW - 1, 30);
   const qrX = P + (LW - qrSize) / 2;
-  const blockH = qrSize + 14.5;          // QR + gap + CART# line + code line
   const colInnerH = MM_H - 2 * P;
-  const qrY = P + Math.max(2, (colInnerH - blockH) / 2);
+  const qrY = P + (colInnerH - qrSize) / 2;  // QR vertically centered in the column
   const qrImg = qrDataUrl(c.sub_lot_code, dpi, qrSize);
   if (qrImg) {
     doc.addImage(qrImg, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'NONE');
