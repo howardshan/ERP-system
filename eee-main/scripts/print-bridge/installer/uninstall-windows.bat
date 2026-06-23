@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul 2>&1
 rem 卸载 ERP 标签打印助手（Windows）。双击运行。无需管理员权限。
 setlocal
