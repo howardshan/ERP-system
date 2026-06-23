@@ -2447,6 +2447,17 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-149 `20260623000003_qc_products_grant_export_import_log.sql`
+**用途**: 把 `qc.products.{export, import, view_log}` 回填给**所有已有 `qc.products.view` 的用户**(BR-Q81)。
+
+**根因**: M-147 只给 dev admin `ysha@smu.edu` seed 了这三个新权限,导致其他已能管理产品的用户(M-147 grant-move 后有 `qc.products.view`)看不到导出/导入按钮与 Change Log 页。
+
+**改动**: 对每个持有 `qc.products.view` 的用户,INSERT 三条新权限(`export`/`import`/`view_log`),`ON CONFLICT DO NOTHING` 幂等。
+
+**依赖**: M-147(grant-move)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)、[`docs/modules/06_users-auth.md`](../modules/06_users-auth.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2581,7 +2592,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | **M-150** | _(下一个)_ |
 | M-147 | 20260623000001_products_edit_back_to_qc.sql · Products/Test Types 编辑权从 production.* 迁回 qc.products.*(Production 只读),新增 export/import/view_log 权限 |
 | M-148 | 20260623000002_qc_product_audit_log.sql · 新建 qc_product_audit_log 表(镜像 finance_audit_log),记录产品/测试类型 CRUD 与 Excel 导入 |
-| **M-149** | _(下一个)_ |
+| M-149 | 20260623000003_qc_products_grant_export_import_log.sql · 把 qc.products.{export,import,view_log} 回填给所有已有 qc.products.view 的用户 |
+| **M-150** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

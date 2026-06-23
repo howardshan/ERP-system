@@ -1,7 +1,7 @@
 import React, { FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as XLSX from 'xlsx';
-import { Plus, Trash2, FlaskConical, Package, Search, ChevronRight, ChevronDown, Download, Upload, X } from 'lucide-react';
+import { Plus, Trash2, FlaskConical, Package, Search, Download, Upload, X } from 'lucide-react';
 import {
   listProducts,
   createProduct,
@@ -100,7 +100,6 @@ export default function ProductManagement({ module = 'production' }: { module?: 
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [testTypes, setTestTypes] = useState<TestType[]>([]);
   const [query, setQuery] = useState('');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [importPreview, setImportPreview] = useState<ImportRowPreview[] | null>(null);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -475,7 +474,6 @@ export default function ProductManagement({ module = 'production' }: { module?: 
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500">
               <th className="p-3 w-8"></th>
-              <th className="p-3 w-8"></th>
               <th className="p-3 font-semibold">{tr('productManagement.colProduct')}</th>
               <th className="p-3 font-semibold">{tr('productManagement.colCode')}</th>
               <th className="p-3 font-semibold">{tr('productManagement.referenceDry')}</th>
@@ -489,8 +487,7 @@ export default function ProductManagement({ module = 'production' }: { module?: 
             {filtered.map((p) => {
               const isEditing = editingId === p.id;
               const checked = selected.has(p.id);
-              const isExpanded = expandedId === p.id;
-              const colCount = 8 + (canEdit || canDelete ? 1 : 0);
+              const colCount = 7 + (canEdit || canDelete ? 1 : 0);
 
               if (isEditing) {
                 return (
@@ -517,8 +514,7 @@ export default function ProductManagement({ module = 'production' }: { module?: 
               }
 
               return (
-                <React.Fragment key={p.id}>
-                  <tr className={cn('border-b border-slate-100', checked ? 'bg-blue-50/40' : 'hover:bg-slate-50/60')}>
+                  <tr key={p.id} className={cn('border-b border-slate-100', checked ? 'bg-blue-50/40' : 'hover:bg-slate-50/60')}>
                     <td className="p-3 align-top">
                       <input
                         type="checkbox"
@@ -527,30 +523,38 @@ export default function ProductManagement({ module = 'production' }: { module?: 
                         className="w-4 h-4 rounded accent-blue-600"
                       />
                     </td>
-                    <td className="p-3 align-top">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedId(isExpanded ? null : p.id)}
-                        className="text-slate-400 hover:text-slate-700"
-                        title={tr('productManagement.requiredTests')}
-                      >
-                        {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                      </button>
-                    </td>
-                    <td className="p-3 font-medium text-slate-900">{p.name}</td>
-                    <td className="p-3 font-mono text-xs text-slate-500">{p.code}</td>
-                    <td className="p-3 text-slate-700">{p.standard_drying_minutes != null ? fmtDays(p.standard_drying_minutes) : tr('productManagement.notSet')}</td>
-                    <td className="p-3 text-slate-700">
+                    <td className="p-3 font-medium text-slate-900 align-top">{p.name}</td>
+                    <td className="p-3 font-mono text-xs text-slate-500 align-top">{p.code}</td>
+                    <td className="p-3 text-slate-700 align-top whitespace-nowrap">{p.standard_drying_minutes != null ? fmtDays(p.standard_drying_minutes) : tr('productManagement.notSet')}</td>
+                    <td className="p-3 text-slate-700 align-top whitespace-nowrap">
                       {tr('productManagement.onePerPrefix')} <span className="font-mono font-bold">{p.sample_every_n_carts ?? 1}</span> {tr('productManagement.cartsSuffix')}
                     </td>
-                    <td className="p-3 text-slate-700"><span className="font-mono font-bold">{p.cart_units ?? 1}</span></td>
-                    <td className="p-3 text-slate-700">
-                      <span className="inline-flex items-center justify-center min-w-[1.5rem] px-1.5 py-0.5 rounded bg-slate-100 text-xs font-medium text-slate-600">
-                        {p.templates.length}
-                      </span>
+                    <td className="p-3 text-slate-700 align-top"><span className="font-mono font-bold">{p.cart_units ?? 1}</span></td>
+                    <td className="p-3 text-slate-700 align-top min-w-[16rem]">
+                      {p.templates.length === 0 ? (
+                        <span className="text-xs text-slate-400">{tr('productManagement.noTestsAssigned')}</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {p.templates.map((tmpl) => {
+                            const hasSoftBand =
+                              tmpl.soft_lower_limit < tmpl.lower_limit ||
+                              tmpl.soft_upper_limit > tmpl.upper_limit;
+                            return (
+                              <span key={tmpl.id} className="text-[11px] bg-blue-50 border border-blue-200 text-blue-800 rounded px-1.5 py-0.5 whitespace-nowrap">
+                                {tmpl.item_name} · [{tmpl.lower_limit}, {tmpl.upper_limit}]
+                                {hasSoftBand && (
+                                  <span className="ml-1 text-amber-700">
+                                    {tr('productManagement.softBadgePrefix')} [{tmpl.soft_lower_limit}, {tmpl.soft_upper_limit}]
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                     </td>
                     {(canEdit || canDelete) && (
-                      <td className="p-3 text-right whitespace-nowrap">
+                      <td className="p-3 text-right whitespace-nowrap align-top">
                         {canEdit && (
                           <button
                             type="button"
@@ -574,41 +578,11 @@ export default function ProductManagement({ module = 'production' }: { module?: 
                       </td>
                     )}
                   </tr>
-                  {isExpanded && (
-                    <tr className="border-b border-slate-100 bg-slate-50/50">
-                      <td></td>
-                      <td colSpan={colCount - 1} className="p-3">
-                        <dt className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">{tr('productManagement.requiredTests')}</dt>
-                        {p.templates.length === 0 ? (
-                          <p className="text-xs text-slate-400">{tr('productManagement.noTestsAssigned')}</p>
-                        ) : (
-                          <div className="flex flex-wrap gap-1.5">
-                            {p.templates.map((tmpl) => {
-                              const hasSoftBand =
-                                tmpl.soft_lower_limit < tmpl.lower_limit ||
-                                tmpl.soft_upper_limit > tmpl.upper_limit;
-                              return (
-                                <span key={tmpl.id} className="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded px-2 py-0.5">
-                                  {tmpl.item_name} · [{tmpl.lower_limit}, {tmpl.upper_limit}]
-                                  {hasSoftBand && (
-                                    <span className="ml-1 text-amber-700">
-                                      {tr('productManagement.softBadgePrefix')} [{tmpl.soft_lower_limit}, {tmpl.soft_upper_limit}]
-                                    </span>
-                                  )}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
               );
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8 + (canEdit || canDelete ? 1 : 0)} className="p-5 text-center text-sm text-slate-500">
+                <td colSpan={7 + (canEdit || canDelete ? 1 : 0)} className="p-5 text-center text-sm text-slate-500">
                   {products.length === 0 ? tr('productManagement.noProducts') : tr('productManagement.noSearchResults')}
                 </td>
               </tr>
