@@ -2668,19 +2668,19 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-147 | 20260621000014_qc_analysis_result_via_champion_events.sql · 4 个分析 RPC 改为按「自检 OR group_(failed\|passed)_by_champion 事件」最早归属单车结果(跨复烘分组拆散仍正确继承首检/复检结果) |
 | M-148 | 20260621000015_qc_retest_group_expand_and_rates.sql · 复检(retest)在分析里扩展到同组 sibling(经 group_retest_reset.disposition_id);返工合格率/复检结果用 champion 事件 |
 | M-149 | 20260621000016_qc_history_actor_labels.sql · 子批次时间线显示操作账号(新 `qc_actor_label`;history RPC 每条事件/取样/检验/处置/常温带操作者名) |
-| M-150 | 20260623000001_products_edit_back_to_qc.sql · Products/Test Types 编辑权从 production.* 迁回 qc.products.*(Production 只读),新增 export/import/view_log 权限 |
-| M-151 | 20260623000002_qc_product_audit_log.sql · 新建 qc_product_audit_log 表(镜像 finance_audit_log),记录产品/测试类型 CRUD 与 Excel 导入 |
-| M-152 | 20260623000003_qc_products_grant_export_import_log.sql · 把 qc.products.{export,import,view_log} 回填给所有已有 qc.products.view 的用户 |
-| M-153 | 20260623000004_qc_daily_report.sql · 新建 qc_daily_test_report 表 + qc-daily-reports 存储桶 + 3 个 RPC(当日检测取数 / 签字归档 / 历史列表);每日检测报告签字归档闭环(BR-Q82) |
-| M-154 | 20260623000004_qc_production_lot_detail_remove_event_cap.sql · Batch Trace 事件列表去掉硬编码 `LIMIT 50`(操作员反馈「很多操作没记录」实为旧/被截掉) |
-| M-155 | 20260623000005_qc_daily_report_grant.sql · 把 qc.daily_report.{view,sign} 回填给已有 qc.testing.{view_status,submit_inspection} 的用户 |
-| M-156 | 20260623000005_qc_quality_event_summary_human_readable.sql · `qc_quality_event_summary` 全量覆盖事件类型,Batch Trace / Sub-lot history 不再显示 `sub_lot_created` / `group_assigned` 等代码名 |
-| M-157 | 20260623000006_qc_trace_unify_on_sub_lots.sql · Batch Trace 砍掉重复的 Quality events 区段;sub_lots 改为列全部 cart(含未扫码)+ 按 sub_lot_code 排序 |
-| M-158 | 20260623000007_auth_audit_log.sql · Users & Auth 用户操作审计日志(双主体 actor/target,生存删除,记登录/账户/权限事件) |
-| M-159 | 20260623000008_auth_audit_log_retention.sql · auth_audit_log 两年留存清理(pg_cron 可用则每日跑,否则手动/外部调度) |
-| **M-160** | _(下一个)_ |
-
-> 注:M-150~M-159 这批 20260623 迁移由多个并行分支合并而来,M 编号在合并时统一重排为唯一连续序列(各 `.sql` 文件头注释里的旧 M 号可能与此表略有出入——迁移按文件名时间戳运行,M 号仅为文档标签,不影响执行)。两个 `20260623000004_*` 与两个 `20260623000005_*` 是不同分支同期产生的不同迁移,文件名不冲突、按字母序先后执行。
+| M-150 | 20260623000004_qc_production_lot_detail_remove_event_cap.sql · Batch Trace 事件列表去掉硬编码 `LIMIT 50`(操作员反馈「很多操作没记录」实为旧/被截掉) |
+| M-151 | 20260623000005_qc_quality_event_summary_human_readable.sql · `qc_quality_event_summary` 全量覆盖事件类型,Batch Trace / Sub-lot history 不再显示 `sub_lot_created` / `group_assigned` 等代码名 |
+| M-152 | 20260623000006_qc_trace_unify_on_sub_lots.sql · Batch Trace 砍掉重复的 Quality events 区段;sub_lots 改为列全部 cart(含未扫码)+ 按 sub_lot_code 排序 |
+| **M-153** | _(下一个)_ |
+| M-147 | 20260623000001_products_edit_back_to_qc.sql · Products/Test Types 编辑权从 production.* 迁回 qc.products.*(Production 只读),新增 export/import/view_log 权限 |
+| M-148 | 20260623000002_qc_product_audit_log.sql · 新建 qc_product_audit_log 表(镜像 finance_audit_log),记录产品/测试类型 CRUD 与 Excel 导入 |
+| M-149 | 20260623000003_qc_products_grant_export_import_log.sql · 把 qc.products.{export,import,view_log} 回填给所有已有 qc.products.view 的用户 |
+| M-150 | 20260623000004_qc_daily_report.sql · 新建 qc_daily_test_report 表 + qc-daily-reports 存储桶 + 3 个 RPC(当日检测取数 / 签字归档 / 历史列表);每日检测报告签字归档闭环(BR-Q82) |
+| M-151 | 20260623000005_qc_daily_report_grant.sql · 把 qc.daily_report.{view,sign} 回填给已有 qc.testing.{view_status,submit_inspection} 的用户 |
+| M-152 | 20260623000006_qc_seed_test_parameters.sql · 从 docs/Testing Parameters.xlsx 导入每个产品的 MC% + Aw 检测项(硬限)及软限;新增 qc_test_type「Moisture Content (MC%)」;软限规则:非红底 Aw±0.005、MC%±0.5(后由 M-153 更正为 ±0.05),红底(21 个 SWD/46xx 产品)无软限(soft=hard);重复 Item 取更严范围;仅更新已存在(按 code 匹配)的产品 |
+| M-153 | 20260623000007_qc_fix_mc_soft_band.sql · 更正 M-152 的 MC% 软限:非红底产品 MC% 软限从 ±0.5 改为 **±0.05**(UPDATE soft_lower=lower-0.05、soft_upper=upper+0.05;红底保持 soft=hard 不动,硬限和 Aw 不动) |
+| M-154 | 20260623000008_qc_drying_sub_lot_dryer_number_dynamic.sql · 放宽 `qc_drying_sub_lot.dryer_number` 的 CHECK 从 1..5 改为 ≥1(补 M-126 数据化烘干房遗漏:RPC 已按 qc_dry_room 校验,但旧列约束仍卡 Dryer 6..16 的 check-in) |
+| **M-155** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

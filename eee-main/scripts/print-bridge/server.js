@@ -131,7 +131,8 @@ app.post('/print', async (req, res) => {
 
     if (IS_WINDOWS) {
       // ── Windows: one PrintDocument, N pages (single job) ──────────────────
-      // PrintDocument units are 1/100 inch → 4"×3" page = 400×300.
+      // PrintDocument units are 1/100 inch → 4"×3" landscape page = 400×300.
+      // SetResolution(dpi) so 812×609 px maps to 4×3 in (not default 96 dpi).
       const escapedPrinter = printerName.replace(/'/g, "''");
       const psArray = tmpFiles
         .map(f => `'${f.replace(/\\/g, '\\\\').replace(/'/g, "''")}'`)
@@ -139,7 +140,11 @@ app.post('/print', async (req, res) => {
       const ps = [
         `Add-Type -AssemblyName System.Drawing`,
         `$paths = @(${psArray})`,
-        `$script:imgs = @(); foreach ($p in $paths) { $script:imgs += [System.Drawing.Bitmap]::FromFile($p) }`,
+        `$script:imgs = @(); foreach ($p in $paths) {`,
+        `  $b = [System.Drawing.Bitmap]::FromFile($p)`,
+        `  $b.SetResolution(${dpi}, ${dpi})`,
+        `  $script:imgs += $b`,
+        `}`,
         `$script:idx = 0`,
         `$pd = New-Object System.Drawing.Printing.PrintDocument`,
         escapedPrinter ? `$pd.PrinterSettings.PrinterName = '${escapedPrinter}'` : '',
@@ -150,7 +155,7 @@ app.post('/print', async (req, res) => {
         `  param($s, $e)`,
         `  $e.Graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor`,
         `  $e.Graphics.PixelOffsetMode  = [System.Drawing.Drawing2D.PixelOffsetMode]::Half`,
-        `  $e.Graphics.DrawImage($script:imgs[$script:idx], 0, 0, $e.PageBounds.Width, $e.PageBounds.Height)`,
+        `  $e.Graphics.DrawImage($script:imgs[$script:idx], 0, 0, 400, 300)`,
         `  $script:idx++`,
         `  $e.HasMorePages = ($script:idx -lt $script:imgs.Count)`,
         `})`,
