@@ -155,30 +155,32 @@ function drawStickerPdfPage(
   }
 }
 
-// Rotate the label 90° so it prints correctly on portrait-fed (3" wide × 4" tall)
-// label stock. The page is created PORTRAIT (MM_H wide × MM_W tall) and the whole
-// landscape layout is rotated onto it via a PDF transformation matrix, so the
-// drawing code in drawStickerPdfPage() keeps its original landscape coordinates.
-//
-// jsPDF bakes the y-flip into every coordinate (using page height), so the `cm`
-// matrix operates in final PDF point-space. For a 90° rotation, a logical point
-// (px, py) jsPDF emits maps to (py - (Hp - Wp), Hp - px):
-//   a=0 b=-1 c=1 d=0  e=-(Hp - Wp)  f=Hp     (Hp/Wp = portrait height/width in pt)
-// Flip to the other direction by swapping to Matrix(0, 1, -1, 0, Hp, 0).
-const PT = 72 / 25.4;                 // mm → pt
-const HP = MM_W * PT;                 // portrait height (4") in pt
-const WP = MM_H * PT;                 // portrait width  (3") in pt
-const ROTATE_90: [number, number, number, number, number, number] =
-  [0, -1, 1, 0, -(HP - WP), HP];
+// 90°-rotation matrix onto a portrait 3"×4" page. jsPDF bakes the y-flip into
+// every coordinate (using page height), so this `cm` works in final PDF
+// point-space: a logical point (px,py) → (Hp - py, px). Swap to
+// [0,-1,1,0,-(HP-WP),HP] for the opposite direction.
+const PT = 72 / 25.4;          // mm → pt
+const HP = MM_W * PT;          // portrait page height (4") in pt
+const ROTATE_90: [number, number, number, number, number, number] = [0, 1, -1, 0, HP, 0];
 
-/** Build a multi-page vector PDF — one 4"×3" label per cart, rotated 90° onto a
- *  portrait (3" wide × 4" tall) page. */
+/**
+ * TEMP — print-orientation test. Emits TWO pages per cart so we can find which
+ * orientation the (portrait-fed) printer needs:
+ *   • Page 1: label as-is — landscape 4"×3" (the current, clipped output).
+ *   • Page 2: same label rotated 90° onto a portrait 3"×4" page.
+ * Print both, keep whichever comes out upright & complete; then we delete the
+ * other path and ship just that one.
+ */
 function buildStickerPdf(
   carts: SubLot[], workOrderBarcode: string, skuCode: string | null, skuName: string, dpi: number,
 ): jsPDF {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [MM_H, MM_W] });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [MM_W, MM_H] });
   carts.forEach((c, i) => {
-    if (i > 0) doc.addPage([MM_H, MM_W], 'portrait');
+    // Page 1 — normal landscape (first cart reuses the auto-created page).
+    if (i > 0) doc.addPage([MM_W, MM_H], 'landscape');
+    drawStickerPdfPage(doc, c, workOrderBarcode, skuCode, skuName, dpi);
+    // Page 2 — rotated 90° onto portrait 3"×4".
+    doc.addPage([MM_H, MM_W], 'portrait');
     doc.saveGraphicsState();
     doc.setCurrentTransformationMatrix(doc.Matrix(...ROTATE_90));
     drawStickerPdfPage(doc, c, workOrderBarcode, skuCode, skuName, dpi);
