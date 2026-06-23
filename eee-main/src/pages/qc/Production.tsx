@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useRef, useState } from 'react';
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   listProducts,
@@ -16,6 +16,7 @@ import { listItems, WarehouseItem } from '../../services/warehouseApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn, daysToMinutes, minutesToDays } from '../../lib/utils';
 import { CartStickerSheet } from './components/CartStickerSheet';
+import { Combobox, type ComboOption } from '../../components/ui/Combobox';
 
 interface Props {
   onCreated?: (lotId: string) => void;
@@ -97,6 +98,13 @@ export default function Production({ onCreated }: Props) {
   }, [skuId]);
 
   const currentSku = skus.find(s => s.id === skuId);
+
+  // Searchable SKU options: type the SKU number (code) or name to filter.
+  // label = code (the number users search by), hint = name.
+  const skuOpts = useMemo<ComboOption[]>(
+    () => skus.map(s => ({ value: s.id, label: s.code, hint: s.name })),
+    [skus],
+  );
 
   // Auto-fill expected dry time from SKU standard
   useEffect(() => {
@@ -181,6 +189,12 @@ export default function Production({ onCreated }: Props) {
     setMsg('');
     if (disabled) {
       setError(t('production.errNoPermission'));
+      return;
+    }
+    // SKU required when creating a new work order (the Combobox isn't a native
+    // required control, so validate explicitly).
+    if (!isAddMode && !skuId) {
+      setError(t('production.selectSku'));
       return;
     }
     if (hasConflict) {
@@ -383,15 +397,16 @@ export default function Production({ onCreated }: Props) {
 
             <label className="block">
               <span className="text-xs font-medium text-slate-700">{t('production.productSku')}</span>
-              <select
-                value={skuId}
-                onChange={(e) => setSkuId(e.target.value)}
-                className="mt-1 w-full border rounded-lg px-3 h-10 text-sm"
-                required={!isAddMode}
-              >
-                <option value="">{t('production.selectSku')}</option>
-                {skus.map(s => <option key={s.id} value={s.id}>{s.name} ({s.code})</option>)}
-              </select>
+              <div className="mt-1">
+                <Combobox
+                  value={skuId}
+                  onChange={setSkuId}
+                  options={skuOpts}
+                  placeholder={t('production.selectSku')}
+                  emptyText={t('production.selectSku')}
+                  className="w-full border rounded-lg px-3 h-10 text-sm"
+                />
+              </div>
             </label>
 
             {/* Only show dry time when creating NEW work order */}
