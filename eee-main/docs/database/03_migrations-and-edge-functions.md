@@ -2512,6 +2512,31 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-153 `20260623000007_auth_audit_log.sql`
+**用途**: Users & Authentication 模块的**用户操作审计日志**——记录登录/登出、账户创建、资料修改、启用/停用、重置密码、权限/模块访问变更。
+
+**设计**:
+- 镜像 `finance_audit_log`(M-018),但**双主体**:既记 `actor`(谁操作,从当前会话解析)又记 `target`(对哪个用户),如「管理员A 修改了 用户B 的权限」。
+- **生存删除**:`actor_auth_id` / `target_auth_id` 都 `→ auth.users ON DELETE SET NULL`,并冗余 `actor_name` / `target_name` / `target_email`;`target_user_id`(erp_user.id)**故意不加 FK**——因为 `user_permission_grant`/`user_module_access` 对 erp_user 是 `ON DELETE CASCADE`,加 FK 会让将来硬删用户时连带影响审计行。
+- `action` 取值:`login_success / logout / create / edit_profile / activate / deactivate / reset_password / edit_permissions`。`diff` 对权限变更存 `{granted, revoked, modules_before, modules_after}`。
+- RLS:`authenticated` 可 INSERT、SELECT(查看由 `auth.audit_log.view` 应用层门控)。**`login_failed` 不记**——此时用户未认证,RLS 会拒绝;如需可后续用 service-role 边缘函数补。
+- seed `auth.audit_log.view` 给 `ysha@smu.edu`。
+
+**前端配套**: [`src/services/authApi.ts`](../../src/services/authApi.ts)(`logAuthAction` / `getAuthAuditLog`)、埋点 [`ITPanel.tsx`](../../src/pages/auth/ITPanel.tsx)(create)、[`UserDetail.tsx`](../../src/pages/auth/UserDetail.tsx)(停用/启用/改密/改权)、[`LoginPage.tsx`](../../src/pages/LoginPage.tsx)(登录)、[`App.tsx`](../../src/App.tsx)(登出,在 signOut 前写),浏览页 [`UserAuditLog.tsx`](../../src/pages/auth/UserAuditLog.tsx)(UserManagement 第 4 个视图,按用户/操作筛选 + 搜索)。`permissionStructure.ts` 的 `auth` 加 `audit_log` 资源。
+
+**关联文档**: [`docs/modules/06_users-auth.md`](../modules/06_users-auth.md)。
+
+---
+
+### M-154 `20260623000008_auth_audit_log_retention.sql`
+**用途**: `auth_audit_log` 的**两年留存**清理。
+
+**改动**: 建 `auth_audit_log_prune()` 函数(删 2 年前的行);若环境装了 `pg_cron`,则用 DO 块检测后 `cron.schedule` 每日 03:00 UTC 执行。**若没有 pg_cron**,函数仍在,可手动或用外部计划任务(如定时边缘函数)调用 `SELECT auth_audit_log_prune();`。
+
+**关联文档**: [`docs/modules/06_users-auth.md`](../modules/06_users-auth.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |

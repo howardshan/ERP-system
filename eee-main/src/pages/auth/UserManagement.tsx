@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Users, Shield, Loader2, CheckCircle2, MonitorCog } from 'lucide-react';
+import { ArrowLeft, Users, Shield, Loader2, CheckCircle2, MonitorCog, History } from 'lucide-react';
 import { getUsers } from '../../services/authApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { PERMISSION_STRUCTURE } from '../../lib/permissionStructure';
@@ -8,16 +8,18 @@ import type { ErpUser } from '../../types/auth';
 import UserDetail from './UserDetail';
 import PermissionBrowser from './PermissionBrowser';
 import ITPanel from './ITPanel';
+import UserAuditLog from './UserAuditLog';
 
 interface Props {
   onHome: () => void;
 }
 
-type View = 'users' | 'permissions' | 'it';
+type View = 'users' | 'permissions' | 'it' | 'audit';
 
 export default function UserManagement({ onHome }: Props) {
   const { t } = useTranslation('auth');
   const { can } = usePermissions();
+  const canViewAudit = can('auth', 'audit_log', 'view');
   const [view, setView] = useState<View>('users');
   const [users, setUsers] = useState<ErpUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +92,16 @@ export default function UserManagement({ onHome }: Props) {
             >
               <MonitorCog size={13} /> {t('userManagement.it')}
             </button>
+            {canViewAudit && (
+              <button
+                onClick={() => setView('audit')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                  view === 'audit' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <History size={13} /> {t('userManagement.activityLog')}
+              </button>
+            )}
           </div>
           {view === 'users' && can('auth', 'users', 'create') && (
             <button
@@ -102,7 +114,11 @@ export default function UserManagement({ onHome }: Props) {
         </div>
       </div>
 
-      {view === 'it' ? (
+      {view === 'audit' ? (
+        <div className="flex-1 flex overflow-hidden">
+          <UserAuditLog />
+        </div>
+      ) : view === 'it' ? (
         <div className="flex-1 flex overflow-hidden">
           <ITPanel />
         </div>

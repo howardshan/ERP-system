@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
+import { logAuthAction } from './services/authApi';
 import { PermissionProvider } from './contexts/PermissionContext';
 import { ModuleVisibilityProvider, useModuleVisibility } from './contexts/ModuleVisibilityContext';
 import { SuperuserApp } from './pages/superuser/SuperuserDashboard';
@@ -72,6 +73,14 @@ function MainApp() {
   const userName = session.user.user_metadata?.full_name ?? userEmail.split('@')[0];
 
   async function handleLogout() {
+    // Log while still authenticated — after signOut the RLS insert would fail.
+    await logAuthAction({
+      action: 'logout',
+      target_auth_id: session!.user.id,
+      target_email: session!.user.email ?? '',
+      target_name: userName,
+      description: 'Signed out',
+    });
     await supabase.auth.signOut();
   }
 
