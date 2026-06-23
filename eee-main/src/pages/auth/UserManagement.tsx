@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Users, Shield, Loader2, CheckCircle2, MonitorCog, History } from 'lucide-react';
+import { ArrowLeft, Users, Shield, Loader2, CheckCircle2, UserPlus, History } from 'lucide-react';
 import { getUsers } from '../../services/authApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { PERMISSION_STRUCTURE } from '../../lib/permissionStructure';
@@ -19,6 +19,7 @@ type View = 'users' | 'permissions' | 'it' | 'audit';
 export default function UserManagement({ onHome }: Props) {
   const { t } = useTranslation('auth');
   const { can } = usePermissions();
+  const canCreateUser = can('auth', 'users', 'create');
   const canViewAudit = can('auth', 'audit_log', 'view');
   const [view, setView] = useState<View>('users');
   const [users, setUsers] = useState<ErpUser[]>([]);
@@ -84,14 +85,16 @@ export default function UserManagement({ onHome }: Props) {
             >
               <Shield size={13} /> {t('userManagement.byPermission')}
             </button>
-            <button
-              onClick={() => setView('it')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                view === 'it' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <MonitorCog size={13} /> {t('userManagement.it')}
-            </button>
+            {canCreateUser && (
+              <button
+                onClick={() => setView('it')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                  view === 'it' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <UserPlus size={13} /> {t('userManagement.addUser')}
+              </button>
+            )}
             {canViewAudit && (
               <button
                 onClick={() => setView('audit')}
@@ -103,14 +106,6 @@ export default function UserManagement({ onHome }: Props) {
               </button>
             )}
           </div>
-          {view === 'users' && can('auth', 'users', 'create') && (
-            <button
-              onClick={() => setView('it')}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors"
-            >
-              <MonitorCog size={13} /> {t('userManagement.addUserIt')}
-            </button>
-          )}
         </div>
       </div>
 

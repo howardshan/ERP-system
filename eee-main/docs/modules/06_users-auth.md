@@ -8,14 +8,16 @@
 
 ---
 
-## 三视图结构
+## 视图结构（四视图）
+
+顶栏标签：**By User / By Permission / Add User / Activity Log**。其中 Add User、Activity Log 按权限显示。
 
 ### 视图一：By User（按用户）
 - 展示所有 `erp_user` 记录（通过 `list_erp_users()` RPC 获取）
 - 列：姓名、**Role（职位，来自 `erp_user.role`）**、部门、上级领导、已授权模块（标签）、状态
 - **注意**：原"Email"列已重命名为"Role"，显示用户的职位/职称字段（`erp_user.role`），而非邮箱
 - 点击用户行 → 进入 `UserDetail`
-- **权限控制**：需要 `auth.users.view` 才能看到按钮（Add User (IT) 需要 `auth.users.create`）
+- **权限控制**：需要 `auth.users.view` 才能进入该模块
 
 ### 视图二：By Permission（按权限）
 - 左侧树：Module → Resource → Permission 三级折叠导航
@@ -26,11 +28,15 @@
 - 权限结构定义在 `src/lib/permissionStructure.ts`
 - **权限控制**：Add User 和移除（×）按钮需要 `auth.roles.manage`
 
-### 视图三：IT（IT 管理）
+### 视图三：Add User（创建账户，原「IT」）
 - 创建新的 Supabase Auth 账号（邮箱 + 密码 + 姓名）
 - 调用 Edge Function `create-auth-user`（EF-002）
 - 创建后触发器自动生成 `erp_user` 记录，再到 By User 视图分配权限
-- **权限控制**：整个面板需要 `auth.users.create`，无权限时显示 `ShieldOff` 拒绝画面
+- **权限控制**：标签本身按 `auth.users.create` 显示；面板内部同样需要 `auth.users.create`，无权限时显示 `ShieldOff` 拒绝画面
+- **变更**：标签由「IT」改名为「Add User」；原 By User 视图右上角那个独立的蓝色「Add User (IT)」按钮已删除——它与本标签是同一入口（都 `setView('it')`），属冗余
+
+### 视图四：Activity Log（用户操作审计日志）
+- 见下方「用户操作审计日志」章节。`UserAuditLog.tsx`，按 `auth.audit_log.view` 显示。
 
 ---
 
@@ -157,6 +163,7 @@ PERMISSION_STRUCTURE = {
 | `PermissionBrowser` | Add User 按钮 | `auth.roles.manage` |
 | `PermissionBrowser` | 移除（×）按钮 | `auth.roles.manage` |
 | `ITPanel` | 整个面板 | `auth.users.create` |
+| `UserManagement` | Add User 视图标签 | `auth.users.create`（原独立「Add User (IT)」按钮已删除，与此标签冗余） |
 | `ProductManagement`（QC，`module="qc"`） | Add / Edit / Delete 按钮 | `qc.products.create` / `.edit` / `.delete` |
 | `ProductManagement` | Export / Import 按钮 | `qc.products.export` / `.import` |
 | `ProductManagement`（Production，`module="production"`） | 仅只读浏览（无新增/编辑/删除） | `production.products.view` |
