@@ -15,8 +15,6 @@ function parseSeq(code: string): number {
   return m ? parseInt(m[1], 10) : 0;
 }
 
-const FAIL_EVENTS = new Set(['inspection_failed_hold', 'displaced']);
-
 interface Props {
   lotId: string;
   onBack: () => void;
@@ -53,9 +51,8 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
 
   useEffect(() => { loadDetail(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [lotId]);
 
-  // Prefer the server-computed max_seq (covers unscanned carts too, since
-  // M-099 hides them from sub_lots). Fall back to the visible sub_lots only
-  // if the RPC didn't emit it (e.g. stale build).
+  // Prefer the server-computed max_seq; fall back to scanning visible
+  // sub_lots if the RPC didn't emit it (e.g. stale build before M-099).
   const maxSeq = useMemo(() => {
     if (!detail) return 0;
     if (typeof detail.lot.max_seq === 'number') return detail.lot.max_seq;
@@ -136,17 +133,14 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
 
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
 
-      <h2 className="font-semibold mb-2 text-slate-900 text-sm">{t('tracePage.dryingSubLots')}</h2>
       {/*
-        When the WO has carts but none have been scanned, sub_lots is empty by
-        M-099's design (scanned_for_check_in_at filter). Show an explainer so
-        operators don't think the page is broken.
+        M-152: Drying sub-lots is the single timeline entry point for Batch
+        Trace. ALL carts on the WO are listed (including those not yet scanned
+        — their status badge reads "Created"). Per-cart events live in the
+        History drawer, so the page no longer renders a separate Quality
+        events list.
       */}
-      {detail.sub_lots.length === 0 && (detail.lot.total_count ?? 0) > 0 && (
-        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3 mb-3">
-          {t('tracePage.noScannedYet')}
-        </p>
-      )}
+      <h2 className="font-semibold mb-2 text-slate-900 text-sm">{t('tracePage.dryingSubLots')}</h2>
       <ul className="space-y-2 mb-6">
         {detail.sub_lots.map((s) => (
           <li key={s.id} className="bg-white border rounded-xl p-3 flex items-center gap-3">
@@ -178,28 +172,6 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
             )}
           </li>
         ))}
-      </ul>
-
-      <h2 className="font-semibold mb-2 text-slate-900 text-sm">{t('tracePage.qualityEvents')}</h2>
-      <ul className="space-y-2">
-        {detail.events.map((ev) => (
-          <li
-            key={ev.id}
-            className={cn(
-              'rounded-xl border p-3',
-              FAIL_EVENTS.has(ev.event_type) ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200',
-            )}
-          >
-            <p className={cn(
-              'font-medium leading-snug text-sm',
-              FAIL_EVENTS.has(ev.event_type) ? 'text-red-900' : 'text-slate-800',
-            )}>
-              {ev.summary}
-            </p>
-            <p className="text-[11px] text-slate-500 mt-1.5">{formatQcDateTime(ev.created_at)}</p>
-          </li>
-        ))}
-        {detail.events.length === 0 && <p className="text-slate-500 text-sm">{t('tracePage.noEvents')}</p>}
       </ul>
 
       <AddCartsDialog
