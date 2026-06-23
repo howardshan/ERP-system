@@ -121,6 +121,86 @@ export async function getPermissionHolders(
   return data ?? [];
 }
 
+// ── Auth audit log (M-153) ────────────────────────────────────────────────────
+// Dual-subject audit: records the actor (resolved from the current session) and
+// the target user the action was performed on.  Fire-and-forget like the other
+// modules' loggers — never throws into the calling operation.
+
+export interface AuthAuditLogEntry {
+  id: number;
+  action: string;
+  actor_auth_id: string | null;
+  actor_name: string;
+  target_auth_id: string | null;
+  target_user_id: string | null;
+  target_name: string | null;
+  target_email: string | null;
+  before_snapshot: Record<string, unknown> | null;
+  after_snapshot: Record<string, unknown> | null;
+  diff: Record<string, unknown> | null;
+  description: string | null;
+  changed_at: string;
+}
+
+export async function logAuthAction(params: {
+  action: string;
+  target_auth_id?: string | null;
+  target_user_id?: string | null;
+  target_name?: string | null;
+  target_email?: string | null;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
+  diff?: Record<string, unknown> | null;
+  description?: string | null;
+}): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: erpRow } = await supabase
+      .from('erp_user').select('full_name').eq('auth_user_id', user.id).single();
+    await supabase.from('auth_audit_log').insert({
+      action:         params.action,
+      actor_auth_id:  user.id,
+      actor_name:     erpRow?.full_name ?? user.email ?? 'Unknown',
+      target_auth_id: params.target_auth_id ?? null,
+      target_user_id: params.target_user_id ?? null,
+      target_name:    params.target_name ?? null,
+      target_email:   params.target_email ?? null,
+      before_snapshot: params.before ?? null,
+      after_snapshot:  params.after ?? null,
+      diff:            params.diff ?? null,
+      description:     params.description ?? null,
+    });
+  } catch {
+    // Logging must never break the main operation
+  }
+}
+
+export async function getAuthAuditLog(params?: {
+  target_user_id?: string;
+  action?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<AuthAuditLogEntry[]> {
+  let query = supabase
+    .from('auth_audit_log')
+    .select('*')
+    .order('changed_at', { ascending: false })
+    .range(params?.offset ?? 0, (params?.offset ?? 0) + (params?.limit ?? 100) - 1);
+  if (params?.target_user_id) query = query.eq('target_user_id', params.target_user_id);
+  if (params?.action) query = query.eq('action', params.action);
+  if (params?.search) {
+    const q = params.search.trim();
+    query = query.or(
+      `description.ilike.%${q}%,actor_name.ilike.%${q}%,target_name.ilike.%${q}%,target_email.ilike.%${q}%`,
+    );
+  }
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data as AuthAuditLogEntry[];
+}
+
 export async function resetUserPassword(authUserId: string, newPassword: string): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(

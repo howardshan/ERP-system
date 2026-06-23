@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BarChart3, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
+import { logAuthAction } from '../services/authApi';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 
 export default function LoginPage() {
@@ -15,8 +16,20 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setError(error.message);
+    } else if (data.user) {
+      // login_success only — login_failed can't be logged (user isn't
+      // authenticated at that point, RLS would reject the insert). M-153.
+      void logAuthAction({
+        action: 'login_success',
+        target_auth_id: data.user.id,
+        target_email: data.user.email ?? email,
+        target_name: (data.user.user_metadata?.full_name as string) ?? data.user.email ?? email,
+        description: 'Signed in',
+      });
+    }
     setLoading(false);
   }
 
