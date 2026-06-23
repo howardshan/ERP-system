@@ -50,8 +50,12 @@ function sh(cmd, args) {
 rmSync(distBin, { recursive: true, force: true });
 mkdirSync(distBin, { recursive: true });
 
+// --public + --public-packages "*": ship plain JS source instead of V8 bytecode.
+// REQUIRED for cross-compiling on a Mac → the Windows/Intel V8 rejects bytecode
+// produced by the host's V8 ("V8 rejected the bytecode cache"), so the binary
+// would crash on launch. Plain source has no host/target mismatch.
 for (const b of builds) {
-  sh('npx', ['--yes', '@yao-pkg/pkg', 'server.js', '--target', b.target, '--output', join(distBin, b.name)]);
+  sh('npx', ['--yes', '@yao-pkg/pkg', 'server.js', '--public', '--public-packages', '*', '--target', b.target, '--output', join(distBin, b.name)]);
 }
 
 // ── 1b. Fetch SumatraPDF (Windows PDF printer) if missing ─────────────────────
