@@ -62,17 +62,16 @@ const XLSX_HEADERS = {
   dryDays:  'Reference Dry Time (days)',
   sampling: 'Sampling Rate (1 per N carts)',
   units:    'Units per Cart',
-  tests:    'Required Tests',
 } as const;
 
-// Encode a product's required-test templates into one cell, mirroring the UI
-// badge text so it round-trips and stays hand-editable.  Format per test:
-//   "<Test Name> [hardLo, hardHi] soft [softLo, softHi]"  joined by " ; ".
-function encodeTests(templates: Product['templates']): string {
-  return templates
-    .filter(t => t.test_type_id != null)
-    .map(t => `${t.item_name} [${t.lower_limit}, ${t.upper_limit}] soft [${t.soft_lower_limit}, ${t.soft_upper_limit}]`)
-    .join(' ; ');
+// Required tests use ONE COLUMN PER TEST TYPE (header = the test type's name,
+// columns generated from the Test Types catalog).  A cell holds the limits for
+// that test, or is blank when the product doesn't require it.  This handles
+// products-with-different-tests (blank cells) and new test types (a new column
+// appears automatically on the next export) without a fixed schema.
+//   Cell format:  "[hardLo, hardHi] soft [softLo, softHi]"
+function encodeTestCell(t: Product['templates'][number]): string {
+  return `[${t.lower_limit}, ${t.upper_limit}] soft [${t.soft_lower_limit}, ${t.soft_upper_limit}]`;
 }
 
 type ImportRowPreview = {
@@ -285,15 +284,23 @@ export default function ProductManagement({ module = 'production' }: { module?: 
 
   // ── Excel export / import (BR-Q81) ──────────────────────────────────────────
   const handleExport = () => {
-    const header = [XLSX_HEADERS.code, XLSX_HEADERS.name, XLSX_HEADERS.dryDays, XLSX_HEADERS.sampling, XLSX_HEADERS.units, XLSX_HEADERS.tests];
-    const rows = products.map((p) => ({
-      [XLSX_HEADERS.code]: p.code,
-      [XLSX_HEADERS.name]: p.name,
-      [XLSX_HEADERS.dryDays]: p.standard_drying_minutes != null ? minutesToDays(p.standard_drying_minutes) : '',
-      [XLSX_HEADERS.sampling]: p.sample_every_n_carts ?? 1,
-      [XLSX_HEADERS.units]: p.cart_units ?? 1,
-      [XLSX_HEADERS.tests]: encodeTests(p.templates),
-    }));
+    // One column per test type (catalog order); header = the test type name.
+    const testHeaders = testTypes.map((tt) => tt.name);
+    const header = [XLSX_HEADERS.code, XLSX_HEADERS.name, XLSX_HEADERS.dryDays, XLSX_HEADERS.sampling, XLSX_HEADERS.units, ...testHeaders];
+    const rows = products.map((p) => {
+      const row: Record<string, unknown> = {
+        [XLSX_HEADERS.code]: p.code,
+        [XLSX_HEADERS.name]: p.name,
+        [XLSX_HEADERS.dryDays]: p.standard_drying_minutes != null ? minutesToDays(p.standard_drying_minutes) : '',
+        [XLSX_HEADERS.sampling]: p.sample_every_n_carts ?? 1,
+        [XLSX_HEADERS.units]: p.cart_units ?? 1,
+      };
+      for (const tt of testTypes) {
+        const tmpl = p.templates.find((t) => t.test_type_id === tt.id);
+        row[tt.name] = tmpl ? encodeTestCell(tmpl) : '';
+      }
+      return row;
+    });
     const ws = XLSX.utils.json_to_sheet(rows, { header });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Products');
@@ -309,31 +316,31 @@ export default function ProductManagement({ module = 'production' }: { module?: 
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
       const headerRow = (XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 })[0] ?? []) as unknown[];
-      const hasTestsColumn = headerRow.some((h) => String(h).trim() === XLSX_HEADERS.tests);
       const byCode = new Map(products.map((p) => [p.code.trim().toLowerCase(), p]));
       const ttByName = new Map(testTypes.map((t) => [t.name.trim().toLowerCase(), t]));
       const num = (v: unknown): number | undefined =>
         v === null || v === undefined || v === '' ? undefined : Number(v);
 
-      // Parse the "Required Tests" cell → templates, or an error string.
-      const parseTests = (cell: unknown): { templates?: TemplateInput[]; error?: string } => {
+      // Test columns = sheet headers that match a known test type (one col each).
+      const testColumns = headerRow
+        .map((h) => String(h).trim())
+        .map((h) => ({ header: h, tt: ttByName.get(h.toLowerCase()) }))
+        .filter((c): c is { header: string; tt: TestType } => c.tt != null);
+      const hasTestsColumn = testColumns.length > 0;
+
+      // Parse one test cell ("[lo, hi] soft [lo, hi]"); blank → not required.
+      const parseTestCell = (cell: unknown, tt: TestType): { template?: TemplateInput; error?: string } => {
         const s = String(cell ?? '').trim();
-        if (!s) return { templates: [] };
-        const out: TemplateInput[] = [];
-        for (const seg of s.split(';').map((x) => x.trim()).filter(Boolean)) {
-          const m = seg.match(/^(.+?)\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\](?:\s*soft\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\])?$/i);
-          if (!m) return { error: tr('productManagement.importErrTestFormat', { seg }) };
-          const tt = ttByName.get(m[1].trim().toLowerCase());
-          if (!tt) return { error: tr('productManagement.importErrUnknownTest', { name: m[1].trim() }) };
-          const lo = Number(m[2]); const hi = Number(m[3]);
-          const slo = m[4] !== undefined ? Number(m[4]) : lo;
-          const shi = m[5] !== undefined ? Number(m[5]) : hi;
-          if (![lo, hi, slo, shi].every(Number.isFinite)) return { error: tr('productManagement.importErrBadNumber') };
-          if (lo > hi) return { error: tr('productManagement.importErrHardOrder', { name: tt.name }) };
-          if (slo > lo || shi < hi) return { error: tr('productManagement.importErrSoftWrap', { name: tt.name }) };
-          out.push({ test_type_id: tt.id, lower_limit: lo, upper_limit: hi, soft_lower_limit: slo, soft_upper_limit: shi });
-        }
-        return { templates: out };
+        if (!s) return {};
+        const m = s.match(/^\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\](?:\s*soft\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\])?$/i);
+        if (!m) return { error: tr('productManagement.importErrTestFormat', { name: tt.name, seg: s }) };
+        const lo = Number(m[1]); const hi = Number(m[2]);
+        const slo = m[3] !== undefined ? Number(m[3]) : lo;
+        const shi = m[4] !== undefined ? Number(m[4]) : hi;
+        if (![lo, hi, slo, shi].every(Number.isFinite)) return { error: tr('productManagement.importErrBadNumber') };
+        if (lo > hi) return { error: tr('productManagement.importErrHardOrder', { name: tt.name }) };
+        if (slo > lo || shi < hi) return { error: tr('productManagement.importErrSoftWrap', { name: tt.name }) };
+        return { template: { test_type_id: tt.id, lower_limit: lo, upper_limit: hi, soft_lower_limit: slo, soft_upper_limit: shi } };
       };
 
       // Stable key for comparing a template set (ignores order).
@@ -357,12 +364,16 @@ export default function ProductManagement({ module = 'production' }: { module?: 
         else if (sample !== undefined && (!Number.isFinite(sample) || sample < 1)) error = tr('productManagement.importErrBadNumber');
         else if (units !== undefined && (!Number.isFinite(units) || units <= 0)) error = tr('productManagement.importErrBadNumber');
 
-        // Required tests (only when the column is present in the sheet).
+        // Required tests — one cell per test-type column present in the sheet.
         let templates: TemplateInput[] | undefined;
         if (hasTestsColumn && !error) {
-          const res = parseTests(r[XLSX_HEADERS.tests]);
-          if (res.error) error = res.error;
-          else templates = res.templates;
+          const tmpls: TemplateInput[] = [];
+          for (const { header, tt } of testColumns) {
+            const res = parseTestCell(r[header], tt);
+            if (res.error) { error = res.error; break; }
+            if (res.template) tmpls.push(res.template);
+          }
+          if (!error) templates = tmpls;
         }
 
         const match = code ? byCode.get(code.toLowerCase()) : undefined;
