@@ -2595,7 +2595,10 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-149 | 20260623000003_qc_products_grant_export_import_log.sql · 把 qc.products.{export,import,view_log} 回填给所有已有 qc.products.view 的用户 |
 | M-150 | 20260623000004_qc_daily_report.sql · 新建 qc_daily_test_report 表 + qc-daily-reports 存储桶 + 3 个 RPC(当日检测取数 / 签字归档 / 历史列表);每日检测报告签字归档闭环(BR-Q82) |
 | M-151 | 20260623000005_qc_daily_report_grant.sql · 把 qc.daily_report.{view,sign} 回填给已有 qc.testing.{view_status,submit_inspection} 的用户 |
-| **M-152** | _(下一个)_ |
+| M-152 | 20260623000006_qc_seed_test_parameters.sql · 从 docs/Testing Parameters.xlsx 导入每个产品的 MC% + Aw 检测项(硬限)及软限;新增 qc_test_type「Moisture Content (MC%)」;软限规则:非红底 Aw±0.005、MC%±0.5(后由 M-153 更正为 ±0.05),红底(21 个 SWD/46xx 产品)无软限(soft=hard);重复 Item 取更严范围;仅更新已存在(按 code 匹配)的产品 |
+| M-153 | 20260623000007_qc_fix_mc_soft_band.sql · 更正 M-152 的 MC% 软限:非红底产品 MC% 软限从 ±0.5 改为 **±0.05**(UPDATE soft_lower=lower-0.05、soft_upper=upper+0.05;红底保持 soft=hard 不动,硬限和 Aw 不动) |
+| M-154 | 20260623000008_qc_drying_sub_lot_dryer_number_dynamic.sql · 放宽 `qc_drying_sub_lot.dryer_number` 的 CHECK 从 1..5 改为 ≥1(补 M-126 数据化烘干房遗漏:RPC 已按 qc_dry_room 校验,但旧列约束仍卡 Dryer 6..16 的 check-in) |
+| **M-155** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

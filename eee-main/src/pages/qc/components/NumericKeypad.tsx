@@ -11,14 +11,17 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
  * select, contenteditable) has focus — that way the Sample ID input and the
  * Remark textarea on the same screen still get their normal typing behaviour.
  */
-export function NumericKeypad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  // Keep latest value + onChange in a ref so the keydown listener can read them
-  // without re-binding on every keystroke (which would lose interim handlers).
-  const stateRef = useRef({ value, onChange });
-  stateRef.current = { value, onChange };
+export function NumericKeypad(
+  { value, onChange, maxDecimals = 2 }:
+  { value: string; onChange: (v: string) => void; maxDecimals?: number },
+) {
+  // Keep latest value + onChange (+ maxDecimals) in a ref so the keydown listener
+  // can read them without re-binding on every keystroke.
+  const stateRef = useRef({ value, onChange, maxDecimals });
+  stateRef.current = { value, onChange, maxDecimals };
 
   const apply = (key: string) => {
-    const { value: v, onChange: cb } = stateRef.current;
+    const { value: v, onChange: cb, maxDecimals: md } = stateRef.current;
     if (key === '⌫') {
       cb(v.slice(0, -1));
       return;
@@ -30,7 +33,7 @@ export function NumericKeypad({ value, onChange }: { value: string; onChange: (v
     }
     const next = v + key;
     const parts = next.split('.');
-    if (parts[1] && parts[1].length > 2) return;
+    if (parts[1] && parts[1].length > md) return;
     cb(next);
   };
 

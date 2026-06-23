@@ -583,7 +583,13 @@ function TestWorkflow({
                         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{tmpl.item_name}</p>
                         <p className={cn('text-4xl font-bold tabular-nums my-1', valColor)}>{raw || '—'}</p>
                       </div>
-                      <NumericKeypad value={raw} onChange={v => setReadings(r => ({ ...r, [tmpl.id]: v }))} />
+                      {/* Aw values are < 1 and need 4-decimal precision (col is
+                          numeric(10,4)); MC% and others keep 2 decimals. */}
+                      <NumericKeypad
+                        value={raw}
+                        onChange={v => setReadings(r => ({ ...r, [tmpl.id]: v }))}
+                        maxDecimals={/aw/i.test(tmpl.unit ?? '') || /water activity/i.test(tmpl.item_name) ? 4 : 2}
+                      />
                     </div>
                   )}
                 </div>

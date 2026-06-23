@@ -7,7 +7,6 @@ import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import { SubLot } from '../../../services/qcApi';
 import { getSavedPrinter, getSavedDpi, LabelDpi } from '../../../lib/printerConfig';
-import { rasterizePdfToPngs } from '../../../lib/pdfRasterize';
 
 function isWindowsBrowser(): boolean {
   return typeof navigator !== 'undefined' && /Win/i.test(navigator.userAgent);
@@ -333,13 +332,6 @@ async function postPrintPngsToBridge(pngs: string[], printer: string, dpi: Label
   }
 }
 
-function pdfBase64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -401,8 +393,12 @@ export function CartStickerSheet({
         if (!pdfB64Ref.current) throw new Error(t('cartStickerSheet.pdfNotReady'));
         setPrintStatus(t('cartStickerSheet.printingCount', { count: carts.length }));
         if (isWindowsBrowser()) {
+          // Canvas PNG at native dpi (not PDF→pdfjs) — matches 4×3 landscape pixels
+          // exactly; avoids pdf.js viewport rotation and missing PNG DPI metadata.
           const dpi = getSavedDpi();
-          const pngs = await rasterizePdfToPngs(pdfBase64ToBytes(pdfB64Ref.current), dpi);
+          const pngs = await Promise.all(
+            carts.map(c => renderPrintPng(c, workOrderBarcode, skuCode, skuName, dpi)),
+          );
           await postPrintPngsToBridge(pngs, printer, dpi);
         } else {
           await postPrintPdfToBridge(pdfB64Ref.current, printer);
