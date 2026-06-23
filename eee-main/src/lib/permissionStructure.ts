@@ -352,6 +352,16 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'view_history', label: 'View Sub-lot Full Timeline', prereq: null },
         ],
       },
+      // M-150 (BR-Q82): daily test report — roll up the day's inspections,
+      // sign off (typed/drawn), archive a PDF; supports back-signing past days.
+      // Frontend call site: pages/qc/DailyTestReport.tsx.
+      daily_report: {
+        label: 'Daily Test Report',
+        permissions: [
+          { id: 'view', label: 'View & Download Daily Reports', prereq: null },
+          { id: 'sign', label: 'Sign Off Daily Report',         prereq: 'view' },
+        ],
+      },
       // Products master data — edit rights returned to QC (M-147, BR-Q80).
       // Production keeps a read-only `production.products.view` entry.
       // Test Types are gated by this same resource (no separate test_types key).
