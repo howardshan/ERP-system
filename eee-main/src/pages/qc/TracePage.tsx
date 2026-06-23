@@ -137,6 +137,16 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
 
       <h2 className="font-semibold mb-2 text-slate-900 text-sm">{t('tracePage.dryingSubLots')}</h2>
+      {/*
+        When the WO has carts but none have been scanned, sub_lots is empty by
+        M-099's design (scanned_for_check_in_at filter). Show an explainer so
+        operators don't think the page is broken.
+      */}
+      {detail.sub_lots.length === 0 && (detail.lot.total_count ?? 0) > 0 && (
+        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3 mb-3">
+          {t('tracePage.noScannedYet')}
+        </p>
+      )}
       <ul className="space-y-2 mb-6">
         {detail.sub_lots.map((s) => (
           <li key={s.id} className="bg-white border rounded-xl p-3 flex items-center gap-3">

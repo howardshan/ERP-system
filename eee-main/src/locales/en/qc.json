@@ -951,6 +951,7 @@
     "addCarts": "Add carts",
     "reprintSticker": "Reprint sticker",
     "dryingSubLots": "Drying sub-lots",
+    "noScannedYet": "No carts have been scanned to a dryer yet — they're still on the production floor. Use Dry Rooms → Scan to bring them up.",
     "inLabel": "In",
     "outLabel": "Out",
     "viewFullHistory": "View full history",
