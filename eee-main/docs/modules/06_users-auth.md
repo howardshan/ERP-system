@@ -115,6 +115,7 @@ PERMISSION_STRUCTURE = {
 - 每个模块都有 `module_permissions.manage`：允许管理该模块内其他用户的权限
 - `prereq`：前置依赖（如 `create` 需要先有 `view`）
 - `hasLimit`：`approve` 权限可设置 `approval_limit`（金额上限），`null` = 无限
+- **M-147 / M-148（BR-Q80）产品主数据编辑权回归 QC**：`production.products` 收窄为只读 `view`；`qc` 新增 `products` 资源 `{view, create, edit, delete, export, import, view_log}`（Test Types 复用同一资源，不单拆）。`ProductManagement` / `TestTypesPage` 用 `module` 属性决定查 `production.*`（只读）还是 `qc.*`（可编辑）。产品/测试类型的 CRUD 与 Excel 导入写入 `qc_product_audit_log`，由 `qc.products.view_log` 门控查看。
 
 ---
 
@@ -155,6 +156,10 @@ PERMISSION_STRUCTURE = {
 | `PermissionBrowser` | Add User 按钮 | `auth.roles.manage` |
 | `PermissionBrowser` | 移除（×）按钮 | `auth.roles.manage` |
 | `ITPanel` | 整个面板 | `auth.users.create` |
+| `ProductManagement`（QC，`module="qc"`） | Add / Edit / Delete 按钮 | `qc.products.create` / `.edit` / `.delete` |
+| `ProductManagement` | Export / Import 按钮 | `qc.products.export` / `.import` |
+| `ProductManagement`（Production，`module="production"`） | 仅只读浏览（无新增/编辑/删除） | `production.products.view` |
+| `ProductAuditLog` | 整个页面 | `qc.products.view_log`（否则 ShieldOff 拒绝画面） |
 
 ---
 

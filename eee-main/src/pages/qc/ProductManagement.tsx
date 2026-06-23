@@ -1,18 +1,21 @@
-import React, { FormEvent, useEffect, useState } from 'react';
+import React, { FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Trash2, FlaskConical, Package } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Plus, Trash2, FlaskConical, Package, Search, Download, Upload, X } from 'lucide-react';
 import {
   listProducts,
   createProduct,
   updateProduct,
   deleteProduct,
   deleteProducts,
+  importProducts,
   listTestTypes,
   listProductItemLinks,
   addSkuItem,
   removeSkuItem,
   Product,
   ProductInput,
+  ProductImportRow,
   TestType,
   TemplateInput,
 } from '../../services/qcApi';
@@ -51,13 +54,52 @@ function productToForm(p: Product): ProductInput {
   };
 }
 
-export default function ProductManagement() {
+// Fixed (locale-independent) Excel column headers so export → edit → import
+// round-trips regardless of UI language.  See BR-Q81.
+const XLSX_HEADERS = {
+  code:     'S2 WIP Code',
+  name:     'Name',
+  dryDays:  'Reference Dry Time (days)',
+  sampling: 'Sampling Rate (1 per N carts)',
+  units:    'Units per Cart',
+  tests:    'Required Tests',
+} as const;
+
+// Encode a product's required-test templates into one cell, mirroring the UI
+// badge text so it round-trips and stays hand-editable.  Format per test:
+//   "<Test Name> [hardLo, hardHi] soft [softLo, softHi]"  joined by " ; ".
+function encodeTests(templates: Product['templates']): string {
+  return templates
+    .filter(t => t.test_type_id != null)
+    .map(t => `${t.item_name} [${t.lower_limit}, ${t.upper_limit}] soft [${t.soft_lower_limit}, ${t.soft_upper_limit}]`)
+    .join(' ; ');
+}
+
+type ImportRowPreview = {
+  rowNum: number;
+  code: string;
+  name: string;
+  drying_days: number | null;
+  sample_every_n_carts?: number;
+  cart_units?: number;
+  templates?: TemplateInput[];
+  status: 'create' | 'update' | 'unchanged' | 'error';
+  error?: string;
+};
+
+// `module` decides which permission namespace gates this page so the SAME
+// component serves two entry points: Production (`production.products.*`,
+// read-only after M-127) and QC (`qc.products.*`, full edit).  Default keeps
+// the original Production behaviour for any call site that doesn't pass it.
+export default function ProductManagement({ module = 'production' }: { module?: 'production' | 'qc' } = {}) {
   const { t: tr } = useTranslation('qc');
   const { can } = usePermissions();
-  const canView = can('production', 'products', 'view');
-  const canCreate = can('production', 'products', 'create');
-  const canEdit = can('production', 'products', 'edit');
-  const canDelete = can('production', 'products', 'delete');
+  const canView = can(module, 'products', 'view');
+  const canCreate = can(module, 'products', 'create');
+  const canEdit = can(module, 'products', 'edit');
+  const canDelete = can(module, 'products', 'delete');
+  const canExport = can(module, 'products', 'export');
+  const canImport = can(module, 'products', 'import');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -69,6 +111,12 @@ export default function ProductManagement() {
   const [busy, setBusy] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [testTypes, setTestTypes] = useState<TestType[]>([]);
+  const [query, setQuery] = useState('');
+  const [importPreview, setImportPreview] = useState<ImportRowPreview[] | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Final-product (ERP item) linking — see qc_sku_item (M-087) + M-095.
   // `allItems` = every item in the warehouse master, used to populate the
@@ -211,8 +259,8 @@ export default function ProductManagement() {
   };
 
   const toggleSelectAll = () => {
-    if (selected.size === products.length) setSelected(new Set());
-    else setSelected(new Set(products.map((p) => p.id)));
+    if (filtered.length > 0 && selected.size === filtered.length) setSelected(new Set());
+    else setSelected(new Set(filtered.map((p) => p.id)));
   };
 
   const bulkDelete = async () => {
@@ -235,10 +283,188 @@ export default function ProductManagement() {
     setBusy(false);
   };
 
+  // ── Excel export / import (BR-Q81) ──────────────────────────────────────────
+  const handleExport = () => {
+    const header = [XLSX_HEADERS.code, XLSX_HEADERS.name, XLSX_HEADERS.dryDays, XLSX_HEADERS.sampling, XLSX_HEADERS.units, XLSX_HEADERS.tests];
+    const rows = products.map((p) => ({
+      [XLSX_HEADERS.code]: p.code,
+      [XLSX_HEADERS.name]: p.name,
+      [XLSX_HEADERS.dryDays]: p.standard_drying_minutes != null ? minutesToDays(p.standard_drying_minutes) : '',
+      [XLSX_HEADERS.sampling]: p.sample_every_n_carts ?? 1,
+      [XLSX_HEADERS.units]: p.cart_units ?? 1,
+      [XLSX_HEADERS.tests]: encodeTests(p.templates),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows, { header });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    XLSX.writeFile(wb, 'products.xlsx');
+  };
+
+  const handleFile = async (file: File) => {
+    setError('');
+    setMsg('');
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+      const headerRow = (XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 })[0] ?? []) as unknown[];
+      const hasTestsColumn = headerRow.some((h) => String(h).trim() === XLSX_HEADERS.tests);
+      const byCode = new Map(products.map((p) => [p.code.trim().toLowerCase(), p]));
+      const ttByName = new Map(testTypes.map((t) => [t.name.trim().toLowerCase(), t]));
+      const num = (v: unknown): number | undefined =>
+        v === null || v === undefined || v === '' ? undefined : Number(v);
+
+      // Parse the "Required Tests" cell → templates, or an error string.
+      const parseTests = (cell: unknown): { templates?: TemplateInput[]; error?: string } => {
+        const s = String(cell ?? '').trim();
+        if (!s) return { templates: [] };
+        const out: TemplateInput[] = [];
+        for (const seg of s.split(';').map((x) => x.trim()).filter(Boolean)) {
+          const m = seg.match(/^(.+?)\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\](?:\s*soft\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\])?$/i);
+          if (!m) return { error: tr('productManagement.importErrTestFormat', { seg }) };
+          const tt = ttByName.get(m[1].trim().toLowerCase());
+          if (!tt) return { error: tr('productManagement.importErrUnknownTest', { name: m[1].trim() }) };
+          const lo = Number(m[2]); const hi = Number(m[3]);
+          const slo = m[4] !== undefined ? Number(m[4]) : lo;
+          const shi = m[5] !== undefined ? Number(m[5]) : hi;
+          if (![lo, hi, slo, shi].every(Number.isFinite)) return { error: tr('productManagement.importErrBadNumber') };
+          if (lo > hi) return { error: tr('productManagement.importErrHardOrder', { name: tt.name }) };
+          if (slo > lo || shi < hi) return { error: tr('productManagement.importErrSoftWrap', { name: tt.name }) };
+          out.push({ test_type_id: tt.id, lower_limit: lo, upper_limit: hi, soft_lower_limit: slo, soft_upper_limit: shi });
+        }
+        return { templates: out };
+      };
+
+      // Stable key for comparing a template set (ignores order).
+      const tkey = (t: { test_type_id: number | null; lower_limit: number; upper_limit: number; soft_lower_limit: number; soft_upper_limit: number }) =>
+        `${t.test_type_id}|${t.lower_limit}|${t.upper_limit}|${t.soft_lower_limit}|${t.soft_upper_limit}`;
+      const sameTemplates = (a: TemplateInput[], b: Product['templates']) => {
+        const ka = a.map(tkey).sort();
+        const kb = b.filter((t) => t.test_type_id != null).map(tkey).sort();
+        return ka.length === kb.length && ka.every((v, i) => v === kb[i]);
+      };
+
+      const previews: ImportRowPreview[] = raw.map((r, i) => {
+        const code = String(r[XLSX_HEADERS.code] ?? '').trim();
+        const name = String(r[XLSX_HEADERS.name] ?? '').trim();
+        const dry = num(r[XLSX_HEADERS.dryDays]);
+        const sample = num(r[XLSX_HEADERS.sampling]);
+        const units = num(r[XLSX_HEADERS.units]);
+        let error: string | undefined;
+        if (!name) error = tr('productManagement.importErrNoName');
+        else if (dry !== undefined && !Number.isFinite(dry)) error = tr('productManagement.importErrBadNumber');
+        else if (sample !== undefined && (!Number.isFinite(sample) || sample < 1)) error = tr('productManagement.importErrBadNumber');
+        else if (units !== undefined && (!Number.isFinite(units) || units <= 0)) error = tr('productManagement.importErrBadNumber');
+
+        // Required tests (only when the column is present in the sheet).
+        let templates: TemplateInput[] | undefined;
+        if (hasTestsColumn && !error) {
+          const res = parseTests(r[XLSX_HEADERS.tests]);
+          if (res.error) error = res.error;
+          else templates = res.templates;
+        }
+
+        const match = code ? byCode.get(code.toLowerCase()) : undefined;
+        let status: ImportRowPreview['status'];
+        if (error) {
+          status = 'error';
+        } else if (!match) {
+          status = 'create';
+        } else {
+          // Mark "update" only if something would actually change — mirrors how
+          // importProducts applies fields (name + drying always, sample/units
+          // only when present, templates only when the column is present).
+          const newDryMins = dry != null ? Math.round(daysToMinutes(dry)) : null;
+          const changed =
+            name !== (match.name ?? '').trim() ||
+            (newDryMins ?? null) !== (match.standard_drying_minutes ?? null) ||
+            (sample !== undefined && sample !== (match.sample_every_n_carts ?? null)) ||
+            (units !== undefined && units !== (match.cart_units ?? null)) ||
+            (templates !== undefined && !sameTemplates(templates, match.templates));
+          status = changed ? 'update' : 'unchanged';
+        }
+        return {
+          rowNum: i + 2, // +1 for 1-based, +1 for the header row
+          code,
+          name,
+          drying_days: dry ?? null,
+          sample_every_n_carts: sample,
+          cart_units: units,
+          templates,
+          status,
+          error,
+        };
+      });
+      setImportPreview(previews);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : tr('productManagement.importErrParse'));
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!importPreview) return;
+    // Only rows that will actually change — skip unchanged & error.
+    const valid = importPreview.filter((p) => p.status === 'create' || p.status === 'update');
+    if (valid.length === 0) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setImporting(true);
+    setImportProgress({ done: 0, total: valid.length });
+    setError('');
+    try {
+      const rows: ProductImportRow[] = valid.map((p) => ({
+        code: p.code || undefined,
+        name: p.name,
+        standard_drying_minutes: p.drying_days != null ? daysToMinutes(p.drying_days) : null,
+        sample_every_n_carts: p.sample_every_n_carts,
+        cart_units: p.cart_units,
+        templates: p.templates,
+      }));
+      const res = await importProducts(rows, {
+        signal: controller.signal,
+        onProgress: (done, total) => setImportProgress({ done, total }),
+      });
+      setMsg(
+        res.aborted
+          ? tr('productManagement.importCancelled', { created: res.created, updated: res.updated })
+          : tr('productManagement.importDone', { created: res.created, updated: res.updated }),
+      );
+      setImportPreview(null);
+      load();
+      reloadLinks();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : tr('productManagement.importErrFailed'));
+    }
+    setImporting(false);
+    setImportProgress(null);
+    abortRef.current = null;
+  };
+
+  const cancelImport = () => {
+    if (importing) abortRef.current?.abort();
+    else setImportPreview(null);
+  };
+
+  // Warn before leaving / refreshing while an import is in flight — closing the
+  // tab leaves a partial (but not corrupt) update; re-importing is idempotent.
+  useEffect(() => {
+    if (!importing) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [importing]);
+
   const isBusy = creating || editingId !== null;
 
+  // Client-side search over name / S2 WIP code — product master is small.
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? products.filter((p) => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q))
+    : products;
+
   if (!canView) {
-    return <PermissionDenied permission="production.products.view" feature={tr('productManagement.featureProductsTemplates')} />;
+    return <PermissionDenied permission={`${module}.products.view`} feature={tr('productManagement.featureProductsTemplates')} />;
   }
 
   return (
@@ -251,24 +477,68 @@ export default function ProductManagement() {
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
       {error && <p className="text-red-600 mb-3 text-sm">{error}</p>}
 
-      <div className="flex items-center gap-2 mb-4">
-        {canCreate && (
-          <button
-            type="button"
-            onClick={creating ? cancel : startCreate}
-            disabled={editingId !== null}
-            className={cn(
-              'flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold',
-              creating ? 'bg-slate-200 text-slate-700' : 'bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50',
-            )}
-          >
-            <Plus size={13} /> {creating ? tr('productManagement.cancelNew') : tr('productManagement.addProduct')}
-          </button>
-        )}
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="relative w-full sm:max-w-xs">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={tr('productManagement.searchPlaceholder')}
+            className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm"
+            spellCheck={false}
+          />
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {canExport && (
+            <button
+              type="button"
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              <Download size={13} /> {tr('productManagement.exportBtn')}
+            </button>
+          )}
+          {canImport && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
+                  e.target.value = '';
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                <Upload size={13} /> {tr('productManagement.importBtn')}
+              </button>
+            </>
+          )}
+          {canCreate && (
+            <button
+              type="button"
+              onClick={creating ? cancel : startCreate}
+              disabled={editingId !== null}
+              className={cn(
+                'flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold',
+                creating ? 'bg-slate-200 text-slate-700' : 'bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50',
+              )}
+            >
+              <Plus size={13} /> {creating ? tr('productManagement.cancelNew') : tr('productManagement.addProduct')}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 mb-3">
-        <SelectAllCheckbox total={products.length} selected={selected.size} onToggleAll={toggleSelectAll} />
+        <SelectAllCheckbox total={filtered.length} selected={selected.size} onToggleAll={toggleSelectAll} />
         {canDelete && selected.size > 0 && (
           <button
             type="button"
@@ -305,47 +575,92 @@ export default function ProductManagement() {
         </form>
       )}
 
-      <ul className="space-y-3">
-        {products.map((p) => {
-          const t = p.templates[0];
-          const isEditing = editingId === p.id;
-          const checked = selected.has(p.id);
-          return (
-            <li key={p.id} className={cn(
-              'rounded-xl p-4 transition-colors',
-              isEditing ? 'bg-white border-2 border-blue-500 shadow-sm' : checked ? 'bg-blue-50/40 border-2 border-blue-400' : 'bg-white border',
-            )}>
-              {isEditing ? (
-                <form onSubmit={submit} className="space-y-4">
-                  <h2 className="font-semibold text-blue-800 text-sm">{tr('productManagement.editHeading', { name: p.name })}</h2>
-                  <ProductFormFields
-                    form={form}
-                    setForm={setForm}
-                    testTypes={testTypes}
-                    allItems={allItems}
-                    selectedItemIds={selectedItemIds}
-                    onToggleItem={toggleItemId}
-                  />
-                  <div className="flex gap-2">
-                    <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">{tr('productManagement.save')}</button>
-                    <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>{tr('productManagement.cancel')}</button>
-                  </div>
-                </form>
-              ) : (
-                <div className="flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleSelect(p.id)}
-                    className="w-4 h-4 rounded accent-blue-600 mt-1"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
-                        <div className="font-semibold text-slate-900">{p.name}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{p.code}</div>
-                      </div>
-                      <div className="flex gap-2 shrink-0">
+      <div className="overflow-x-auto border border-slate-200 rounded-xl bg-white">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500">
+              <th className="p-3 w-8"></th>
+              <th className="p-3 font-semibold">{tr('productManagement.colProduct')}</th>
+              <th className="p-3 font-semibold">{tr('productManagement.colCode')}</th>
+              <th className="p-3 font-semibold">{tr('productManagement.referenceDry')}</th>
+              <th className="p-3 font-semibold">{tr('productManagement.samplingRate')}</th>
+              <th className="p-3 font-semibold">{tr('productManagement.unitsPerCart')}</th>
+              <th className="p-3 font-semibold">{tr('productManagement.requiredTests')}</th>
+              {(canEdit || canDelete) && <th className="p-3 font-semibold text-right">{tr('productManagement.colActions')}</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((p) => {
+              const isEditing = editingId === p.id;
+              const checked = selected.has(p.id);
+              const colCount = 7 + (canEdit || canDelete ? 1 : 0);
+
+              if (isEditing) {
+                return (
+                  <tr key={p.id} className="border-b border-slate-100 bg-white">
+                    <td colSpan={colCount} className="p-4 border-l-2 border-blue-500">
+                      <form onSubmit={submit} className="space-y-4">
+                        <h2 className="font-semibold text-blue-800 text-sm">{tr('productManagement.editHeading', { name: p.name })}</h2>
+                        <ProductFormFields
+                          form={form}
+                          setForm={setForm}
+                          testTypes={testTypes}
+                          allItems={allItems}
+                          selectedItemIds={selectedItemIds}
+                          onToggleItem={toggleItemId}
+                        />
+                        <div className="flex gap-2">
+                          <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium">{tr('productManagement.save')}</button>
+                          <button type="button" className="px-4 py-2 rounded-lg border text-sm" onClick={cancel}>{tr('productManagement.cancel')}</button>
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                );
+              }
+
+              return (
+                  <tr key={p.id} className={cn('border-b border-slate-100', checked ? 'bg-blue-50/40' : 'hover:bg-slate-50/60')}>
+                    <td className="p-3 align-top">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleSelect(p.id)}
+                        className="w-4 h-4 rounded accent-blue-600"
+                      />
+                    </td>
+                    <td className="p-3 font-medium text-slate-900 align-top">{p.name}</td>
+                    <td className="p-3 font-mono text-xs text-slate-500 align-top">{p.code}</td>
+                    <td className="p-3 text-slate-700 align-top whitespace-nowrap">{p.standard_drying_minutes != null ? fmtDays(p.standard_drying_minutes) : tr('productManagement.notSet')}</td>
+                    <td className="p-3 text-slate-700 align-top whitespace-nowrap">
+                      {tr('productManagement.onePerPrefix')} <span className="font-mono font-bold">{p.sample_every_n_carts ?? 1}</span> {tr('productManagement.cartsSuffix')}
+                    </td>
+                    <td className="p-3 text-slate-700 align-top"><span className="font-mono font-bold">{p.cart_units ?? 1}</span></td>
+                    <td className="p-3 text-slate-700 align-top min-w-[16rem]">
+                      {p.templates.length === 0 ? (
+                        <span className="text-xs text-slate-400">{tr('productManagement.noTestsAssigned')}</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {p.templates.map((tmpl) => {
+                            const hasSoftBand =
+                              tmpl.soft_lower_limit < tmpl.lower_limit ||
+                              tmpl.soft_upper_limit > tmpl.upper_limit;
+                            return (
+                              <span key={tmpl.id} className="text-[11px] bg-blue-50 border border-blue-200 text-blue-800 rounded px-1.5 py-0.5 whitespace-nowrap">
+                                {tmpl.item_name} · [{tmpl.lower_limit}, {tmpl.upper_limit}]
+                                {hasSoftBand && (
+                                  <span className="ml-1 text-amber-700">
+                                    {tr('productManagement.softBadgePrefix')} [{tmpl.soft_lower_limit}, {tmpl.soft_upper_limit}]
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                    {(canEdit || canDelete) && (
+                      <td className="p-3 text-right whitespace-nowrap align-top">
                         {canEdit && (
                           <button
                             type="button"
@@ -366,54 +681,120 @@ export default function ProductManagement() {
                             {tr('productManagement.delete')}
                           </button>
                         )}
-                      </div>
-                    </div>
-                    <dl className="mt-3 grid sm:grid-cols-3 gap-2 text-xs">
-                      <div>
-                        <dt className="text-slate-500">{tr('productManagement.referenceDry')}</dt>
-                        <dd className="text-slate-800">{p.standard_drying_minutes != null ? fmtDays(p.standard_drying_minutes) : tr('productManagement.notSet')}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-slate-500">{tr('productManagement.samplingRate')}</dt>
-                        <dd className="text-slate-800">
-                          {tr('productManagement.onePerPrefix')} <span className="font-mono font-bold">{p.sample_every_n_carts ?? 1}</span> {tr('productManagement.cartsSuffix')}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-slate-500">{tr('productManagement.unitsPerCart')}</dt>
-                        <dd className="text-slate-800"><span className="font-mono font-bold">{p.cart_units ?? 1}</span></dd>
-                      </div>
-                      {p.templates.length > 0 && (
-                        <div className="sm:col-span-2">
-                          <dt className="text-slate-500 mb-1">{tr('productManagement.requiredTests')}</dt>
-                          <dd className="flex flex-wrap gap-1.5">
-                            {p.templates.map(tmpl => {
-                              const hasSoftBand =
-                                tmpl.soft_lower_limit < tmpl.lower_limit ||
-                                tmpl.soft_upper_limit > tmpl.upper_limit;
-                              return (
-                                <span key={tmpl.id} className="text-xs bg-blue-50 border border-blue-200 text-blue-800 rounded px-2 py-0.5">
-                                  {tmpl.item_name} · [{tmpl.lower_limit}, {tmpl.upper_limit}]
-                                  {hasSoftBand && (
-                                    <span className="ml-1 text-amber-700">
-                                      {tr('productManagement.softBadgePrefix')} [{tmpl.soft_lower_limit}, {tmpl.soft_upper_limit}]
-                                    </span>
-                                  )}
-                                </span>
-                              );
-                            })}
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-                  </div>
+                      </td>
+                    )}
+                  </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7 + (canEdit || canDelete ? 1 : 0)} className="p-5 text-center text-sm text-slate-500">
+                  {products.length === 0 ? tr('productManagement.noProducts') : tr('productManagement.noSearchResults')}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {importPreview && (() => {
+        const createCount = importPreview.filter((p) => p.status === 'create').length;
+        const updateCount = importPreview.filter((p) => p.status === 'update').length;
+        const unchangedCount = importPreview.filter((p) => p.status === 'unchanged').length;
+        const errorCount = importPreview.filter((p) => p.status === 'error').length;
+        const validCount = createCount + updateCount;
+        const pct = importProgress && importProgress.total > 0
+          ? Math.round((importProgress.done / importProgress.total) * 100)
+          : 0;
+        // Preview lists only actionable rows (create / update / error) — the
+        // (often hundreds of) unchanged rows are summarised in the count badge.
+        const visibleRows = importPreview.filter((p) => p.status !== 'unchanged');
+        return (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-xl">
+              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+                <h2 className="font-bold text-slate-900">{tr('productManagement.importPreviewTitle')}</h2>
+                <button type="button" onClick={cancelImport} disabled={importing} className="text-slate-400 hover:text-slate-700 disabled:opacity-40">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-4 overflow-auto">
+                <div className="flex flex-wrap gap-2 mb-3 text-xs">
+                  <span className="px-2 py-1 rounded bg-emerald-50 text-emerald-700 font-bold">{tr('productManagement.importCreate')}: {createCount}</span>
+                  <span className="px-2 py-1 rounded bg-amber-50 text-amber-700 font-bold">{tr('productManagement.importUpdate')}: {updateCount}</span>
+                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold">{tr('productManagement.importUnchanged')}: {unchangedCount}</span>
+                  {errorCount > 0 && <span className="px-2 py-1 rounded bg-red-50 text-red-700 font-bold">{tr('productManagement.importError')}: {errorCount}</span>}
                 </div>
-              )}
-            </li>
-          );
-        })}
-        {products.length === 0 && <p className="text-slate-500 text-sm">{tr('productManagement.noProducts')}</p>}
-      </ul>
+                {validCount > 0 && !importing && (
+                  <p className="mb-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                    {tr('productManagement.importPartialWarning')}
+                  </p>
+                )}
+                {importPreview.length === 0 ? (
+                  <p className="text-sm text-slate-500">{tr('productManagement.importNoRows')}</p>
+                ) : visibleRows.length === 0 ? (
+                  <p className="text-sm text-slate-500">{tr('productManagement.importAllUnchanged')}</p>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-slate-500 border-b border-slate-200">
+                        <th className="p-1.5 w-10">#</th>
+                        <th className="p-1.5">{tr('productManagement.colCode')}</th>
+                        <th className="p-1.5">{tr('productManagement.colProduct')}</th>
+                        <th className="p-1.5">{tr('productManagement.colStatus')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleRows.map((p) => (
+                        <tr key={p.rowNum} className="border-b border-slate-100">
+                          <td className="p-1.5 text-slate-400">{p.rowNum}</td>
+                          <td className="p-1.5 font-mono">{p.code || '—'}</td>
+                          <td className="p-1.5">{p.name || '—'}</td>
+                          <td className="p-1.5">
+                            {p.status === 'error'
+                              ? <span className="text-red-600">{p.error}</span>
+                              : p.status === 'create'
+                                ? <span className="text-emerald-700">{tr('productManagement.importCreate')}</span>
+                                : p.status === 'update'
+                                  ? <span className="text-amber-700">{tr('productManagement.importUpdate')}</span>
+                                  : <span className="text-slate-400">{tr('productManagement.importUnchanged')}</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <div className="p-4 border-t border-slate-200 space-y-3">
+                {importing && importProgress && (
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-500 mb-1">
+                      <span>{tr('productManagement.importProgress', { done: importProgress.done, total: importProgress.total })}</span>
+                      <span>{pct}%</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full bg-emerald-500 transition-all duration-150" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={cancelImport} className="px-4 py-2 rounded-lg border text-sm">
+                    {importing ? tr('productManagement.cancelImport') : tr('productManagement.cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmImport}
+                    disabled={importing || validCount === 0}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50"
+                  >
+                    {importing ? tr('productManagement.importing') : tr('productManagement.importConfirm', { count: validCount })}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

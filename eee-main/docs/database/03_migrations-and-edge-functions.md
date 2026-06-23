@@ -2417,6 +2417,44 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 - `qc_sub_lot_full_history` 每类记录加操作者:events.`actor`、samples.`taken_by`、inspections.`inspector`、dispositions.`operator`、room_temp_sessions.`started_by`/`ended_by`。
 
 **前端配套**: `src/pages/qc/SubLotHistoryDrawer.tsx`(时间线每条时间戳后显示 `· 操作者`)、`src/services/qcApi.ts`(`QualityEvent.actor` + `SubLotFullHistory` 各类型加操作者字段)。
+### M-147 `20260623000001_products_edit_back_to_qc.sql`
+**用途**: 把 Products / Test Types 的**编辑权**从 `production.*` 命名空间迁回新的 `qc.products.*`,Production 仅保留只读(BR-Q80)。
+
+**背景**: M-094 当初把 products/trace/work_orders 从 QC 迁到 Production 模块。现在产品主数据重新归 QC 管:QC 可编辑、Production 只读。
+
+**改动**(复刻 M-094 三步法,幂等 `ON CONFLICT DO NOTHING`):
+- `production.products.view` → **保留**,并**复制**一份到 `qc.products.view`(Production 只读页仍需 `production.products.view`,故不删)。
+- `production.products.{create,edit,delete}` → 迁移到 `qc.products.{create,edit,delete}`(先 INSERT 后 DELETE 旧行)。
+- 为被迁移用户补 `user_module_access('qc')`。
+- 为 dev admin `ysha@smu.edu` seed 三个新 QC 权限 `qc.products.{export,import,view_log}`(CROSS JOIN + VALUES 范式)。
+
+**前端配套**: [`src/lib/permissionStructure.ts`](../../src/lib/permissionStructure.ts)(`qc` 加 `products` 资源、`production.products` 收窄为只读 view)、[`src/pages/qc/QualityControlModule.tsx`](../../src/pages/qc/QualityControlModule.tsx)(QC 加 Products/Test Types/Change Log 入口)、[`ProductManagement.tsx`](../../src/pages/qc/ProductManagement.tsx) 与 [`TestTypesPage.tsx`](../../src/pages/qc/TestTypesPage.tsx)(新增 `module` 属性,`production`=只读 / `qc`=可编辑)。
+
+**业务规则**: **BR-Q80**(编辑权回归 QC、Production 只读)。**依赖**: M-094(原迁移)、M-009(权限表)。**关联文档**: [`docs/modules/06_users-auth.md`](../modules/06_users-auth.md)、[`docs/modules/09_qc.md`](../modules/09_qc.md)。
+
+---
+
+### M-148 `20260623000002_qc_product_audit_log.sql`
+**用途**: 新建 `qc_product_audit_log` 表,记录产品 / 测试类型的 create/edit/delete 及 Excel 批量导入操作(BR-Q80 操作日志)。
+
+**改动**:
+- 建表 `qc_product_audit_log`,**结构镜像 `finance_audit_log`(M-018)**:`entity_type`(`product`/`test_type`/`product_import`)、`entity_id`、`action`、`actor_auth_id`/`actor_name`、`before/after_snapshot`、`diff`、`entry_number`、`description`、`changed_at`,并建 3 个索引(`entity_type+entity_id`、`changed_at DESC`、`actor_auth_id`)。
+- RLS:`authenticated` 可 INSERT(写日志)与 SELECT(查看由 `qc.products.view_log` 应用层门控)。
+
+**前端配套**: [`src/services/qcApi.ts`](../../src/services/qcApi.ts)(`logProductAction` fire-and-forget 写入、`getProductAuditLog` 查询,挂到 product/test-type CRUD 与 `importProducts`)、[`src/pages/qc/ProductAuditLog.tsx`](../../src/pages/qc/ProductAuditLog.tsx)(仿 finance AuditLog 的日志页)。
+
+**业务规则**: **BR-Q80**。**依赖**: M-018(审计范式)、M-147(`view_log` 权限 seed)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
+
+---
+
+### M-149 `20260623000003_qc_products_grant_export_import_log.sql`
+**用途**: 把 `qc.products.{export, import, view_log}` 回填给**所有已有 `qc.products.view` 的用户**(BR-Q81)。
+
+**根因**: M-147 只给 dev admin `ysha@smu.edu` seed 了这三个新权限,导致其他已能管理产品的用户(M-147 grant-move 后有 `qc.products.view`)看不到导出/导入按钮与 Change Log 页。
+
+**改动**: 对每个持有 `qc.products.view` 的用户,INSERT 三条新权限(`export`/`import`/`view_log`),`ON CONFLICT DO NOTHING` 幂等。
+
+**依赖**: M-147(grant-move)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)、[`docs/modules/06_users-auth.md`](../modules/06_users-auth.md)。
 
 ---
 
@@ -2551,6 +2589,10 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-147 | 20260621000014_qc_analysis_result_via_champion_events.sql · 4 个分析 RPC 改为按「自检 OR group_(failed\|passed)_by_champion 事件」最早归属单车结果(跨复烘分组拆散仍正确继承首检/复检结果) |
 | M-148 | 20260621000015_qc_retest_group_expand_and_rates.sql · 复检(retest)在分析里扩展到同组 sibling(经 group_retest_reset.disposition_id);返工合格率/复检结果用 champion 事件 |
 | M-149 | 20260621000016_qc_history_actor_labels.sql · 子批次时间线显示操作账号(新 `qc_actor_label`;history RPC 每条事件/取样/检验/处置/常温带操作者名) |
+| **M-150** | _(下一个)_ |
+| M-147 | 20260623000001_products_edit_back_to_qc.sql · Products/Test Types 编辑权从 production.* 迁回 qc.products.*(Production 只读),新增 export/import/view_log 权限 |
+| M-148 | 20260623000002_qc_product_audit_log.sql · 新建 qc_product_audit_log 表(镜像 finance_audit_log),记录产品/测试类型 CRUD 与 Excel 导入 |
+| M-149 | 20260623000003_qc_products_grant_export_import_log.sql · 把 qc.products.{export,import,view_log} 回填给所有已有 qc.products.view 的用户 |
 | **M-150** | _(下一个)_ |
 
 | 编号 | 目录 |
