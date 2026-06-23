@@ -951,8 +951,6 @@
     "outLabel": "出",
     "viewFullHistory": "查看完整历史",
     "history": "历史",
-    "qualityEvents": "质量事件",
-    "noEvents": "无事件",
     "addedCartsMsg": "已添加 {{count}} 辆料车（{{start}} … {{end}}）",
     "skipPrinting": "跳过打印",
     "printStickersTitle": "打印标签？",

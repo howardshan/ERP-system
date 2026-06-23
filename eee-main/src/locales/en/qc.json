@@ -955,8 +955,6 @@
     "outLabel": "Out",
     "viewFullHistory": "View full history",
     "history": "History",
-    "qualityEvents": "Quality events",
-    "noEvents": "No events",
     "addedCartsMsg": "Added {{count}} cart(s) ({{start}} … {{end}})",
     "skipPrinting": "Skip printing",
     "printStickersTitle": "Print stickers?",
