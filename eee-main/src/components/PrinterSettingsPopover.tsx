@@ -125,7 +125,9 @@ export function PrinterSettingsPopover() {
   const searchBridge = async () => {
     setBusy(true);
     try {
-      const r = await fetchBridge(`${PRINT_BRIDGE}/printers`, 2000);
+      // 8s, not 2s: /printers shells out to `Get-Printer` (PowerShell), whose
+      // cold start can take several seconds on the first call after boot.
+      const r = await fetchBridge(`${PRINT_BRIDGE}/printers`, 8000);
       if (!r.ok) throw new Error(t('printerSettingsPopover.bridgeNotRunning'));
       const data = await r.json() as string[] | { printers?: string[] };
       const list = Array.isArray(data) ? data : (data.printers ?? []);
