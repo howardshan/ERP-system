@@ -78,13 +78,11 @@ app.post('/print', async (req, res) => {
     try {
       await writeFile(pdfFile, Buffer.from(body.pdf, 'base64'));
       if (IS_WINDOWS) {
-        // SumatraPDF.exe ships next to this binary; prints PDF silently.
-        // `fit` (not `noscale`): scale + auto-rotate the page to fill the
-        // printer's paper, matching the browser's "Windows print" behaviour.
-        // `noscale` printed at 100% from a corner, so when the Windows paper
-        // size didn't match the label it clipped (~half the label missing).
+        // SumatraPDF fallback when client still sends { pdf }. Prefer { pngs } from
+        // the web app on Windows — PrintDocument with fixed PaperSize 4×3.
+        // `noscale` respects PDF page geometry (no auto-rotate like `fit`).
         const sumatra = join(dirname(process.execPath), 'SumatraPDF.exe');
-        const args = ['-silent', '-exit-when-done', '-print-settings', 'fit'];
+        const args = ['-silent', '-exit-when-done', '-print-settings', 'noscale'];
         args.push(printerName ? '-print-to' : '-print-to-default');
         if (printerName) args.push(printerName);
         args.push(pdfFile);

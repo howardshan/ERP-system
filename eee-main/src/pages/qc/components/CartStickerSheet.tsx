@@ -6,7 +6,12 @@ import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import { SubLot } from '../../../services/qcApi';
-import { getSavedPrinter, getSavedDpi } from '../../../lib/printerConfig';
+import { getSavedPrinter, getSavedDpi, LabelDpi } from '../../../lib/printerConfig';
+import { rasterizePdfToPngs } from '../../../lib/pdfRasterize';
+
+function isWindowsBrowser(): boolean {
+  return typeof navigator !== 'undefined' && /Win/i.test(navigator.userAgent);
+}
 
 interface Props {
   carts: SubLot[];
@@ -19,10 +24,10 @@ interface Props {
 // ─────────────────────────────────────────────────────────────────────────────
 // Label: 4 × 3 inch, LANDSCAPE (4" wide × 3" tall) = 101.6 × 76.2 mm.
 //
-// Print path (web): browser builds a VECTOR PDF (jsPDF) → POST /print { pdf }
-//   → bridge prints it (macOS `lp file.pdf`, Windows SumatraPDF). Text & lines
-//   stay vector and are rasterised by the printer driver at its native dpi, so
-//   edges are crisp on any model (no fixed-resolution bitmap, no aliasing).
+// Print path (web): browser builds a VECTOR PDF (jsPDF) → POST /print
+//   macOS: { pdf } → lp
+//   Windows: rasterize PDF in-browser → { pngs, dpi } → PrintDocument 4×3
+//   (avoids SumatraPDF fit auto-rotate that clips landscape labels).
 //
 // The barcode is drawn as VECTOR bars (CODE128 module pattern → filled rects).
 // Tauri desktop still uses a PNG canvas (its Rust `print_png` command).
@@ -300,7 +305,7 @@ async function checkPrintBridge(): Promise<boolean> {
   return ok;
 }
 
-/** Send the whole batch as ONE vector PDF → bridge prints it as a single job. */
+/** macOS: send vector PDF as one job. */
 async function postPrintPdfToBridge(pdfBase64: string, printer: string): Promise<void> {
   const r = await fetchWithTimeout(`${PRINT_BRIDGE}/print`, {
     method: 'POST',
@@ -314,6 +319,27 @@ async function postPrintPdfToBridge(pdfBase64: string, printer: string): Promise
   }
 }
 
+/** Windows: PNG batch → PrintDocument PaperSize 4×3 (no Sumatra auto-rotate). */
+async function postPrintPngsToBridge(pngs: string[], printer: string, dpi: LabelDpi): Promise<void> {
+  const r = await fetchWithTimeout(`${PRINT_BRIDGE}/print`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pngs, dpi, printer: printer || undefined }),
+    timeoutMs: 120_000,
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ error: r.statusText })) as { error?: string };
+    throw new Error(err.error ?? r.statusText);
+  }
+}
+
+function pdfBase64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -325,8 +351,15 @@ export function CartStickerSheet({
   const [printStatus, setPrintStatus] = useState('');
   const [pdfUrl, setPdfUrl] = useState('');
   const pdfB64Ref = useRef<string>('');
+  const previewRef = useRef<HTMLIFrameElement>(null);
 
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+  const handleBrowserPrint = () => {
+    const w = previewRef.current?.contentWindow;
+    if (w) w.print();
+    else if (pdfUrl) window.open(pdfUrl, '_blank');
+  };
 
   // Build the vector PDF once per prop change — used for both preview and print.
   useEffect(() => {
@@ -363,11 +396,17 @@ export function CartStickerSheet({
         return;
       }
 
-      // ── Web: silent bridge prints the vector PDF as one job ───────────────
+      // ── Web: silent bridge ───────────────────────────────────────────────
       if (await checkPrintBridge()) {
         if (!pdfB64Ref.current) throw new Error(t('cartStickerSheet.pdfNotReady'));
         setPrintStatus(t('cartStickerSheet.printingCount', { count: carts.length }));
-        await postPrintPdfToBridge(pdfB64Ref.current, printer);
+        if (isWindowsBrowser()) {
+          const dpi = getSavedDpi();
+          const pngs = await rasterizePdfToPngs(pdfBase64ToBytes(pdfB64Ref.current), dpi);
+          await postPrintPngsToBridge(pngs, printer, dpi);
+        } else {
+          await postPrintPdfToBridge(pdfB64Ref.current, printer);
+        }
         setPrintStatus(`✓ ${t('cartStickerSheet.printed', { count: carts.length })}`);
         return;
       }
@@ -419,6 +458,14 @@ export function CartStickerSheet({
           </button>
           <button
             type="button"
+            disabled={printing || !pdfUrl}
+            onClick={handleBrowserPrint}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-600 hover:bg-slate-500 text-white disabled:opacity-50"
+          >
+            {t('cartStickerSheet.browserPrintButton')}
+          </button>
+          <button
+            type="button"
             onClick={onClose}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700"
           >
@@ -430,7 +477,7 @@ export function CartStickerSheet({
       {/* Preview — the actual PDF that will be printed */}
       <div className="flex-1 overflow-hidden p-4 bg-slate-100">
         {pdfUrl ? (
-          <iframe title="labels" src={pdfUrl} className="w-full h-full rounded border border-slate-300 bg-white" />
+          <iframe ref={previewRef} title="labels" src={pdfUrl} className="w-full h-full rounded border border-slate-300 bg-white" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
             {t('cartStickerSheet.generatingPreview')}
