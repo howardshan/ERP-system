@@ -22,6 +22,10 @@ copy /Y "%SRC%erp-print-bridge-win-x64.exe" "%APPDIR%\erp-print-bridge.exe" >nul
 rem SumatraPDF 用于静默打印 PDF（与桥同目录）
 if exist "%SRC%SumatraPDF.exe" copy /Y "%SRC%SumatraPDF.exe" "%APPDIR%\SumatraPDF.exe" >nul
 
+rem 解除「来自互联网」的标记（Mark of the Web），否则隐藏启动时会被 SmartScreen 拦截
+rem 报错 800704C7「操作已被用户取消」。Unblock-File 删除 Zone.Identifier 数据流即可放行。
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -LiteralPath '%APPDIR%' -Filter *.exe | Unblock-File" >nul 2>&1
+
 rem 在「启动」文件夹放一个 VBS，登录时以隐藏窗口方式启动打印助手
 > "%STARTUP%\erp-print-bridge.vbs" echo CreateObject("WScript.Shell").Run """%APPDIR%\erp-print-bridge.exe""", 0, False
 
