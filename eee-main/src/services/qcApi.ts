@@ -2035,3 +2035,92 @@ export async function getGroupMembers(testGroupId: string): Promise<Array<{ id: 
   if (error) throw new Error(error.message);
   return (data ?? []) as Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>;
 }
+
+// ─── Daily Test Report (M-151) ─────────────────────────────────────────────
+
+/** One flattened reading inside an inspection (multi-test shape). */
+export interface DailyTestReading {
+  item_name: string;
+  unit: string | null;
+  value: number;
+  in_hard?: boolean | null;
+  in_soft?: boolean | null;
+}
+
+/** One inspection done on the report's day. */
+export interface DailyTestRow {
+  inspection_id: string;
+  sample_id: string | null;
+  sub_lot_code: string;
+  sku_name: string | null;
+  result: 'pass' | 'fail';
+  readings: DailyTestReading[];
+  remark: string | null;
+  submitted_at: string;
+  inspector: string | null;
+}
+
+/** A signed report in the history list. */
+export interface DailyReportListItem {
+  id: string;
+  report_date: string;
+  signer_name: string;
+  signed_at: string;
+  signature_type: 'typed' | 'drawn';
+  is_backdated: boolean;
+  backdate_reason: string | null;
+  pdf_storage_path: string | null;
+  test_count: number;
+  pass_count: number;
+  fail_count: number;
+}
+
+const DAILY_REPORT_BUCKET = 'qc-daily-reports';
+
+/** All inspections submitted on `date` (YYYY-MM-DD). */
+export async function getDailyTestData(date: string): Promise<DailyTestRow[]> {
+  return rpc<DailyTestRow[]>('qc_daily_test_report_data', { p_date: date });
+}
+
+/** All signed daily reports, newest first. */
+export async function listDailyReports(): Promise<DailyReportListItem[]> {
+  return rpc<DailyReportListItem[]>('qc_list_daily_reports');
+}
+
+/**
+ * Sign + archive a daily report: upload the PDF to Storage, then persist the
+ * signed record (server derives signer + back-date flag). Throws if the day is
+ * already signed.
+ */
+export async function signDailyReport(params: {
+  date: string;
+  signatureType: 'typed' | 'drawn';
+  signatureData: string;
+  snapshot: Record<string, unknown>;
+  pdfBlob: Blob;
+  backdateReason?: string | null;
+}): Promise<DailyReportListItem> {
+  const path = `${params.date}/${params.date}.pdf`;
+  const { error: upErr } = await supabase.storage
+    .from(DAILY_REPORT_BUCKET)
+    .upload(path, params.pdfBlob, { contentType: 'application/pdf', upsert: false });
+  if (upErr) throw new Error(upErr.message);
+
+  return rpc<DailyReportListItem>('qc_sign_daily_report', {
+    p_date: params.date,
+    p_signature_type: params.signatureType,
+    p_signature_data: params.signatureData,
+    p_snapshot: params.snapshot,
+    p_pdf_path: path,
+    p_backdate_reason: params.backdateReason ?? null,
+  });
+}
+
+/** Signed download URL (1h) for an archived report PDF. */
+export async function getDailyReportPdfUrl(storagePath: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from(DAILY_REPORT_BUCKET)
+    .createSignedUrl(storagePath, 3600);
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
+}

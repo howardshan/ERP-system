@@ -2593,7 +2593,9 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-147 | 20260623000001_products_edit_back_to_qc.sql · Products/Test Types 编辑权从 production.* 迁回 qc.products.*(Production 只读),新增 export/import/view_log 权限 |
 | M-148 | 20260623000002_qc_product_audit_log.sql · 新建 qc_product_audit_log 表(镜像 finance_audit_log),记录产品/测试类型 CRUD 与 Excel 导入 |
 | M-149 | 20260623000003_qc_products_grant_export_import_log.sql · 把 qc.products.{export,import,view_log} 回填给所有已有 qc.products.view 的用户 |
-| **M-150** | _(下一个)_ |
+| M-150 | 20260623000004_qc_daily_report.sql · 新建 qc_daily_test_report 表 + qc-daily-reports 存储桶 + 3 个 RPC(当日检测取数 / 签字归档 / 历史列表);每日检测报告签字归档闭环(BR-Q82) |
+| M-151 | 20260623000005_qc_daily_report_grant.sql · 把 qc.daily_report.{view,sign} 回填给已有 qc.testing.{view_status,submit_inspection} 的用户 |
+| **M-152** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
