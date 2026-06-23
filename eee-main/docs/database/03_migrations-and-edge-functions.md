@@ -2458,6 +2458,60 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-150 `20260623000004_qc_production_lot_detail_remove_event_cap.sql`
+**用途**: Production → Batch Trace 详情页**事件列表显示不全**。操作员反馈「有很多操作和行为没有记录」,实际是事件被 SQL 端硬编码截掉了。
+
+**根因**: M-099 的 `qc_production_lot_detail` 在 events 子查询里写死 `LIMIT 50`。一条 10 车 WO 走完一遍完整生命周期(sub_lot_created×10 + scanned_for_check_in×10 + check_in×10 + 若干 move_dryer + check_out×10 + group_assigned + sample_taken + inspection + disposition + 同步钩子)就轻松超过 50;`ORDER BY created_at DESC` 让**旧事件先被丢弃**,操作员看到的恰好是「最近一截」,误判为「丢数据」。
+
+**改动**: 移除 events 子查询的 `LIMIT 50`,其余 lot / sub_lots / 字段全部与 M-099 字节级一致。每个 WO 的事件数本就有上限(子批次数 × 生命周期长度),典型几百条以内,无需分页;JSON 聚合性能足够。
+
+**前端配套**: 无 schema/类型变化;[`src/pages/qc/TracePage.tsx`](../../src/pages/qc/TracePage.tsx) 顺手加一段「empty drying sub-lots」提示——当 WO 有车但 `scanned_for_check_in_at IS NULL`(M-099 过滤掉) → 列表本会空白,新增 `tracePage.noScannedYet` i18n 解释(en/zh)。
+
+**业务规则**:
+- **BR-Q73** Batch Trace 详情页应展示该 WO 的**完整** quality event timeline,不做 50 条截断。
+
+**依赖**: M-099 (20260527000002 `qc_production_lot_detail`)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
+
+---
+
+### M-151 `20260623000005_qc_quality_event_summary_human_readable.sql`
+**用途**: Batch Trace / Sub-lot history 事件列表显示**生硬的代码名**(如 `sub_lot_created` / `group_assigned` / `resume_drying` / `qc_disposition_synced_to_wh` / `released` / `disposition_completed: redry_dryer`)。
+
+**根因**: 原版 `qc_quality_event_summary` (M-002) 只为 5 个事件类型写了人话(check_in / check_out / inspection_passed / inspection_failed_hold / disposition_completed),其它走 fallback `prefix || p_event_type` —— 直接打印代码名。`disposition_completed` 自己也只 label 了 rework/grind/scrap/concession,后来 M-106 加的 redry_dryer / room_temp_dry / retest 也是裸字符串。
+
+**改动**: `CREATE OR REPLACE FUNCTION qc_quality_event_summary` 用全量 CASE 覆盖代码里能写出的所有 event_type:lifecycle(sub_lot_created / scanned_for_check_in / check_in / move_dryer / resume_drying / check_out / displaced)、sampling group(group_assigned / group_passed_by_champion / group_failed_by_champion / group_retest_reset / group_orphan_repaired / champion_promoted)、sampling+inspection(sample_taken + 旧 inspection_*)、disposition(7 个 type 全标 + redry 目标时长)、warehouse sync(qc_hold_synced_to_wh / qc_disposition_synced_to_wh)、release(released / packaging_item_set)、admin(manual_repair)。带可用 payload 字段(old/new dryer 号 / sample_id / 成员数 / champion Aw / 目标 min / 同步源)的会拼进文案。未知事件回退 `initcap(replace(_, ' '))`,即使遗漏也读得通。
+
+**前端配套**: 无 —— 函数被 [`qc_production_lot_detail`](../../supabase/migrations/20260623000004_qc_production_lot_detail_remove_event_cap.sql) (M-150) 和 [`qc_sub_lot_full_history`](../../supabase/migrations/20260621000013_qc_sub_lot_history_multi_test_readings.sql) (M-146) 在拼 events 数组时直接调用,push 后两处 RPC 下次返回即生效。
+
+**业务规则**:
+- **BR-Q74** Batch Trace 与 Sub-lot history 抽屉的 events 列表必须显示**操作员可读的中性英文摘要**,不得直接暴露 event_type 代码名或裸 disposition type 字符串。
+
+**依赖**: M-002 (20260520000002 原 `qc_quality_event_summary`)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
+
+---
+
+### M-152 `20260623000006_qc_trace_unify_on_sub_lots.sql`
+**用途**: Batch Trace 信息重复——「Drying sub-lots」每个 cart 抽屉里已经能看到完整 timeline,「Quality events」区段只是把同样数据按时间扁平化再排了一遍,操作员问「Quality events 还存在的意义是什么」。
+
+**根因**: Trace 页历史上是双入口设计,被 M-145 / M-146 把抽屉做完整(全 group + 多 reading)之后,Quality events 区段就成了纯冗余。但要把它直接砍掉,会遇到一个 gap:M-099 的过滤 `scanned_for_check_in_at IS NOT NULL` 让未扫码 cart **不出现在 Drying sub-lots**;对新建 WO(0/N)整个列表是空的,没有任何 cart 可点。
+
+**改动**:
+1. `qc_production_lot_detail` 的 sub_lots 子查询去掉 scanned-only 过滤 → **所有 cart 都列出**,包括还在生产线上的(状态徽章为「Created」,抽屉里只有一条 `sub_lot_created` 事件,仍是有意义的可见入口)。
+2. sub_lots `ORDER BY` 改为 `sub_lot_code`(自然 001..NNN),取代 `created_at`(批量建 cart 时戳几乎相同 → 现有 UI 显示成「002, 005, 006, 007, 001…」的乱序)。
+3. events 字段返回**空数组**。前端不再渲染 Quality events 区段,字段保留(空数组)是为了让 TS 类型 `ProductionLotDetail.events: QualityEvent[]` 不必跟着改 + 旧 build 客户端不会报错。顺手省掉对 `qc_quality_event` 的 JOIN+aggregate。
+
+**前端配套**:
+- [`src/pages/qc/TracePage.tsx`](../../src/pages/qc/TracePage.tsx) 删 `Quality events` 整块(`<h2>` + `<ul>` + `FAIL_EVENTS` Set + `noEvents` empty hint),删 M-150 顺手加的 `noScannedYet` 提示(现在未扫码 cart 直接列出,提示冗余)。
+- 4 个 i18n key 一并清理:`tracePage.qualityEvents` / `tracePage.noEvents` / `tracePage.noScannedYet`(en + zh)。
+
+**业务规则**:
+- **BR-Q82** Batch Trace 详情页的 **Drying sub-lots 区段是唯一 timeline 入口**:列出该 WO 下**全部** cart(含 `status='created' AND scanned_for_check_in_at IS NULL` 的未扫码 cart),每个 cart 通过 History 抽屉显示完整 per-cart 时间线;不再单列 Quality events。**取代 BR-Q62**(原规则是「sub-lots 只展示扫码过的车」)。
+- **BR-Q83** Batch Trace 的 Drying sub-lots 排序按 `sub_lot_code` 升序(自然 001..NNN),不按 `created_at`。
+
+**依赖**: M-150 (20260623000004 上一版 `qc_production_lot_detail`)。**关联文档**: [`docs/modules/09_qc.md`](../modules/09_qc.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2589,7 +2643,10 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-147 | 20260621000014_qc_analysis_result_via_champion_events.sql · 4 个分析 RPC 改为按「自检 OR group_(failed\|passed)_by_champion 事件」最早归属单车结果(跨复烘分组拆散仍正确继承首检/复检结果) |
 | M-148 | 20260621000015_qc_retest_group_expand_and_rates.sql · 复检(retest)在分析里扩展到同组 sibling(经 group_retest_reset.disposition_id);返工合格率/复检结果用 champion 事件 |
 | M-149 | 20260621000016_qc_history_actor_labels.sql · 子批次时间线显示操作账号(新 `qc_actor_label`;history RPC 每条事件/取样/检验/处置/常温带操作者名) |
-| **M-150** | _(下一个)_ |
+| M-150 | 20260623000004_qc_production_lot_detail_remove_event_cap.sql · Batch Trace 事件列表去掉硬编码 `LIMIT 50`(操作员反馈「很多操作没记录」实为旧/被截掉) |
+| M-151 | 20260623000005_qc_quality_event_summary_human_readable.sql · `qc_quality_event_summary` 全量覆盖事件类型,Batch Trace / Sub-lot history 不再显示 `sub_lot_created` / `group_assigned` 等代码名 |
+| M-152 | 20260623000006_qc_trace_unify_on_sub_lots.sql · Batch Trace 砍掉重复的 Quality events 区段;sub_lots 改为列全部 cart(含未扫码)+ 按 sub_lot_code 排序 |
+| **M-153** | _(下一个)_ |
 | M-147 | 20260623000001_products_edit_back_to_qc.sql · Products/Test Types 编辑权从 production.* 迁回 qc.products.*(Production 只读),新增 export/import/view_log 权限 |
 | M-148 | 20260623000002_qc_product_audit_log.sql · 新建 qc_product_audit_log 表(镜像 finance_audit_log),记录产品/测试类型 CRUD 与 Excel 导入 |
 | M-149 | 20260623000003_qc_products_grant_export_import_log.sql · 把 qc.products.{export,import,view_log} 回填给所有已有 qc.products.view 的用户 |
