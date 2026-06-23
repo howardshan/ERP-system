@@ -12,13 +12,15 @@ import { usePermissions } from '../../contexts/PermissionContext';
 import { PermissionDenied } from './components/PermissionDenied';
 import { cn } from '../../lib/utils';
 
-export default function TestTypesPage() {
+// `module` mirrors ProductManagement: Production mounts this read-only
+// (`production.products.*`), QC mounts it editable (`qc.products.*`).
+export default function TestTypesPage({ module = 'production' }: { module?: 'production' | 'qc' } = {}) {
   const { t: tr } = useTranslation('qc');
   const { can } = usePermissions();
-  const canView   = can('production', 'products', 'view');
-  const canCreate = can('production', 'products', 'create');
-  const canEdit   = can('production', 'products', 'edit');
-  const canDelete = can('production', 'products', 'delete');
+  const canView   = can(module, 'products', 'view');
+  const canCreate = can(module, 'products', 'create');
+  const canEdit   = can(module, 'products', 'edit');
+  const canDelete = can(module, 'products', 'delete');
 
   const [types, setTypes] = useState<TestType[]>([]);
   const [error, setError] = useState('');
@@ -98,7 +100,7 @@ export default function TestTypesPage() {
     setBusy(false);
   };
 
-  if (!canView) return <PermissionDenied permission="production.products.view" feature={tr('testTypesPage.feature')} />;
+  if (!canView) return <PermissionDenied permission={`${module}.products.view`} feature={tr('testTypesPage.feature')} />;
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
