@@ -645,7 +645,13 @@
     "importErrNoName": "名称为必填项。",
     "importErrBadNumber": "数字无效。",
     "importErrParse": "无法读取文件。",
-    "importErrFailed": "导入失败。"
+    "importErrFailed": "导入失败。",
+    "importUnchanged": "未变更",
+    "importAllUnchanged": "没有需要导入的变更 —— 每一行都与当前数据一致。",
+    "importProgress": "正在导入 {{done}} / {{total}}…",
+    "cancelImport": "停止导入",
+    "importCancelled": "导入已停止 — 新建 {{created}} 条，更新 {{updated}} 条。重新导入同一文件即可完成（未变更行会跳过）。",
+    "importPartialWarning": "只会写入有变更的行。导入过程中请勿关闭或刷新页面 —— 若中途离开，已处理的行会被保存，重新导入同一文件是安全的（会跳过未变更的行）。"
   },
   "productAuditLog": {
     "module": "质量控制",

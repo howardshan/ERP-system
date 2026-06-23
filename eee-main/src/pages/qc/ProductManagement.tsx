@@ -71,7 +71,7 @@ type ImportRowPreview = {
   drying_days: number | null;
   sample_every_n_carts?: number;
   cart_units?: number;
-  status: 'create' | 'update' | 'error';
+  status: 'create' | 'update' | 'unchanged' | 'error';
   error?: string;
 };
 
@@ -102,7 +102,9 @@ export default function ProductManagement({ module = 'production' }: { module?: 
   const [query, setQuery] = useState('');
   const [importPreview, setImportPreview] = useState<ImportRowPreview[] | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Final-product (ERP item) linking — see qc_sku_item (M-087) + M-095.
   // `allItems` = every item in the warehouse master, used to populate the
@@ -307,7 +309,25 @@ export default function ProductManagement({ module = 'production' }: { module?: 
         else if (dry !== undefined && !Number.isFinite(dry)) error = tr('productManagement.importErrBadNumber');
         else if (sample !== undefined && (!Number.isFinite(sample) || sample < 1)) error = tr('productManagement.importErrBadNumber');
         else if (units !== undefined && (!Number.isFinite(units) || units <= 0)) error = tr('productManagement.importErrBadNumber');
-        const exists = code ? byCode.has(code.toLowerCase()) : false;
+
+        const match = code ? byCode.get(code.toLowerCase()) : undefined;
+        let status: ImportRowPreview['status'];
+        if (error) {
+          status = 'error';
+        } else if (!match) {
+          status = 'create';
+        } else {
+          // Only mark as "update" if the row would actually change something —
+          // mirrors how importProducts applies fields (name + drying always,
+          // sample/units only when present).  Avoids 379 no-op "updates".
+          const newDryMins = dry != null ? Math.round(daysToMinutes(dry)) : null;
+          const changed =
+            name !== (match.name ?? '').trim() ||
+            (newDryMins ?? null) !== (match.standard_drying_minutes ?? null) ||
+            (sample !== undefined && sample !== (match.sample_every_n_carts ?? null)) ||
+            (units !== undefined && units !== (match.cart_units ?? null));
+          status = changed ? 'update' : 'unchanged';
+        }
         return {
           rowNum: i + 2, // +1 for 1-based, +1 for the header row
           code,
@@ -315,7 +335,7 @@ export default function ProductManagement({ module = 'production' }: { module?: 
           drying_days: dry ?? null,
           sample_every_n_carts: sample,
           cart_units: units,
-          status: error ? 'error' : exists ? 'update' : 'create',
+          status,
           error,
         };
       });
@@ -327,8 +347,13 @@ export default function ProductManagement({ module = 'production' }: { module?: 
 
   const confirmImport = async () => {
     if (!importPreview) return;
-    const valid = importPreview.filter((p) => p.status !== 'error');
+    // Only rows that will actually change — skip unchanged & error.
+    const valid = importPreview.filter((p) => p.status === 'create' || p.status === 'update');
+    if (valid.length === 0) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setImporting(true);
+    setImportProgress({ done: 0, total: valid.length });
     setError('');
     try {
       const rows: ProductImportRow[] = valid.map((p) => ({
@@ -338,8 +363,15 @@ export default function ProductManagement({ module = 'production' }: { module?: 
         sample_every_n_carts: p.sample_every_n_carts,
         cart_units: p.cart_units,
       }));
-      const res = await importProducts(rows);
-      setMsg(tr('productManagement.importDone', { created: res.created, updated: res.updated }));
+      const res = await importProducts(rows, {
+        signal: controller.signal,
+        onProgress: (done, total) => setImportProgress({ done, total }),
+      });
+      setMsg(
+        res.aborted
+          ? tr('productManagement.importCancelled', { created: res.created, updated: res.updated })
+          : tr('productManagement.importDone', { created: res.created, updated: res.updated }),
+      );
       setImportPreview(null);
       load();
       reloadLinks();
@@ -347,7 +379,23 @@ export default function ProductManagement({ module = 'production' }: { module?: 
       setError(e instanceof Error ? e.message : tr('productManagement.importErrFailed'));
     }
     setImporting(false);
+    setImportProgress(null);
+    abortRef.current = null;
   };
+
+  const cancelImport = () => {
+    if (importing) abortRef.current?.abort();
+    else setImportPreview(null);
+  };
+
+  // Warn before leaving / refreshing while an import is in flight — closing the
+  // tab leaves a partial (but not corrupt) update; re-importing is idempotent.
+  useEffect(() => {
+    if (!importing) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [importing]);
 
   const isBusy = creating || editingId !== null;
 
@@ -594,25 +642,40 @@ export default function ProductManagement({ module = 'production' }: { module?: 
       {importPreview && (() => {
         const createCount = importPreview.filter((p) => p.status === 'create').length;
         const updateCount = importPreview.filter((p) => p.status === 'update').length;
+        const unchangedCount = importPreview.filter((p) => p.status === 'unchanged').length;
         const errorCount = importPreview.filter((p) => p.status === 'error').length;
         const validCount = createCount + updateCount;
+        const pct = importProgress && importProgress.total > 0
+          ? Math.round((importProgress.done / importProgress.total) * 100)
+          : 0;
+        // Preview lists only actionable rows (create / update / error) — the
+        // (often hundreds of) unchanged rows are summarised in the count badge.
+        const visibleRows = importPreview.filter((p) => p.status !== 'unchanged');
         return (
           <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-xl">
               <div className="p-4 border-b border-slate-200 flex items-center justify-between">
                 <h2 className="font-bold text-slate-900">{tr('productManagement.importPreviewTitle')}</h2>
-                <button type="button" onClick={() => setImportPreview(null)} className="text-slate-400 hover:text-slate-700">
+                <button type="button" onClick={cancelImport} disabled={importing} className="text-slate-400 hover:text-slate-700 disabled:opacity-40">
                   <X size={18} />
                 </button>
               </div>
               <div className="p-4 overflow-auto">
-                <div className="flex gap-2 mb-3 text-xs">
+                <div className="flex flex-wrap gap-2 mb-3 text-xs">
                   <span className="px-2 py-1 rounded bg-emerald-50 text-emerald-700 font-bold">{tr('productManagement.importCreate')}: {createCount}</span>
                   <span className="px-2 py-1 rounded bg-amber-50 text-amber-700 font-bold">{tr('productManagement.importUpdate')}: {updateCount}</span>
+                  <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 font-bold">{tr('productManagement.importUnchanged')}: {unchangedCount}</span>
                   {errorCount > 0 && <span className="px-2 py-1 rounded bg-red-50 text-red-700 font-bold">{tr('productManagement.importError')}: {errorCount}</span>}
                 </div>
+                {validCount > 0 && !importing && (
+                  <p className="mb-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                    {tr('productManagement.importPartialWarning')}
+                  </p>
+                )}
                 {importPreview.length === 0 ? (
                   <p className="text-sm text-slate-500">{tr('productManagement.importNoRows')}</p>
+                ) : visibleRows.length === 0 ? (
+                  <p className="text-sm text-slate-500">{tr('productManagement.importAllUnchanged')}</p>
                 ) : (
                   <table className="w-full text-xs">
                     <thead>
@@ -624,7 +687,7 @@ export default function ProductManagement({ module = 'production' }: { module?: 
                       </tr>
                     </thead>
                     <tbody>
-                      {importPreview.map((p) => (
+                      {visibleRows.map((p) => (
                         <tr key={p.rowNum} className="border-b border-slate-100">
                           <td className="p-1.5 text-slate-400">{p.rowNum}</td>
                           <td className="p-1.5 font-mono">{p.code || '—'}</td>
@@ -634,7 +697,9 @@ export default function ProductManagement({ module = 'production' }: { module?: 
                               ? <span className="text-red-600">{p.error}</span>
                               : p.status === 'create'
                                 ? <span className="text-emerald-700">{tr('productManagement.importCreate')}</span>
-                                : <span className="text-amber-700">{tr('productManagement.importUpdate')}</span>}
+                                : p.status === 'update'
+                                  ? <span className="text-amber-700">{tr('productManagement.importUpdate')}</span>
+                                  : <span className="text-slate-400">{tr('productManagement.importUnchanged')}</span>}
                           </td>
                         </tr>
                       ))}
@@ -642,18 +707,31 @@ export default function ProductManagement({ module = 'production' }: { module?: 
                   </table>
                 )}
               </div>
-              <div className="p-4 border-t border-slate-200 flex justify-end gap-2">
-                <button type="button" onClick={() => setImportPreview(null)} className="px-4 py-2 rounded-lg border text-sm">
-                  {tr('productManagement.cancel')}
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmImport}
-                  disabled={importing || validCount === 0}
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50"
-                >
-                  {importing ? tr('productManagement.importing') : tr('productManagement.importConfirm', { count: validCount })}
-                </button>
+              <div className="p-4 border-t border-slate-200 space-y-3">
+                {importing && importProgress && (
+                  <div>
+                    <div className="flex justify-between text-[11px] text-slate-500 mb-1">
+                      <span>{tr('productManagement.importProgress', { done: importProgress.done, total: importProgress.total })}</span>
+                      <span>{pct}%</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                      <div className="h-full bg-emerald-500 transition-all duration-150" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={cancelImport} className="px-4 py-2 rounded-lg border text-sm">
+                    {importing ? tr('productManagement.cancelImport') : tr('productManagement.cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmImport}
+                    disabled={importing || validCount === 0}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium disabled:opacity-50"
+                  >
+                    {importing ? tr('productManagement.importing') : tr('productManagement.importConfirm', { count: validCount })}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

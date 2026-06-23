@@ -649,7 +649,13 @@
     "importErrNoName": "Name is required.",
     "importErrBadNumber": "Invalid number.",
     "importErrParse": "Could not read the file.",
-    "importErrFailed": "Import failed."
+    "importErrFailed": "Import failed.",
+    "importUnchanged": "Unchanged",
+    "importAllUnchanged": "No changes to import — every row matches the current data.",
+    "importProgress": "Importing {{done}} / {{total}}…",
+    "cancelImport": "Stop import",
+    "importCancelled": "Import stopped — {{created}} created, {{updated}} updated. Re-import the same file to finish (unchanged rows are skipped).",
+    "importPartialWarning": "Only changed rows will be written. Don't close or refresh this page while importing — if you do, rows processed so far are saved and re-importing the same file is safe (it skips unchanged rows)."
   },
   "productAuditLog": {
     "module": "Quality Control",
