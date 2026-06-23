@@ -451,6 +451,13 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'manage', label: 'Edit Department', prereq: 'view' },
         ],
       },
+      // M-153 — User activity / admin audit log.
+      audit_log: {
+        label: 'User Activity Log',
+        permissions: [
+          { id: 'view', label: 'View Activity Log', prereq: null },
+        ],
+      },
     },
   },
 };

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Save, Loader2, KeyRound, Eye, EyeOff, CheckCircle2, AlertCircle, ShieldCheck, Bell } from 'lucide-react';
-import { getUser, getUsers, getUserPermissions, setPermission, setModuleAccess, updateUser, resetUserPassword } from '../../services/authApi';
+import { getUser, getUsers, getUserPermissions, setPermission, setModuleAccess, updateUser, resetUserPassword, logAuthAction } from '../../services/authApi';
 import {
   getNotificationTypes,
   getUserNotificationSettings,
@@ -211,6 +211,30 @@ export default function UserDetail({ userId, onBack }: Props) {
         });
       }
 
+      // Audit: one summary entry per save if anything changed (M-153).
+      const grantedKeys = [...localGrants.keys()];
+      const revokedKeys = [...removedGrants];
+      const modulesBefore = [...(user.module_access ?? [])].sort();
+      const modulesAfter = [...localModules].sort();
+      const modulesChanged = JSON.stringify(modulesBefore) !== JSON.stringify(modulesAfter);
+      if (grantedKeys.length || revokedKeys.length || modulesChanged || localNotif.size) {
+        void logAuthAction({
+          action: 'edit_permissions',
+          target_auth_id: user.auth_user_id ?? null,
+          target_user_id: user.id,
+          target_name: user.full_name,
+          target_email: user.email,
+          diff: {
+            granted: grantedKeys,
+            revoked: revokedKeys,
+            modules_before: modulesBefore,
+            modules_after: modulesAfter,
+            notifications_changed: [...localNotif.keys()],
+          },
+          description: `Updated permissions for ${user.email}`,
+        });
+      }
+
       const [u, g, ss] = await Promise.all([
         getUser(userId),
         getUserPermissions(userId),
@@ -248,7 +272,16 @@ export default function UserDetail({ userId, onBack }: Props) {
     }
     setDeactivating(true);
     setConfirmDeactivate(false);
-    await updateUser(userId, { is_active: !user.is_active });
+    const wasActive = user.is_active;
+    await updateUser(userId, { is_active: !wasActive });
+    void logAuthAction({
+      action: wasActive ? 'deactivate' : 'activate',
+      target_auth_id: user.auth_user_id ?? null,
+      target_user_id: user.id,
+      target_name: user.full_name,
+      target_email: user.email,
+      description: `${wasActive ? 'Deactivated' : 'Activated'} account ${user.email}`,
+    });
     const u = await getUser(userId);
     setUser(u);
     setDeactivating(false);
@@ -263,6 +296,14 @@ export default function UserDetail({ userId, onBack }: Props) {
     setResetMsg(null);
     try {
       await resetUserPassword(user.auth_user_id, newPassword);
+      void logAuthAction({
+        action: 'reset_password',
+        target_auth_id: user.auth_user_id,
+        target_user_id: user.id,
+        target_name: user.full_name,
+        target_email: user.email,
+        description: `Reset password for ${user.email}`,
+      });
       setNewPassword(''); setConfirmPassword('');
       setResetMsg({ type: 'ok', text: t('userDetail.passwordUpdated') });
     } catch (err: any) {

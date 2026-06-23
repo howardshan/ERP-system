@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UserPlus, CheckCircle2, AlertCircle, Loader2, Eye, EyeOff, ShieldOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { logAuthAction } from '../../services/authApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 
 interface CreateResult {
@@ -55,6 +56,13 @@ export default function ITPanel() {
       if (json.error) {
         setResult({ type: 'error', message: json.error });
       } else {
+        void logAuthAction({
+          action: 'create',
+          target_auth_id: json.user_id ?? null,
+          target_name: form.full_name || form.email,
+          target_email: form.email,
+          description: `Created account ${form.email}`,
+        });
         setResult({ type: 'success', message: t('iTPanel.successMessage', { email: form.email }) });
         setForm({ full_name: '', email: '', password: '', confirm: '' });
       }
