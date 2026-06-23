@@ -552,9 +552,37 @@ export interface ProductImportRow {
   standard_drying_minutes: number | null;
   sample_every_n_carts?: number;
   cart_units?: number;
+  // BR-Q81 phase 2: required-test templates.  `undefined` = the import sheet
+  // had no "Required Tests" column → leave a product's tests untouched.  An
+  // array (possibly empty) = replace the product's templates wholesale.
+  templates?: TemplateInput[];
 }
 
 export interface ProductImportResult { created: number; updated: number; processed: number; total: number; aborted: boolean; }
+
+// Replace a SKU's inspection templates wholesale (delete + insert), deriving
+// item_name/unit from the test-type catalog — same shape as create/updateProduct.
+async function replaceProductTemplates(
+  skuId: string,
+  templates: TemplateInput[],
+  typeMap: Record<number, { name: string; unit: string | null }>,
+): Promise<void> {
+  const { error: delErr } = await supabase.from('qc_inspection_template').delete().eq('sku_id', skuId);
+  if (delErr) throw new Error(delErr.message);
+  if (templates.length === 0) return;
+  const rows = templates.map(t => ({
+    sku_id: skuId,
+    test_type_id: t.test_type_id,
+    item_name: typeMap[t.test_type_id]?.name ?? 'Unknown',
+    unit: typeMap[t.test_type_id]?.unit ?? null,
+    lower_limit:      t.lower_limit,
+    upper_limit:      t.upper_limit,
+    soft_lower_limit: t.soft_lower_limit,
+    soft_upper_limit: t.soft_upper_limit,
+  }));
+  const { error: insErr } = await supabase.from('qc_inspection_template').insert(rows);
+  if (insErr) throw new Error(insErr.message);
+}
 
 export async function importProducts(
   rows: ProductImportRow[],
@@ -562,6 +590,10 @@ export async function importProducts(
 ): Promise<ProductImportResult> {
   const existing = await listProducts();
   const byCode = new Map(existing.map(p => [p.code.trim().toLowerCase(), p]));
+  // Test-type catalog for item_name/unit derivation when replacing templates.
+  const { data: types } = await supabase.from('qc_test_type').select('id, name, unit');
+  const typeMap: Record<number, { name: string; unit: string | null }> =
+    Object.fromEntries((types ?? []).map((tt: { id: number; name: string; unit: string | null }) => [tt.id, tt]));
   const total = rows.length;
   let created = 0;
   let updated = 0;
@@ -584,18 +616,22 @@ export async function importProducts(
       if (row.cart_units !== undefined) patch.cart_units = row.cart_units;
       const { error } = await supabase.from('qc_product_sku').update(patch).eq('id', match.id);
       if (error) throw new Error(error.message);
+      if (row.templates !== undefined) await replaceProductTemplates(match.id, row.templates, typeMap);
       updated++;
       items.push({ code: match.code, name: row.name, action: 'update' });
     } else {
       const newCode = code && code.length ? code : await rpc<string>('qc_next_sku_code');
-      const { error } = await supabase.from('qc_product_sku').insert({
+      const { data: ins, error } = await supabase.from('qc_product_sku').insert({
         code: newCode,
         name: row.name,
         standard_drying_minutes: row.standard_drying_minutes,
         sample_every_n_carts: row.sample_every_n_carts ?? 3,
         cart_units: row.cart_units ?? 1,
-      });
+      }).select('id').single();
       if (error) throw new Error(error.message);
+      if (row.templates !== undefined && row.templates.length > 0) {
+        await replaceProductTemplates(ins.id, row.templates, typeMap);
+      }
       created++;
       items.push({ code: newCode, name: row.name, action: 'create' });
     }

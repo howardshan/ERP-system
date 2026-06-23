@@ -62,7 +62,18 @@ const XLSX_HEADERS = {
   dryDays:  'Reference Dry Time (days)',
   sampling: 'Sampling Rate (1 per N carts)',
   units:    'Units per Cart',
+  tests:    'Required Tests',
 } as const;
+
+// Encode a product's required-test templates into one cell, mirroring the UI
+// badge text so it round-trips and stays hand-editable.  Format per test:
+//   "<Test Name> [hardLo, hardHi] soft [softLo, softHi]"  joined by " ; ".
+function encodeTests(templates: Product['templates']): string {
+  return templates
+    .filter(t => t.test_type_id != null)
+    .map(t => `${t.item_name} [${t.lower_limit}, ${t.upper_limit}] soft [${t.soft_lower_limit}, ${t.soft_upper_limit}]`)
+    .join(' ; ');
+}
 
 type ImportRowPreview = {
   rowNum: number;
@@ -71,6 +82,7 @@ type ImportRowPreview = {
   drying_days: number | null;
   sample_every_n_carts?: number;
   cart_units?: number;
+  templates?: TemplateInput[];
   status: 'create' | 'update' | 'unchanged' | 'error';
   error?: string;
 };
@@ -273,13 +285,14 @@ export default function ProductManagement({ module = 'production' }: { module?: 
 
   // ── Excel export / import (BR-Q81) ──────────────────────────────────────────
   const handleExport = () => {
-    const header = [XLSX_HEADERS.code, XLSX_HEADERS.name, XLSX_HEADERS.dryDays, XLSX_HEADERS.sampling, XLSX_HEADERS.units];
+    const header = [XLSX_HEADERS.code, XLSX_HEADERS.name, XLSX_HEADERS.dryDays, XLSX_HEADERS.sampling, XLSX_HEADERS.units, XLSX_HEADERS.tests];
     const rows = products.map((p) => ({
       [XLSX_HEADERS.code]: p.code,
       [XLSX_HEADERS.name]: p.name,
       [XLSX_HEADERS.dryDays]: p.standard_drying_minutes != null ? minutesToDays(p.standard_drying_minutes) : '',
       [XLSX_HEADERS.sampling]: p.sample_every_n_carts ?? 1,
       [XLSX_HEADERS.units]: p.cart_units ?? 1,
+      [XLSX_HEADERS.tests]: encodeTests(p.templates),
     }));
     const ws = XLSX.utils.json_to_sheet(rows, { header });
     const wb = XLSX.utils.book_new();
@@ -295,9 +308,43 @@ export default function ProductManagement({ module = 'production' }: { module?: 
       const wb = XLSX.read(buf, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+      const headerRow = (XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 })[0] ?? []) as unknown[];
+      const hasTestsColumn = headerRow.some((h) => String(h).trim() === XLSX_HEADERS.tests);
       const byCode = new Map(products.map((p) => [p.code.trim().toLowerCase(), p]));
+      const ttByName = new Map(testTypes.map((t) => [t.name.trim().toLowerCase(), t]));
       const num = (v: unknown): number | undefined =>
         v === null || v === undefined || v === '' ? undefined : Number(v);
+
+      // Parse the "Required Tests" cell → templates, or an error string.
+      const parseTests = (cell: unknown): { templates?: TemplateInput[]; error?: string } => {
+        const s = String(cell ?? '').trim();
+        if (!s) return { templates: [] };
+        const out: TemplateInput[] = [];
+        for (const seg of s.split(';').map((x) => x.trim()).filter(Boolean)) {
+          const m = seg.match(/^(.+?)\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\](?:\s*soft\s*\[\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\])?$/i);
+          if (!m) return { error: tr('productManagement.importErrTestFormat', { seg }) };
+          const tt = ttByName.get(m[1].trim().toLowerCase());
+          if (!tt) return { error: tr('productManagement.importErrUnknownTest', { name: m[1].trim() }) };
+          const lo = Number(m[2]); const hi = Number(m[3]);
+          const slo = m[4] !== undefined ? Number(m[4]) : lo;
+          const shi = m[5] !== undefined ? Number(m[5]) : hi;
+          if (![lo, hi, slo, shi].every(Number.isFinite)) return { error: tr('productManagement.importErrBadNumber') };
+          if (lo > hi) return { error: tr('productManagement.importErrHardOrder', { name: tt.name }) };
+          if (slo > lo || shi < hi) return { error: tr('productManagement.importErrSoftWrap', { name: tt.name }) };
+          out.push({ test_type_id: tt.id, lower_limit: lo, upper_limit: hi, soft_lower_limit: slo, soft_upper_limit: shi });
+        }
+        return { templates: out };
+      };
+
+      // Stable key for comparing a template set (ignores order).
+      const tkey = (t: { test_type_id: number | null; lower_limit: number; upper_limit: number; soft_lower_limit: number; soft_upper_limit: number }) =>
+        `${t.test_type_id}|${t.lower_limit}|${t.upper_limit}|${t.soft_lower_limit}|${t.soft_upper_limit}`;
+      const sameTemplates = (a: TemplateInput[], b: Product['templates']) => {
+        const ka = a.map(tkey).sort();
+        const kb = b.filter((t) => t.test_type_id != null).map(tkey).sort();
+        return ka.length === kb.length && ka.every((v, i) => v === kb[i]);
+      };
+
       const previews: ImportRowPreview[] = raw.map((r, i) => {
         const code = String(r[XLSX_HEADERS.code] ?? '').trim();
         const name = String(r[XLSX_HEADERS.name] ?? '').trim();
@@ -310,6 +357,14 @@ export default function ProductManagement({ module = 'production' }: { module?: 
         else if (sample !== undefined && (!Number.isFinite(sample) || sample < 1)) error = tr('productManagement.importErrBadNumber');
         else if (units !== undefined && (!Number.isFinite(units) || units <= 0)) error = tr('productManagement.importErrBadNumber');
 
+        // Required tests (only when the column is present in the sheet).
+        let templates: TemplateInput[] | undefined;
+        if (hasTestsColumn && !error) {
+          const res = parseTests(r[XLSX_HEADERS.tests]);
+          if (res.error) error = res.error;
+          else templates = res.templates;
+        }
+
         const match = code ? byCode.get(code.toLowerCase()) : undefined;
         let status: ImportRowPreview['status'];
         if (error) {
@@ -317,15 +372,16 @@ export default function ProductManagement({ module = 'production' }: { module?: 
         } else if (!match) {
           status = 'create';
         } else {
-          // Only mark as "update" if the row would actually change something —
-          // mirrors how importProducts applies fields (name + drying always,
-          // sample/units only when present).  Avoids 379 no-op "updates".
+          // Mark "update" only if something would actually change — mirrors how
+          // importProducts applies fields (name + drying always, sample/units
+          // only when present, templates only when the column is present).
           const newDryMins = dry != null ? Math.round(daysToMinutes(dry)) : null;
           const changed =
             name !== (match.name ?? '').trim() ||
             (newDryMins ?? null) !== (match.standard_drying_minutes ?? null) ||
             (sample !== undefined && sample !== (match.sample_every_n_carts ?? null)) ||
-            (units !== undefined && units !== (match.cart_units ?? null));
+            (units !== undefined && units !== (match.cart_units ?? null)) ||
+            (templates !== undefined && !sameTemplates(templates, match.templates));
           status = changed ? 'update' : 'unchanged';
         }
         return {
@@ -335,6 +391,7 @@ export default function ProductManagement({ module = 'production' }: { module?: 
           drying_days: dry ?? null,
           sample_every_n_carts: sample,
           cart_units: units,
+          templates,
           status,
           error,
         };
@@ -362,6 +419,7 @@ export default function ProductManagement({ module = 'production' }: { module?: 
         standard_drying_minutes: p.drying_days != null ? daysToMinutes(p.drying_days) : null,
         sample_every_n_carts: p.sample_every_n_carts,
         cart_units: p.cart_units,
+        templates: p.templates,
       }));
       const res = await importProducts(rows, {
         signal: controller.signal,
