@@ -649,7 +649,13 @@
     "importErrNoName": "Name is required.",
     "importErrBadNumber": "Invalid number.",
     "importErrParse": "Could not read the file.",
-    "importErrFailed": "Import failed."
+    "importErrFailed": "Import failed.",
+    "importUnchanged": "Unchanged",
+    "importAllUnchanged": "No changes to import — every row matches the current data.",
+    "importProgress": "Importing {{done}} / {{total}}…",
+    "cancelImport": "Stop import",
+    "importCancelled": "Import stopped — {{created}} created, {{updated}} updated. Re-import the same file to finish (unchanged rows are skipped).",
+    "importPartialWarning": "Only changed rows will be written. Don't close or refresh this page while importing — if you do, rows processed so far are saved and re-importing the same file is safe (it skips unchanged rows)."
   },
   "productAuditLog": {
     "module": "Quality Control",
@@ -671,12 +677,14 @@
     "createdRecord": "Created record",
     "deletedRecord": "Deleted record",
     "noDetails": "No further details.",
+    "importItems": "Affected products",
+    "importNoItemDetail": "This import predates per-product detail logging.",
     "secondsAgo": "{{count}}s ago",
     "minutesAgo": "{{count}}m ago",
     "hoursAgo": "{{count}}h ago",
     "daysAgo": "{{count}}d ago",
     "col": { "time": "Time", "who": "Who", "action": "Action", "entity": "Entity", "reference": "Reference", "summary": "Summary" },
-    "action": { "create": "Create", "edit": "Edit", "delete": "Delete", "import": "Import" },
+    "action": { "create": "Create", "edit": "Edit", "update": "Update", "delete": "Delete", "import": "Import" },
     "entity": { "product": "Product", "test_type": "Test Type", "product_import": "Import" },
     "entityOption": { "all": "All entities", "product": "Products", "test_type": "Test Types", "product_import": "Imports" },
     "field": { "code": "S2 WIP", "name": "Name", "standard_drying_minutes": "Reference dry time", "sample_every_n_carts": "Sampling rate", "cart_units": "Units per cart", "unit": "Unit", "description": "Description", "is_active": "Active" }

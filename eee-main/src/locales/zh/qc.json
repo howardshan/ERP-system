@@ -645,7 +645,13 @@
     "importErrNoName": "名称为必填项。",
     "importErrBadNumber": "数字无效。",
     "importErrParse": "无法读取文件。",
-    "importErrFailed": "导入失败。"
+    "importErrFailed": "导入失败。",
+    "importUnchanged": "未变更",
+    "importAllUnchanged": "没有需要导入的变更 —— 每一行都与当前数据一致。",
+    "importProgress": "正在导入 {{done}} / {{total}}…",
+    "cancelImport": "停止导入",
+    "importCancelled": "导入已停止 — 新建 {{created}} 条，更新 {{updated}} 条。重新导入同一文件即可完成（未变更行会跳过）。",
+    "importPartialWarning": "只会写入有变更的行。导入过程中请勿关闭或刷新页面 —— 若中途离开，已处理的行会被保存，重新导入同一文件是安全的（会跳过未变更的行）。"
   },
   "productAuditLog": {
     "module": "质量控制",
@@ -667,12 +673,14 @@
     "createdRecord": "新建记录",
     "deletedRecord": "删除记录",
     "noDetails": "无更多详情。",
+    "importItems": "受影响的产品",
+    "importNoItemDetail": "此次导入早于「逐产品明细」记录功能。",
     "secondsAgo": "{{count}} 秒前",
     "minutesAgo": "{{count}} 分钟前",
     "hoursAgo": "{{count}} 小时前",
     "daysAgo": "{{count}} 天前",
     "col": { "time": "时间", "who": "操作人", "action": "操作", "entity": "对象", "reference": "引用", "summary": "摘要" },
-    "action": { "create": "新建", "edit": "编辑", "delete": "删除", "import": "导入" },
+    "action": { "create": "新建", "edit": "编辑", "update": "更新", "delete": "删除", "import": "导入" },
     "entity": { "product": "产品", "test_type": "测试类型", "product_import": "导入" },
     "entityOption": { "all": "全部对象", "product": "产品", "test_type": "测试类型", "product_import": "导入" },
     "field": { "code": "S2 WIP", "name": "名称", "standard_drying_minutes": "参考烘干时间", "sample_every_n_carts": "抽样率", "cart_units": "每车单位", "unit": "单位", "description": "描述", "is_active": "启用" }

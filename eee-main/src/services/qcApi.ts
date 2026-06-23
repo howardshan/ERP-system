@@ -535,9 +535,16 @@ export async function deleteProducts(ids: string[]): Promise<void> {
 // matches an existing product updates its core fields (templates / final-product
 // links are left untouched); a row with no match (or blank code) creates a new
 // product with no test templates.  Rows are NOT deleted for codes absent from
-// the sheet — import never removes products.  Parsing / validation happens in
-// the UI; this function trusts the rows it's given and records one summary
-// `product_import` audit entry on top of the per-row create/edit entries.
+// the sheet — import never removes products.
+//
+// The caller (ProductManagement) only passes rows that actually changed
+// (unchanged rows are filtered out in the preview), so this loop is normally
+// tiny.  Each row is a single lightweight UPDATE/INSERT — we deliberately do
+// NOT route through updateProduct/createProduct here, because those re-fetch
+// the whole product list and write a per-row audit entry, which made a 379-row
+// import take minutes.  One summary `product_import` audit entry is written at
+// the end instead.  `onProgress` drives the UI progress bar; `signal` lets the
+// user abort mid-run (already-committed rows stay — re-importing is idempotent).
 
 export interface ProductImportRow {
   code?: string | null;
@@ -547,44 +554,64 @@ export interface ProductImportRow {
   cart_units?: number;
 }
 
-export interface ProductImportResult { created: number; updated: number; }
+export interface ProductImportResult { created: number; updated: number; processed: number; total: number; aborted: boolean; }
 
-export async function importProducts(rows: ProductImportRow[]): Promise<ProductImportResult> {
+export async function importProducts(
+  rows: ProductImportRow[],
+  opts?: { onProgress?: (done: number, total: number) => void; signal?: AbortSignal },
+): Promise<ProductImportResult> {
   const existing = await listProducts();
   const byCode = new Map(existing.map(p => [p.code.trim().toLowerCase(), p]));
+  const total = rows.length;
   let created = 0;
   let updated = 0;
+  let processed = 0;
+  let aborted = false;
+  // Per-row record of what the import touched, stored in the audit snapshot so
+  // the Change Log can show exactly which products were created / updated.
+  const items: { code: string; name: string; action: 'create' | 'update' }[] = [];
+
   for (const row of rows) {
+    if (opts?.signal?.aborted) { aborted = true; break; }
     const code = row.code?.trim();
     const match = code ? byCode.get(code.toLowerCase()) : undefined;
     if (match) {
-      await updateProduct(match.id, {
+      const patch: Record<string, unknown> = {
         name: row.name,
         standard_drying_minutes: row.standard_drying_minutes,
-        sample_every_n_carts: row.sample_every_n_carts,
-        cart_units: row.cart_units,
-      });
+      };
+      if (row.sample_every_n_carts !== undefined) patch.sample_every_n_carts = row.sample_every_n_carts;
+      if (row.cart_units !== undefined) patch.cart_units = row.cart_units;
+      const { error } = await supabase.from('qc_product_sku').update(patch).eq('id', match.id);
+      if (error) throw new Error(error.message);
       updated++;
+      items.push({ code: match.code, name: row.name, action: 'update' });
     } else {
-      await createProduct({
-        code: code || undefined,
+      const newCode = code && code.length ? code : await rpc<string>('qc_next_sku_code');
+      const { error } = await supabase.from('qc_product_sku').insert({
+        code: newCode,
         name: row.name,
         standard_drying_minutes: row.standard_drying_minutes,
         sample_every_n_carts: row.sample_every_n_carts ?? 3,
         cart_units: row.cart_units ?? 1,
-        templates: [],
       });
+      if (error) throw new Error(error.message);
       created++;
+      items.push({ code: newCode, name: row.name, action: 'create' });
     }
+    processed++;
+    opts?.onProgress?.(processed, total);
   }
+
   void logProductAction({
     entity_type: 'product_import',
     entity_id: 'import',
     action: 'import',
-    after: { created, updated, total: rows.length },
-    description: `Imported products from Excel — ${created} created, ${updated} updated`,
+    after: { created, updated, processed, total, aborted, items },
+    description: `Imported products from Excel — ${created} created, ${updated} updated`
+      + (aborted ? ` (cancelled after ${processed}/${total})` : ''),
   });
-  return { created, updated };
+  return { created, updated, processed, total, aborted };
 }
 
 // M-086: SKU → ERP item links (one-to-many via qc_sku_item junction table).

@@ -97,6 +97,48 @@ function DiffPanel({ log }: { log: ProductAuditLogEntry }) {
         </div>
       )}
 
+      {action === 'import' && after && (() => {
+        const items = Array.isArray((after as { items?: unknown }).items)
+          ? ((after as { items: { code: string; name: string; action: string }[] }).items)
+          : [];
+        return (
+          <div>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t('productAuditLog.importItems')}</p>
+            {items.length === 0 ? (
+              <p className="text-xs text-slate-400">{t('productAuditLog.importNoItemDetail')}</p>
+            ) : (
+              <div className="max-h-72 overflow-auto">
+                <table className="text-xs w-full max-w-2xl">
+                  <thead>
+                    <tr className="text-[10px] text-slate-400 border-b border-slate-200">
+                      <th className="text-left font-bold pb-1.5 pr-6 w-24">{t('productAuditLog.col.action')}</th>
+                      <th className="text-left font-bold pb-1.5 pr-6 w-32">{t('productAuditLog.field.code')}</th>
+                      <th className="text-left font-bold pb-1.5">{t('productAuditLog.field.name')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((it, i) => (
+                      <tr key={i} className="border-t border-slate-100">
+                        <td className="py-1 pr-6">
+                          <span className={cn(
+                            'px-1.5 py-0.5 rounded text-[10px] font-bold',
+                            it.action === 'create' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+                          )}>
+                            {it.action === 'create' ? t('productAuditLog.action.create') : t('productAuditLog.action.update')}
+                          </span>
+                        </td>
+                        <td className="py-1 pr-6 font-mono text-slate-600">{it.code}</td>
+                        <td className="py-1 text-slate-700">{it.name}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {action === 'delete' && before && (
         <div>
           <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider mb-2">{t('productAuditLog.deletedRecord')}</p>
