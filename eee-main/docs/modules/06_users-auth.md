@@ -106,6 +106,7 @@ PERMISSION_STRUCTURE = {
       users:              { permissions: [view, create, edit, delete, reset_password] },
       roles:              { permissions: [view, manage] },
       departments:        { permissions: [view, manage] },
+      audit_log:          { permissions: [view] },   // M-153 用户操作审计日志
     }
   },
 }
@@ -160,6 +161,8 @@ PERMISSION_STRUCTURE = {
 | `ProductManagement` | Export / Import 按钮 | `qc.products.export` / `.import` |
 | `ProductManagement`（Production，`module="production"`） | 仅只读浏览（无新增/编辑/删除） | `production.products.view` |
 | `ProductAuditLog` | 整个页面 | `qc.products.view_log`（否则 ShieldOff 拒绝画面） |
+| `UserManagement` | Activity Log 视图标签 | `auth.audit_log.view` |
+| `UserAuditLog` | 整个页面 | `auth.audit_log.view`（否则 ShieldOff 拒绝画面） |
 
 ---
 
@@ -193,6 +196,24 @@ PERMISSION_STRUCTURE = {
 3. 对每个移除权限调用 `setPermission(..., false)`（delete）
 4. 重新从 DB 拉取 `getUserPermissions(userId)` 验证每个待删权限已不存在；若仍存在则抛出错误（`"Failed to remove permission: module.resource.perm"`）
 5. 无条件调用 `reloadPermissions()`，刷新整个 PermissionContext（不再以"是否编辑自己"为条件判断）
+
+---
+
+## 用户操作审计日志（M-153 / M-154）
+
+记录账户与认证相关事件：登录/登出、账户创建、资料修改、启用/停用、重置密码、权限/模块访问变更。**已删除用户**当前为「停用」语义（`is_active=false`，行保留），所以其历史天然可查；表也按「将来可硬删」设计，删后记录仍可读。
+
+**表 `auth_audit_log`（M-153）**：镜像 `finance_audit_log`，但**双主体**——同时记 `actor`（操作人）与 `target`（被操作的目标用户）。`actor_auth_id` / `target_auth_id` 均 `→ auth.users ON DELETE SET NULL`，并冗余 `actor_name` / `target_name` / `target_email`；`target_user_id`（erp_user.id）**不加 FK**（避免被 erp_user 的 `ON DELETE CASCADE` 影响）。`action ∈ {login_success, logout, create, edit_profile, activate, deactivate, reset_password, edit_permissions}`。
+
+**写入与埋点**：`authApi.logAuthAction(...)`（fire-and-forget，actor 从当前会话解析）。埋点位置：
+- `create` → [`ITPanel.tsx`](../../src/pages/auth/ITPanel.tsx)（创建成功后）
+- `activate` / `deactivate`、`reset_password`、`edit_permissions`（一次保存写一条汇总，`diff` 存 granted/revoked/模块前后）→ [`UserDetail.tsx`](../../src/pages/auth/UserDetail.tsx)
+- `login_success` → [`LoginPage.tsx`](../../src/pages/LoginPage.tsx)（登录成功后；**`login_failed` 不记**——未认证状态 RLS 会拒绝）
+- `logout` → [`App.tsx`](../../src/App.tsx)（**在 `signOut` 之前**写，否则登出后 RLS 拒绝）
+
+**浏览 UI**：[`UserAuditLog.tsx`](../../src/pages/auth/UserAuditLog.tsx)，作为 UserManagement 的**第 4 个视图「Activity Log」**，支持按**用户**（含停用用户）/ 操作类型筛选 + 搜索（actor/target/摘要），展开看 diff/快照。权限门 `auth.audit_log.view`。
+
+**两年留存（M-154）**：`auth_audit_log_prune()` 删 2 年前的行；装了 `pg_cron` 则每日自动跑，否则手动/外部计划任务调用。
 
 ---
 

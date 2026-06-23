@@ -2512,6 +2512,31 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-153 `20260623000007_auth_audit_log.sql`
+**用途**: Users & Authentication 模块的**用户操作审计日志**——记录登录/登出、账户创建、资料修改、启用/停用、重置密码、权限/模块访问变更。
+
+**设计**:
+- 镜像 `finance_audit_log`(M-018),但**双主体**:既记 `actor`(谁操作,从当前会话解析)又记 `target`(对哪个用户),如「管理员A 修改了 用户B 的权限」。
+- **生存删除**:`actor_auth_id` / `target_auth_id` 都 `→ auth.users ON DELETE SET NULL`,并冗余 `actor_name` / `target_name` / `target_email`;`target_user_id`(erp_user.id)**故意不加 FK**——因为 `user_permission_grant`/`user_module_access` 对 erp_user 是 `ON DELETE CASCADE`,加 FK 会让将来硬删用户时连带影响审计行。
+- `action` 取值:`login_success / logout / create / edit_profile / activate / deactivate / reset_password / edit_permissions`。`diff` 对权限变更存 `{granted, revoked, modules_before, modules_after}`。
+- RLS:`authenticated` 可 INSERT、SELECT(查看由 `auth.audit_log.view` 应用层门控)。**`login_failed` 不记**——此时用户未认证,RLS 会拒绝;如需可后续用 service-role 边缘函数补。
+- seed `auth.audit_log.view` 给 `ysha@smu.edu`。
+
+**前端配套**: [`src/services/authApi.ts`](../../src/services/authApi.ts)(`logAuthAction` / `getAuthAuditLog`)、埋点 [`ITPanel.tsx`](../../src/pages/auth/ITPanel.tsx)(create)、[`UserDetail.tsx`](../../src/pages/auth/UserDetail.tsx)(停用/启用/改密/改权)、[`LoginPage.tsx`](../../src/pages/LoginPage.tsx)(登录)、[`App.tsx`](../../src/App.tsx)(登出,在 signOut 前写),浏览页 [`UserAuditLog.tsx`](../../src/pages/auth/UserAuditLog.tsx)(UserManagement 第 4 个视图,按用户/操作筛选 + 搜索)。`permissionStructure.ts` 的 `auth` 加 `audit_log` 资源。
+
+**关联文档**: [`docs/modules/06_users-auth.md`](../modules/06_users-auth.md)。
+
+---
+
+### M-154 `20260623000008_auth_audit_log_retention.sql`
+**用途**: `auth_audit_log` 的**两年留存**清理。
+
+**改动**: 建 `auth_audit_log_prune()` 函数(删 2 年前的行);若环境装了 `pg_cron`,则用 DO 块检测后 `cron.schedule` 每日 03:00 UTC 执行。**若没有 pg_cron**,函数仍在,可手动或用外部计划任务(如定时边缘函数)调用 `SELECT auth_audit_log_prune();`。
+
+**关联文档**: [`docs/modules/06_users-auth.md`](../modules/06_users-auth.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2646,14 +2671,18 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-150 | 20260623000004_qc_production_lot_detail_remove_event_cap.sql · Batch Trace 事件列表去掉硬编码 `LIMIT 50`(操作员反馈「很多操作没记录」实为旧/被截掉) |
 | M-151 | 20260623000005_qc_quality_event_summary_human_readable.sql · `qc_quality_event_summary` 全量覆盖事件类型,Batch Trace / Sub-lot history 不再显示 `sub_lot_created` / `group_assigned` 等代码名 |
 | M-152 | 20260623000006_qc_trace_unify_on_sub_lots.sql · Batch Trace 砍掉重复的 Quality events 区段;sub_lots 改为列全部 cart(含未扫码)+ 按 sub_lot_code 排序 |
-| **M-153** | _(下一个)_ |
+| M-153 | 20260623000007_auth_audit_log.sql · Users & Auth 用户操作审计日志(双主体 actor/target,生存删除,记登录/账户/权限事件) |
+| M-154 | 20260623000008_auth_audit_log_retention.sql · auth_audit_log 两年留存清理(pg_cron 可用则每日跑,否则手动/外部调度) |
+| **M-155** | _(下一个)_ |
 | M-147 | 20260623000001_products_edit_back_to_qc.sql · Products/Test Types 编辑权从 production.* 迁回 qc.products.*(Production 只读),新增 export/import/view_log 权限 |
 | M-148 | 20260623000002_qc_product_audit_log.sql · 新建 qc_product_audit_log 表(镜像 finance_audit_log),记录产品/测试类型 CRUD 与 Excel 导入 |
 | M-149 | 20260623000003_qc_products_grant_export_import_log.sql · 把 qc.products.{export,import,view_log} 回填给所有已有 qc.products.view 的用户 |
 | M-150 | 20260623000004_qc_production_lot_detail_remove_event_cap.sql · Batch Trace 事件列表去掉硬编码 `LIMIT 50`(操作员反馈「很多操作没记录」实为旧/被截掉) |
 | M-151 | 20260623000005_qc_quality_event_summary_human_readable.sql · `qc_quality_event_summary` 全量覆盖事件类型,Batch Trace / Sub-lot history 不再显示 `sub_lot_created` / `group_assigned` 等代码名 |
 | M-152 | 20260623000006_qc_trace_unify_on_sub_lots.sql · Batch Trace 砍掉重复的 Quality events 区段;sub_lots 改为列全部 cart(含未扫码)+ 按 sub_lot_code 排序 |
-| **M-153** | _(下一个)_ |
+| M-153 | 20260623000007_auth_audit_log.sql · Users & Auth 用户操作审计日志(双主体 actor/target,生存删除,记登录/账户/权限事件) |
+| M-154 | 20260623000008_auth_audit_log_retention.sql · auth_audit_log 两年留存清理(pg_cron 可用则每日跑,否则手动/外部调度) |
+| **M-155** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
