@@ -567,6 +567,9 @@ export async function importProducts(
   let updated = 0;
   let processed = 0;
   let aborted = false;
+  // Per-row record of what the import touched, stored in the audit snapshot so
+  // the Change Log can show exactly which products were created / updated.
+  const items: { code: string; name: string; action: 'create' | 'update' }[] = [];
 
   for (const row of rows) {
     if (opts?.signal?.aborted) { aborted = true; break; }
@@ -582,6 +585,7 @@ export async function importProducts(
       const { error } = await supabase.from('qc_product_sku').update(patch).eq('id', match.id);
       if (error) throw new Error(error.message);
       updated++;
+      items.push({ code: match.code, name: row.name, action: 'update' });
     } else {
       const newCode = code && code.length ? code : await rpc<string>('qc_next_sku_code');
       const { error } = await supabase.from('qc_product_sku').insert({
@@ -593,6 +597,7 @@ export async function importProducts(
       });
       if (error) throw new Error(error.message);
       created++;
+      items.push({ code: newCode, name: row.name, action: 'create' });
     }
     processed++;
     opts?.onProgress?.(processed, total);
@@ -602,7 +607,7 @@ export async function importProducts(
     entity_type: 'product_import',
     entity_id: 'import',
     action: 'import',
-    after: { created, updated, processed, total, aborted },
+    after: { created, updated, processed, total, aborted, items },
     description: `Imported products from Excel — ${created} created, ${updated} updated`
       + (aborted ? ` (cancelled after ${processed}/${total})` : ''),
   });
