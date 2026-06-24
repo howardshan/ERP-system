@@ -435,6 +435,7 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'edit',           label: 'Edit User',      prereq: 'view' },
           { id: 'delete',         label: 'Delete User',    prereq: 'edit' },
           { id: 'reset_password', label: 'Reset Password', prereq: 'view' },
+          { id: 'reset_mfa',      label: 'Reset MFA',      prereq: 'view' },
         ],
       },
       roles: {

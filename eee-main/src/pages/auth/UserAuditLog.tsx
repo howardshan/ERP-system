@@ -17,11 +17,15 @@ const ACTION_META: Record<string, { cls: string }> = {
   deactivate:       { cls: 'bg-red-100     text-red-700'     },
   reset_password:   { cls: 'bg-violet-100  text-violet-700'  },
   edit_permissions: { cls: 'bg-indigo-100  text-indigo-700'  },
+  mfa_enrolled:     { cls: 'bg-teal-100    text-teal-700'    },
+  mfa_reset:        { cls: 'bg-orange-100  text-orange-700'  },
+  mfa_removed:      { cls: 'bg-amber-100   text-amber-700'   },
 };
 
 const ACTION_OPTION_VALUES = [
   '', 'login_success', 'logout', 'create', 'edit_profile',
   'activate', 'deactivate', 'reset_password', 'edit_permissions',
+  'mfa_enrolled', 'mfa_reset', 'mfa_removed',
 ];
 
 const PAGE_SIZE = 50;
