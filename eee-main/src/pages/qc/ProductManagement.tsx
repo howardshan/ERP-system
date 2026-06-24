@@ -479,7 +479,7 @@ export default function ProductManagement({ module = 'production' }: { module?: 
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-5xl mx-auto">
       <h1 className="text-2xl font-bold text-slate-900 mb-1">{tr('productManagement.title')}</h1>
       <p className="text-slate-600 mb-4 text-sm">
         {tr('productManagement.subtitle')}

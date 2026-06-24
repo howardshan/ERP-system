@@ -231,7 +231,7 @@ export default function EmployeeProfile({ employeeId, onBack }: Props) {
               <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">{t('employeeProfile.noSalaryRecords')}</div>
             )}
             {salaryHistory.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
                 <div className="px-6 py-4 border-b border-slate-200">
                   <h3 className="text-sm font-bold text-slate-900">{t('employeeProfile.salaryHistory')}</h3>
                 </div>

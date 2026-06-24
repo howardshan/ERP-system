@@ -172,7 +172,7 @@ export default function BenefitsPlans() {
             ) : enrollments.length === 0 ? (
               <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">{t('benefitsPlans.emptyEnrollments')}</div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="bg-slate-50 border-b border-slate-200">
                     {[

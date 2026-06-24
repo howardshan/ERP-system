@@ -178,6 +178,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
               <p className="text-sm font-medium">{t('approvalsQueue.noPending')}</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
@@ -231,6 +232,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </Card>
@@ -307,6 +309,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
                     {t('approvalsQueue.journalLines')}
                   </p>
+                  <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse border border-slate-200 rounded-lg overflow-hidden text-xs">
                     <thead>
                       <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
@@ -350,6 +353,7 @@ export default function ApprovalsQueue({ onNavigate }: { onNavigate?: (screen: s
                       </tr>
                     </tfoot>
                   </table>
+                  </div>
                 </div>
               ) : null}
 

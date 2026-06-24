@@ -33,7 +33,7 @@ export default function LotsListPage({ onOpenLot }: { onOpenLot: (lotId: number)
 
       {error && <p className="text-red-600 mb-3 text-sm">{error}</p>}
 
-      <div className="overflow-hidden rounded-xl border bg-white">
+      <div className="overflow-x-auto rounded-xl border bg-white">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
             <tr>

@@ -88,6 +88,7 @@ export default function LeaveRequests() {
                 <p className="text-sm">{t('leaveRequests.empty')}</p>
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead><tr className="bg-slate-50 border-b border-slate-200">
                   {['employee','type','period','days','reason','status','actions'].map(h => <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h === 'actions' ? '' : t(`leaveRequests.col.${h}`)}</th>)}
@@ -124,6 +125,7 @@ export default function LeaveRequests() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         )}

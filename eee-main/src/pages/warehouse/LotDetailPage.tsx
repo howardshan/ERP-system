@@ -360,7 +360,7 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
 
           {/* current balances by location */}
           <h2 className="text-sm font-bold text-slate-700 mb-2">{t('lotDetailPage.currentStockByLocation')}</h2>
-          <div className="overflow-hidden rounded-xl border bg-white mb-6">
+          <div className="overflow-x-auto rounded-xl border bg-white mb-6">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
@@ -386,7 +386,7 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
 
           {/* timeline */}
           <h2 className="text-sm font-bold text-slate-700 mb-2">{t('lotDetailPage.transactionTimeline')}</h2>
-          <div className="overflow-hidden rounded-xl border bg-white">
+          <div className="overflow-x-auto rounded-xl border bg-white">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
@@ -420,7 +420,7 @@ export default function LotDetailPage({ lotId, onBack }: { lotId: number; onBack
           {coaHistory.length > 0 && (
             <>
               <h2 className="text-sm font-bold text-slate-700 mb-2 mt-6">{t('lotDetailPage.coaHistory')}</h2>
-              <div className="overflow-hidden rounded-xl border bg-white">
+              <div className="overflow-x-auto rounded-xl border bg-white">
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                     <tr>

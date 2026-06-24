@@ -230,9 +230,9 @@ export default function PackagingPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0" style={{ minHeight: 'calc(100vh - 56px)' }}>
-      {/* Left panel — SKU list */}
-      <aside className="w-80 shrink-0 border-r border-slate-200 bg-white flex flex-col">
+    <div className="flex flex-col lg:flex-row min-h-0" style={{ minHeight: 'calc(100vh - 56px)' }}>
+      {/* Left panel — SKU list. Stacks on top on mobile (capped height), side panel on lg+. */}
+      <aside className="w-full lg:w-80 shrink-0 border-b lg:border-r border-slate-200 bg-white flex flex-col max-h-[55vh] lg:max-h-none">
         <div className="p-4 border-b border-slate-100">
           <div className="flex items-center justify-between mb-0.5">
             <h2 className="text-sm font-bold text-slate-900">{t('packagingPage.productsInStock')}</h2>
@@ -296,9 +296,9 @@ export default function PackagingPage() {
       </aside>
 
       {/* Right panel — Cart table */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#faf8f5]">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#faf8f5]">
         {/* Scan input bar + Packing mode entry */}
-        <div className="px-6 pt-5 pb-3 flex items-center justify-between gap-3">
+        <div className="px-4 sm:px-6 pt-5 pb-3 flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             {selectedSkuId ? (
               <div className="flex items-center gap-3">
@@ -354,7 +354,7 @@ export default function PackagingPage() {
         </div>
 
         {/* Cart table */}
-        <div className="flex-1 px-6 overflow-auto">
+        <div className="flex-1 px-4 sm:px-6 overflow-auto">
           {!selectedSkuId && (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <Package size={40} className="text-slate-300 mb-3" />

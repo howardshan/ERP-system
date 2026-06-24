@@ -103,6 +103,7 @@ export default function JournalEntriesList({ onNavigate }: { onNavigate?: (scree
               <p className="text-sm">{t('journalEntriesList.noEntries')}</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
@@ -146,6 +147,7 @@ export default function JournalEntriesList({ onNavigate }: { onNavigate?: (scree
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

@@ -118,6 +118,7 @@ export default function MyLeave() {
                 <p className="text-sm">{t('myLeave.noRequests')}</p>
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead><tr className="bg-slate-50 border-b border-slate-200">
                   {[['type',t('myLeave.colType')],['period',t('myLeave.colPeriod')],['days',t('myLeave.colDays')],['reason',t('myLeave.colReason')],['status',t('myLeave.colStatus')],['approver',t('myLeave.colApprover')],['actions','']].map(([k,h]) => <th key={k} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
@@ -143,6 +144,7 @@ export default function MyLeave() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>
