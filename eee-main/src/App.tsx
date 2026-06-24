@@ -21,6 +21,7 @@ import WorkflowList from './pages/WorkflowList';
 import WorkflowBuilder from './pages/WorkflowBuilder';
 import DocsPage from './pages/DocsPage';
 import UserManagement from './pages/auth/UserManagement';
+import LogsModule from './pages/logs/LogsModule';
 import HRModule from './pages/hr/HRModule';
 import QualityControlModule from './pages/qc/QualityControlModule';
 import PackagingModule from './pages/packaging/PackagingModule';
@@ -192,6 +193,10 @@ function AppShell({
 
   if (activeModule === 'auth') {
     return <UserManagement onHome={() => setActiveModule('home')} />;
+  }
+
+  if (activeModule === 'logs') {
+    return <LogsModule onHome={() => setActiveModule('home')} />;
   }
 
   if (activeModule === 'account-settings') {

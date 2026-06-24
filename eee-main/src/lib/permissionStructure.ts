@@ -460,6 +460,24 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
       },
     },
   },
+  // M-155 — Central, cross-module system log (reads v_system_audit_log).
+  logs: {
+    label: 'Logs & Audit',
+    resources: {
+      module_permissions: {
+        label: 'Module Permissions',
+        permissions: [
+          { id: 'manage', label: 'Manage User Permissions', prereq: null },
+        ],
+      },
+      entries: {
+        label: 'System Log',
+        permissions: [
+          { id: 'view', label: 'View System Log', prereq: null },
+        ],
+      },
+    },
+  },
 };
 
 export const ALL_MODULES = Object.keys(PERMISSION_STRUCTURE);

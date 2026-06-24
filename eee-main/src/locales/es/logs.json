@@ -1,0 +1,36 @@
+{
+  "logs": {
+    "allModules": "Todos los módulos",
+    "title": "Registros y auditoría",
+    "administration": "Administración",
+    "pageTitle": "Registro del sistema",
+    "subtitle": "Todas las operaciones registradas en los módulos. Filtre por persona, módulo y fecha.",
+    "refresh": "Actualizar",
+    "allUsers": "Todas las personas",
+    "allModules2": "Todos los módulos",
+    "from": "Desde",
+    "to": "Hasta",
+    "searchPlaceholder": "Buscar resumen, actor, entidad…",
+    "clearFilters": "Limpiar",
+    "empty": "Sin registros.",
+    "loadMore": "Cargar más",
+    "noPermission": "No tiene permiso para ver el registro del sistema.",
+    "askAdminPrefix": "Pida a un administrador que otorgue ",
+    "askAdminSuffix": ".",
+    "details": "Detalles",
+    "noDetails": "Sin más detalles.",
+    "secondsAgo": "hace {{count}} s",
+    "minutesAgo": "hace {{count}} min",
+    "hoursAgo": "hace {{count}} h",
+    "daysAgo": "hace {{count}} d",
+    "col": { "time": "Hora", "actor": "Persona", "module": "Módulo", "action": "Acción", "entity": "Entidad", "summary": "Resumen" },
+    "module": {
+      "finance": "Finanzas",
+      "hr": "RR. HH.",
+      "qc": "Calidad",
+      "auth": "Usuarios",
+      "production": "Producción",
+      "notifications": "Notificaciones"
+    }
+  }
+}

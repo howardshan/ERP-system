@@ -1,0 +1,36 @@
+{
+  "logs": {
+    "allModules": "All Modules",
+    "title": "Logs & Audit",
+    "administration": "Administration",
+    "pageTitle": "System Log",
+    "subtitle": "All recorded operations across modules. Filter by person, module and time.",
+    "refresh": "Refresh",
+    "allUsers": "All people",
+    "allModules2": "All modules",
+    "from": "From",
+    "to": "To",
+    "searchPlaceholder": "Search summary, actor, entity…",
+    "clearFilters": "Clear",
+    "empty": "No log entries.",
+    "loadMore": "Load more",
+    "noPermission": "You don't have permission to view the system log.",
+    "askAdminPrefix": "Ask an admin to grant ",
+    "askAdminSuffix": ".",
+    "details": "Details",
+    "noDetails": "No further details.",
+    "secondsAgo": "{{count}}s ago",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "col": { "time": "Time", "actor": "Person", "module": "Module", "action": "Action", "entity": "Entity", "summary": "Summary" },
+    "module": {
+      "finance": "Finance",
+      "hr": "HR",
+      "qc": "QC",
+      "auth": "Users",
+      "production": "Production",
+      "notifications": "Notifications"
+    }
+  }
+}

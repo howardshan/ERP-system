@@ -8,6 +8,7 @@ import en_faq from '../locales/en/faq.json';
 import en_common from '../locales/en/common.json';
 import en_finance from '../locales/en/finance.json';
 import en_hr from '../locales/en/hr.json';
+import en_logs from '../locales/en/logs.json';
 import en_nav from '../locales/en/nav.json';
 import en_packaging from '../locales/en/packaging.json';
 import en_production from '../locales/en/production.json';
@@ -21,6 +22,7 @@ import zh_faq from '../locales/zh/faq.json';
 import zh_common from '../locales/zh/common.json';
 import zh_finance from '../locales/zh/finance.json';
 import zh_hr from '../locales/zh/hr.json';
+import zh_logs from '../locales/zh/logs.json';
 import zh_nav from '../locales/zh/nav.json';
 import zh_packaging from '../locales/zh/packaging.json';
 import zh_production from '../locales/zh/production.json';
@@ -34,6 +36,7 @@ import es_faq from '../locales/es/faq.json';
 import es_common from '../locales/es/common.json';
 import es_finance from '../locales/es/finance.json';
 import es_hr from '../locales/es/hr.json';
+import es_logs from '../locales/es/logs.json';
 import es_nav from '../locales/es/nav.json';
 import es_packaging from '../locales/es/packaging.json';
 import es_production from '../locales/es/production.json';
@@ -49,7 +52,7 @@ export const SUPPORTED_LANGS = [
   { code: 'es', label: 'Español' },
 ] as const;
 
-export const NAMESPACES = ["app","auth","common","faq","finance","hr","nav","packaging","production","qc","ui","warehouse","workflowBuilder"] as const;
+export const NAMESPACES = ["app","auth","common","faq","finance","hr","logs","nav","packaging","production","qc","ui","warehouse","workflowBuilder"] as const;
 
 void i18n
   .use(LanguageDetector)
@@ -63,6 +66,7 @@ void i18n
       common: en_common,
       finance: en_finance,
       hr: en_hr,
+      logs: en_logs,
       nav: en_nav,
       packaging: en_packaging,
       production: en_production,
@@ -78,6 +82,7 @@ void i18n
       common: zh_common,
       finance: zh_finance,
       hr: zh_hr,
+      logs: zh_logs,
       nav: zh_nav,
       packaging: zh_packaging,
       production: zh_production,
@@ -93,6 +98,7 @@ void i18n
       common: es_common,
       finance: es_finance,
       hr: es_hr,
+      logs: es_logs,
       nav: es_nav,
       packaging: es_packaging,
       production: es_production,

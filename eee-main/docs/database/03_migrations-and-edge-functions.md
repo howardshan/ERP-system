@@ -2537,6 +2537,22 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-155 `20260623000009_system_audit_log_view.sql`
+**用途**: 中央「Logs & Audit」模块的统一只读视图——把各模块分散的审计/事件表聚合到一处，供新顶层 Logs 模块按人员/模块/时间/关键词筛选。
+
+**设计**:
+- `CREATE VIEW v_system_audit_log AS` UNION ALL 7 张源表，归一为 `id / source / module / ts / actor_auth_id / actor_name / action / entity_type / entity_id / summary / detail(jsonb)`。`detail` 把各源表的 diff/before/after/payload 一并带出，前端展开行无需二次回查。
+- 源表与映射：`finance/hr/qc_product/auth_audit_log`(4 张结构统一的用户操作审计) + `qc_quality_event`(actor 名 LEFT JOIN erp_user、summary 用 `qc_quality_event_summary`) + `prod_downtime_event`(actor=created_by 文本、reason 取 `prod_downtime_reason.label`) + `notification_log`(投递日志、无 actor)。
+- **不新建中央表、不改各模块写入**——纯读时聚合，现有数据自动可见，将来新模块加审计只需更新视图。
+- **设计取舍**：排除 `journal_entry_edit_log`(与 finance_audit_log 重复)、`hr_calendar_event`(面试排程业务数据)。视图以 owner 身份运行(默认非 invoker)，可跨表读取，安全门控放在 app 层 `logs.entries.view`(与现有审计表「表可读、页面门控」一致)。
+- seed `logs.entries.view` 权限 + `user_module_access('logs')` 给 `ysha@smu.edu`(否则首页卡片不显示)。
+
+**前端配套**: 新增顶层模块 `logs`——[`permissionStructure.ts`](../../src/lib/permissionStructure.ts)、[`HomePage.tsx`](../../src/pages/HomePage.tsx)(卡片)、[`App.tsx`](../../src/App.tsx)(路由)、[`lib/moduleVisibility.ts`](../../src/lib/moduleVisibility.ts)、[`services/logsApi.ts`](../../src/services/logsApi.ts)(`getSystemLog`)、[`pages/logs/LogsModule.tsx`](../../src/pages/logs/LogsModule.tsx)(筛选+表格+展开)、i18n 新命名空间 `logs`。
+
+**边界**: 中央页只显示已被记录的操作；warehouse/sales/workflow/packaging/production 工单等未埋点模块本期不覆盖(后续增量)。**关联文档**: [`docs/modules/13_logs.md`](../modules/13_logs.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2680,7 +2696,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-152 | 20260623000006_qc_seed_test_parameters.sql · 从 docs/Testing Parameters.xlsx 导入每个产品的 MC% + Aw 检测项(硬限)及软限;新增 qc_test_type「Moisture Content (MC%)」;软限规则:非红底 Aw±0.005、MC%±0.5(后由 M-153 更正为 ±0.05),红底(21 个 SWD/46xx 产品)无软限(soft=hard);重复 Item 取更严范围;仅更新已存在(按 code 匹配)的产品 |
 | M-153 | 20260623000007_qc_fix_mc_soft_band.sql · 更正 M-152 的 MC% 软限:非红底产品 MC% 软限从 ±0.5 改为 **±0.05**(UPDATE soft_lower=lower-0.05、soft_upper=upper+0.05;红底保持 soft=hard 不动,硬限和 Aw 不动) |
 | M-154 | 20260623000008_qc_drying_sub_lot_dryer_number_dynamic.sql · 放宽 `qc_drying_sub_lot.dryer_number` 的 CHECK 从 1..5 改为 ≥1(补 M-126 数据化烘干房遗漏:RPC 已按 qc_dry_room 校验,但旧列约束仍卡 Dryer 6..16 的 check-in) |
-| **M-155** | _(下一个)_ |
+| M-155 | 20260623000009_system_audit_log_view.sql · 中央 Logs 模块:建只读视图 `v_system_audit_log`(UNION finance/hr/qc/auth 审计 + qc_quality_event/prod_downtime/notification_log),归一为 module/actor/action/ts/summary/detail;新增顶层 `logs` 模块 + `logs.entries.view` 权限,seed + user_module_access 给 ysha |
+| **M-156** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

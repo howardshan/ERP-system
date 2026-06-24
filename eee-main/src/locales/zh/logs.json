@@ -1,0 +1,36 @@
+{
+  "logs": {
+    "allModules": "所有模块",
+    "title": "日志与审计",
+    "administration": "系统管理",
+    "pageTitle": "系统日志",
+    "subtitle": "全模块已记录的操作。按人员、模块、时间筛选。",
+    "refresh": "刷新",
+    "allUsers": "全部人员",
+    "allModules2": "全部模块",
+    "from": "从",
+    "to": "至",
+    "searchPlaceholder": "搜索摘要、操作人、对象…",
+    "clearFilters": "清除",
+    "empty": "暂无日志记录。",
+    "loadMore": "加载更多",
+    "noPermission": "您没有查看系统日志的权限。",
+    "askAdminPrefix": "请联系管理员授予 ",
+    "askAdminSuffix": "。",
+    "details": "详情",
+    "noDetails": "无更多详情。",
+    "secondsAgo": "{{count}} 秒前",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "daysAgo": "{{count}} 天前",
+    "col": { "time": "时间", "actor": "人员", "module": "模块", "action": "操作", "entity": "对象", "summary": "摘要" },
+    "module": {
+      "finance": "财务",
+      "hr": "人力资源",
+      "qc": "质检",
+      "auth": "用户",
+      "production": "生产",
+      "notifications": "通知"
+    }
+  }
+}
