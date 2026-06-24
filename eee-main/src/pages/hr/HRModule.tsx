@@ -17,6 +17,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useSidebar, sidebarOffCanvas, SidebarScrim, SidebarToggle } from '../../components/layout/mobileNav';
 import { usePermissions } from '../../contexts/PermissionContext';
 import EmployeeDirectory from './employees/EmployeeDirectory';
 import EmployeeProfile from './employees/EmployeeProfile';
@@ -98,7 +99,8 @@ export default function HRModule({ onHome }: Props) {
 
   const isActive = (id: string) => screen === id || screen.startsWith(id + ':');
 
-  function navigate(s: string) { setScreen(s); }
+  const { open, openSidebar, closeSidebar } = useSidebar();
+  function navigate(s: string) { setScreen(s); closeSidebar(); }
 
   function renderContent() {
     if (screen === 'employees') {
@@ -134,7 +136,8 @@ export default function HRModule({ onHome }: Props) {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#0a0f1d] border-r border-white/10 flex flex-col h-screen fixed left-0 top-0">
+      <SidebarScrim open={open} onClose={closeSidebar} />
+      <aside className={cn('w-64 bg-[#0a0f1d] border-r border-white/10 flex flex-col h-screen fixed left-0 top-0', sidebarOffCanvas(open))}>
         <div className="p-5 mb-1">
           <button
             onClick={onHome}
@@ -229,7 +232,12 @@ export default function HRModule({ onHome }: Props) {
       </aside>
 
       {/* Main content */}
-      <div className="ml-64 flex-1 min-h-screen">
+      <div className="lg:ml-64 flex-1 min-h-screen">
+        {/* Mobile-only bar to open the nav (HR has no desktop top bar). */}
+        <div className="lg:hidden sticky top-0 z-20 bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2">
+          <SidebarToggle onClick={openSidebar} className="-ml-1" />
+          <span className="text-sm font-bold text-slate-700">{t('hRModule.title', 'Human Resources')}</span>
+        </div>
         {renderContent()}
       </div>
     </div>

@@ -17,6 +17,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
+import { sidebarOffCanvas } from './mobileNav';
 
 interface NavItemProps {
   icon: React.ElementType;
@@ -62,9 +63,10 @@ interface SidebarProps {
   setActiveScreen: (screen: string) => void;
   pendingApprovalCount?: number;
   onHome: () => void;
+  open?: boolean;
 }
 
-export function Sidebar({ activeScreen, setActiveScreen, pendingApprovalCount = 0, onHome }: SidebarProps) {
+export function Sidebar({ activeScreen, setActiveScreen, pendingApprovalCount = 0, onHome, open = false }: SidebarProps) {
   const isActive = (id: string) =>
     activeScreen === id || activeScreen.startsWith(id + ':');
   const { can } = usePermissions();
@@ -77,7 +79,7 @@ export function Sidebar({ activeScreen, setActiveScreen, pendingApprovalCount = 
   const canViewAuditLog = can('finance', 'audit_log', 'view');
 
   return (
-    <aside className="w-64 bg-[#0a0f1d] border-r border-white/10 flex flex-col h-screen fixed left-0 top-0">
+    <aside className={cn('w-64 bg-[#0a0f1d] border-r border-white/10 flex flex-col h-screen fixed left-0 top-0', sidebarOffCanvas(open))}>
       {/* Logo / back to home */}
       <div className="p-5 mb-1">
         <button
