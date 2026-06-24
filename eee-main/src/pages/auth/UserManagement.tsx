@@ -26,7 +26,7 @@ export default function UserManagement({ onHome }: Props) {
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [statusTab, setStatusTab] = useState<'active' | 'inactive'>('active');
   const [moduleFilter, setModuleFilter] = useState('');
 
   async function load() {
@@ -37,11 +37,13 @@ export default function UserManagement({ onHome }: Props) {
 
   useEffect(() => { load(); }, []);
 
-  // Search (name / email / role / department) + status + module-access filters.
+  // Active/Inactive is a primary TAB (default Active); search + module are
+  // secondary filters applied within the chosen tab.
+  const activeCount = users.filter(u => u.is_active).length;
+  const inactiveCount = users.length - activeCount;
   const q = query.trim().toLowerCase();
   const filteredUsers = users.filter(u => {
-    if (statusFilter === 'active' && !u.is_active) return false;
-    if (statusFilter === 'inactive' && u.is_active) return false;
+    if (statusTab === 'active' ? !u.is_active : u.is_active) return false;
     if (moduleFilter && !(u.module_access ?? []).includes(moduleFilter)) return false;
     if (q) {
       const hay = [u.full_name, u.email, u.role, u.department].filter(Boolean).join(' ').toLowerCase();
@@ -49,7 +51,7 @@ export default function UserManagement({ onHome }: Props) {
     }
     return true;
   });
-  const hasFilters = q !== '' || statusFilter !== 'all' || moduleFilter !== '';
+  const hasFilters = q !== '' || moduleFilter !== '';
 
   if (selectedUserId) {
     return (
@@ -140,53 +142,61 @@ export default function UserManagement({ onHome }: Props) {
         </div>
       ) : (
         <main className="flex-1 overflow-y-auto px-10 py-7">
-          {/* Search + filters */}
+          {/* Active / Inactive tabs + search & module filters */}
           {!loading && users.length > 0 && (
-            <div className="flex items-center gap-3 flex-wrap mb-4">
-              <div className="relative flex-1 min-w-[14rem] max-w-md">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                <input
-                  type="search"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder={t('userManagement.searchPlaceholder')}
-                  className="w-full text-sm border border-slate-200 rounded-lg pl-9 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
-                  spellCheck={false}
-                />
-              </div>
-              <Filter size={14} className="text-slate-400 shrink-0" />
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-                className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
-              >
-                <option value="all">{t('userManagement.statusAll')}</option>
-                <option value="active">{t('userManagement.active')}</option>
-                <option value="inactive">{t('userManagement.inactive')}</option>
-              </select>
-              <select
-                value={moduleFilter}
-                onChange={e => setModuleFilter(e.target.value)}
-                className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 max-w-[14rem]"
-              >
-                <option value="">{t('userManagement.moduleAll')}</option>
-                {Object.entries(PERMISSION_STRUCTURE).map(([id, mod]) => (
-                  <option key={id} value={id}>{mod.label}</option>
+            <>
+              <div className="flex items-center gap-1 mb-3 border-b border-slate-200 overflow-x-auto">
+                {(['active', 'inactive'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setStatusTab(tab)}
+                    className={`px-4 py-2 text-sm font-bold border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                      statusTab === tab ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {tab === 'active' ? t('userManagement.active') : t('userManagement.inactive')}
+                    <span className="ml-1.5 text-xs font-bold text-slate-400">{tab === 'active' ? activeCount : inactiveCount}</span>
+                  </button>
                 ))}
-              </select>
-              {hasFilters && (
-                <button
-                  type="button"
-                  onClick={() => { setQuery(''); setStatusFilter('all'); setModuleFilter(''); }}
-                  className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-700 px-2 py-1.5"
+              </div>
+              <div className="flex items-center gap-3 flex-wrap mb-4">
+                <div className="relative flex-1 min-w-[14rem] max-w-md">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    placeholder={t('userManagement.searchPlaceholder')}
+                    className="w-full text-sm border border-slate-200 rounded-lg pl-9 pr-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 placeholder:text-slate-400"
+                    spellCheck={false}
+                  />
+                </div>
+                <Filter size={14} className="text-slate-400 shrink-0" />
+                <select
+                  value={moduleFilter}
+                  onChange={e => setModuleFilter(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700 max-w-[14rem]"
                 >
-                  <X size={12} /> {t('userManagement.clearFilters')}
-                </button>
-              )}
-              <span className="ml-auto text-xs text-slate-400">
-                {t('userManagement.resultsCount', { shown: filteredUsers.length, total: users.length })}
-              </span>
-            </div>
+                  <option value="">{t('userManagement.moduleAll')}</option>
+                  {Object.entries(PERMISSION_STRUCTURE).map(([id, mod]) => (
+                    <option key={id} value={id}>{mod.label}</option>
+                  ))}
+                </select>
+                {hasFilters && (
+                  <button
+                    type="button"
+                    onClick={() => { setQuery(''); setModuleFilter(''); }}
+                    className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-700 px-2 py-1.5"
+                  >
+                    <X size={12} /> {t('userManagement.clearFilters')}
+                  </button>
+                )}
+                <span className="ml-auto text-xs text-slate-400">
+                  {t('userManagement.resultsCount', { shown: filteredUsers.length, total: statusTab === 'active' ? activeCount : inactiveCount })}
+                </span>
+              </div>
+            </>
           )}
 
           {/* User table */}
