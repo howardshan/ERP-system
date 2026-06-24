@@ -1,5 +1,9 @@
 # 登录双因子验证（MFA / TOTP）实施计划
 
+> **状态：已实施（2026-06-24）。** `tsc --noEmit` 0 错误、`npm run build` 通过。落地编号：migration **M-156**（`20260623000010_auth_reset_mfa_permission.sql`，seed `auth.users.reset_mfa`）、边缘函数 **EF-005**（`reset-user-mfa`）。新增/改动：`MfaGate.tsx`、`App.tsx`(AAL 门控)、`AccountSettings.tsx`(MFA 状态)、`UserDetail.tsx`(Reset MFA)、`authApi.resetUserMfa`、`permissionStructure`(reset_mfa)、审计 action `mfa_enrolled/mfa_reset/mfa_removed`、i18n 三语、docs(06/03)。技术文档同步在 `eee-main/docs/`。下方为原始计划存档。
+>
+> ── 以下为原始计划，存档 ──
+>
 > **状态：计划（待执行，2026-06-24 制定）。** 应客户要求，为登录增加「Microsoft Authenticator」双重验证。决策已确认：**全员强制** + **管理员重置找回**。本文件为落地清单，按下方实施顺序执行，每步可独立验证。
 
 ## 背景 / 目标

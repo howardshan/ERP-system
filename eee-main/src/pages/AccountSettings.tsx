@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Bell, Lock, Loader2, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, Bell, Lock, Loader2, User as UserIcon, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { usePermissions } from '../contexts/PermissionContext';
 import { PERMISSION_STRUCTURE } from '../lib/permissionStructure';
 import {
@@ -27,6 +28,13 @@ export default function AccountSettings({ onHome }: Props) {
   const [settings, setSettings] = useState<Record<string, UserNotificationSetting>>({});
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    supabase.auth.mfa.listFactors()
+      .then(({ data }) => setMfaEnabled((data?.totp ?? []).length > 0))
+      .catch(() => setMfaEnabled(false));
+  }, []);
 
   useEffect(() => {
     if (permLoading) return;
@@ -116,6 +124,26 @@ export default function AccountSettings({ onHome }: Props) {
                   </div>
                 )}
               </dl>
+            </section>
+
+            {/* Two-factor authentication */}
+            <section className="bg-white border border-slate-200 rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldCheck size={15} className="text-slate-500" />
+                <h2 className="text-sm font-bold text-slate-900">{tr('accountSettings.mfaTitle')}</h2>
+              </div>
+              {mfaEnabled === null ? (
+                <Loader2 size={16} className="animate-spin text-slate-400" />
+              ) : mfaEnabled ? (
+                <div className="flex items-center gap-2 text-sm text-emerald-700 font-medium">
+                  <CheckCircle2 size={15} /> {tr('accountSettings.mfaEnabled')}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-amber-700 font-medium">
+                  <AlertCircle size={15} /> {tr('accountSettings.mfaNotSet')}
+                </div>
+              )}
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">{tr('accountSettings.mfaDesc')}</p>
             </section>
 
             {/* Notification settings */}

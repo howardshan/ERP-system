@@ -280,6 +280,31 @@ supabase functions deploy send-notification --no-verify-jwt
 
 ---
 
+### EF-005 `reset-user-mfa`
+**目录**: `supabase/functions/reset-user-mfa/index.ts`
+**用途**: 管理员重置（删除）某用户的全部 MFA(TOTP) factor——用户丢失验证器时的找回（仿 EF-003 reset-user-password）。配合 M-156 的 `auth.users.reset_mfa` 权限。
+
+**请求**:
+```
+POST /functions/v1/reset-user-mfa
+Authorization: Bearer <JWT>
+{ "auth_user_id": "<uuid>" }
+```
+
+**响应**: `{ "success": true, "removed": <n> }` / `{ "error": "..." }`
+
+**技术细节**:
+- 校验调用者已认证（`callerClient.auth.getUser`）；用 `SUPABASE_SERVICE_ROLE_KEY` 的 `auth.admin.mfa.listFactors({userId})` 列出再 `deleteFactor` 逐个删除。
+- 前端 `authApi.resetUserMfa` 调用；UI 在 `UserDetail` 的「Reset MFA」按钮，gate `auth.users.reset_mfa`。
+- 与正常用户 JWT 一致鉴权，**按默认（verify-jwt）部署**即可。
+
+**部署命令**:
+```bash
+supabase functions deploy reset-user-mfa
+```
+
+---
+
 ## 变更操作规范
 
 ### 新增 Migration
@@ -2553,6 +2578,21 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-156 `20260623000010_auth_reset_mfa_permission.sql`
+**用途**: 登录双因子验证（MFA / TOTP）配套——seed 新权限 `auth.users.reset_mfa`。
+
+**背景**: 客户要求登录加 Microsoft Authenticator 双重验证。MS Authenticator = 标准 TOTP，直接用 **Supabase 原生 MFA**（`supabase.auth.mfa.*`），factor 存在 Supabase auth schema，**不新建业务表**。强制范围 = **全员强制**，找回 = **管理员重置**（EF-005）。本迁移只 seed `auth.users.reset_mfa` 给 dev admin。
+
+**前端配套**:
+- 门控 [`MfaGate.tsx`](../../src/pages/MfaGate.tsx) + [`App.tsx`](../../src/App.tsx)：密码登录后查 `getAuthenticatorAssuranceLevel`，未达 aal2 → 渲染 MfaGate（已绑定=输验证码 challenge；未绑定=强制扫码 enroll），到 aal2 才进系统。
+- 自助查看 [`AccountSettings.tsx`](../../src/pages/AccountSettings.tsx)（MFA 已启用状态）。
+- 管理员重置 [`UserDetail.tsx`](../../src/pages/auth/UserDetail.tsx)（Reset MFA 按钮，gate `auth.users.reset_mfa`）+ [`authApi.resetUserMfa`](../../src/services/authApi.ts) + **EF-005**。
+- 审计新 action：`mfa_enrolled` / `mfa_reset` / `mfa_removed`（写入 `auth_audit_log`）。
+
+**关联文档**: [`docs/modules/06_users-auth.md`](../modules/06_users-auth.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2697,7 +2737,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-153 | 20260623000007_qc_fix_mc_soft_band.sql · 更正 M-152 的 MC% 软限:非红底产品 MC% 软限从 ±0.5 改为 **±0.05**(UPDATE soft_lower=lower-0.05、soft_upper=upper+0.05;红底保持 soft=hard 不动,硬限和 Aw 不动) |
 | M-154 | 20260623000008_qc_drying_sub_lot_dryer_number_dynamic.sql · 放宽 `qc_drying_sub_lot.dryer_number` 的 CHECK 从 1..5 改为 ≥1(补 M-126 数据化烘干房遗漏:RPC 已按 qc_dry_room 校验,但旧列约束仍卡 Dryer 6..16 的 check-in) |
 | M-155 | 20260623000009_system_audit_log_view.sql · 中央 Logs 模块:建只读视图 `v_system_audit_log`(UNION finance/hr/qc/auth 审计 + qc_quality_event/prod_downtime/notification_log),归一为 module/actor/action/ts/summary/detail;新增顶层 `logs` 模块 + `logs.entries.view` 权限,seed + user_module_access 给 ysha |
-| **M-156** | _(下一个)_ |
+| M-156 | 20260623000010_auth_reset_mfa_permission.sql · 登录 MFA(TOTP)配套:seed `auth.users.reset_mfa` 权限(Supabase 原生 MFA + 全员强制 + 管理员重置 EF-005) |
+| **M-157** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
@@ -2706,4 +2747,5 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | EF-002 | functions/create-auth-user/ |
 | EF-003 | functions/reset-user-password/ |
 | EF-004 | functions/send-notification/ |
-| **EF-005** | _(下一个)_ |
+| EF-005 | functions/reset-user-mfa/ |
+| **EF-006** | _(下一个)_ |

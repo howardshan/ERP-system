@@ -218,3 +218,23 @@ export async function resetUserPassword(authUserId: string, newPassword: string)
   const json = await res.json();
   if (json.error) throw new Error(json.error);
 }
+
+// Admin "reset MFA" — removes all of a user's TOTP factors via EF-005 so they
+// can re-enroll on next login (recovery for a lost authenticator).
+export async function resetUserMfa(authUserId: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-mfa`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ auth_user_id: authUserId }),
+    }
+  );
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+}

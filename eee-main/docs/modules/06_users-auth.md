@@ -110,7 +110,7 @@ PERMISSION_STRUCTURE = {
     label: 'Users & Authentication',
     resources: {
       module_permissions: { permissions: [manage] },
-      users:              { permissions: [view, create, edit, delete, reset_password] },
+      users:              { permissions: [view, create, edit, delete, reset_password, reset_mfa] },
       roles:              { permissions: [view, manage] },
       departments:        { permissions: [view, manage] },
       audit_log:          { permissions: [view] },   // M-153 用户操作审计日志
@@ -164,6 +164,7 @@ PERMISSION_STRUCTURE = {
 | `PermissionBrowser` | Add User 按钮 | `auth.roles.manage` |
 | `PermissionBrowser` | 移除（×）按钮 | `auth.roles.manage` |
 | `ITPanel` | 整个面板 | `auth.users.create` |
+| `UserDetail` | Reset MFA 按钮 | `auth.users.reset_mfa` |
 | `UserManagement` | Add User 视图标签 | `auth.users.create`（原独立「Add User (IT)」按钮已删除，与此标签冗余） |
 | `ProductManagement`（QC，`module="qc"`） | Add / Edit / Delete 按钮 | `qc.products.create` / `.edit` / `.delete` |
 | `ProductManagement` | Export / Import 按钮 | `qc.products.export` / `.import` |
@@ -211,7 +212,7 @@ PERMISSION_STRUCTURE = {
 
 记录账户与认证相关事件：登录/登出、账户创建、资料修改、启用/停用、重置密码、权限/模块访问变更。**已删除用户**当前为「停用」语义（`is_active=false`，行保留），所以其历史天然可查；表也按「将来可硬删」设计，删后记录仍可读。
 
-**表 `auth_audit_log`（M-153）**：镜像 `finance_audit_log`，但**双主体**——同时记 `actor`（操作人）与 `target`（被操作的目标用户）。`actor_auth_id` / `target_auth_id` 均 `→ auth.users ON DELETE SET NULL`，并冗余 `actor_name` / `target_name` / `target_email`；`target_user_id`（erp_user.id）**不加 FK**（避免被 erp_user 的 `ON DELETE CASCADE` 影响）。`action ∈ {login_success, logout, create, edit_profile, activate, deactivate, reset_password, edit_permissions}`。
+**表 `auth_audit_log`（M-153）**：镜像 `finance_audit_log`，但**双主体**——同时记 `actor`（操作人）与 `target`（被操作的目标用户）。`actor_auth_id` / `target_auth_id` 均 `→ auth.users ON DELETE SET NULL`，并冗余 `actor_name` / `target_name` / `target_email`；`target_user_id`（erp_user.id）**不加 FK**（避免被 erp_user 的 `ON DELETE CASCADE` 影响）。`action ∈ {login_success, logout, create, edit_profile, activate, deactivate, reset_password, edit_permissions, mfa_enrolled, mfa_reset, mfa_removed}`。
 
 **写入与埋点**：`authApi.logAuthAction(...)`（fire-and-forget，actor 从当前会话解析）。埋点位置：
 - `create` → [`ITPanel.tsx`](../../src/pages/auth/ITPanel.tsx)（创建成功后）
@@ -222,6 +223,28 @@ PERMISSION_STRUCTURE = {
 **浏览 UI**：[`UserAuditLog.tsx`](../../src/pages/auth/UserAuditLog.tsx)，作为 UserManagement 的**第 4 个视图「Activity Log」**，支持按**用户**（含停用用户）/ 操作类型筛选 + 搜索（actor/target/摘要），展开看 diff/快照。权限门 `auth.audit_log.view`。
 
 **两年留存（M-154）**：`auth_audit_log_prune()` 删 2 年前的行；装了 `pg_cron` 则每日自动跑，否则手动/外部计划任务调用。
+
+---
+
+## 登录双因子验证（MFA / TOTP，M-156 / EF-005）
+
+应客户要求，登录加双因子验证。**Microsoft Authenticator = 标准 TOTP**，直接用 **Supabase 原生 MFA**（`supabase.auth.mfa.*`），factor 密钥存在 Supabase auth schema，**不新建业务表、不自研加密**。
+
+**强制范围：全员强制。** **找回：管理员重置。**
+
+**登录门控（[`App.tsx`](../../src/App.tsx) + [`MfaGate.tsx`](../../src/pages/MfaGate.tsx)）**：
+- 密码 `signInWithPassword` 成功后会话处于 aal1。`App` 查 `mfa.getAuthenticatorAssuranceLevel()`：`currentLevel !== 'aal2'` → 渲染 `<MfaGate>`，到 aal2 才渲染主应用。
+- MfaGate 两态（用 `listFactors()` 判断）：已有 verified totp factor → **输入 6 位码**（`challengeAndVerify`）；无 factor → **强制绑定**（`enroll` 出二维码 + secret，用 MS Authenticator 扫码后验证）。绑定/验证成功后 session 升 aal2，`onVerified` 触发 App 复查放行。
+- 自助查看：[`AccountSettings.tsx`](../../src/pages/AccountSettings.tsx) 显示「双因子验证：已启用/未设置」（`listFactors`）。
+
+**找回（管理员重置）**：[`UserDetail.tsx`](../../src/pages/auth/UserDetail.tsx) 的「Reset MFA」按钮（gate `auth.users.reset_mfa`）→ `authApi.resetUserMfa` → **EF-005 `reset-user-mfa`**（service role，`auth.admin.mfa.listFactors`+`deleteFactor` 删除该用户全部 factor）→ 用户下次登录回到强制绑定页。
+
+**权限**：`auth.users.reset_mfa`（M-156 seed 给 ysha）。**审计**：`mfa_enrolled`（用户绑定）/`mfa_reset`（管理员重置）/`mfa_removed`（自助解绑）写入 `auth_audit_log`。
+
+**注意/边界**：
+- ⚠️ **全员强制上线即生效**——所有现有用户下次登录都被强制绑定，需提前装好验证器 App。
+- ⚠️ 找回是唯一逃生口，**务必保证至少一个管理员能登录执行重置**，避免全员被锁。
+- RLS 加固（敏感表要求 `aal2`）为可选二期，本期强制由 app 层门控实现。Supabase 后台无需改配置（TOTP 默认可用）。
 
 ---
 
