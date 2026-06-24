@@ -149,6 +149,16 @@
           "3": "Registro de auditoría"
         }
       },
+      "logs": {
+        "label": "Registros y auditoría",
+        "description": "Registro de operaciones de todo el sistema en todos los módulos, filtrable por persona, módulo y fecha.",
+        "features": {
+          "0": "Registro multimódulo",
+          "1": "Filtrar por persona",
+          "2": "Filtrar por módulo",
+          "3": "Búsqueda por rango de fechas"
+        }
+      },
       "faq": {
         "label": "Preguntas frecuentes y ayuda",
         "description": "Respuestas prácticas para cada módulo del sistema de QC y producción, con búsqueda.",

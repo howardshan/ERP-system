@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Settings,
   HelpCircle,
+  ScrollText,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../contexts/PermissionContext';
@@ -220,6 +221,24 @@ const MODULES: Module[] = [
       chevron: 'text-slate-400',
     },
     features: ['User Management', 'Role & Permissions', 'Approval Tiers', 'Audit Trail'],
+  },
+  {
+    id: 'logs',
+    label: 'Logs & Audit',
+    description: 'System-wide operation log across all modules, filterable by person, module and time.',
+    icon: ScrollText,
+    status: 'active',
+    color: {
+      bg: 'bg-zinc-50',
+      border: 'border-zinc-200',
+      icon: 'text-zinc-700',
+      iconBg: 'bg-zinc-200',
+      badge: 'bg-zinc-100 border-zinc-200',
+      badgeText: 'text-zinc-600',
+      button: 'bg-zinc-700 hover:bg-zinc-600 text-white',
+      chevron: 'text-zinc-400',
+    },
+    features: ['Cross-module log', 'Filter by person', 'Filter by module', 'Time-range search'],
   },
   {
     id: 'faq',

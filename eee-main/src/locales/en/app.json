@@ -149,6 +149,16 @@
           "3": "Audit Trail"
         }
       },
+      "logs": {
+        "label": "Logs & Audit",
+        "description": "System-wide operation log across all modules, filterable by person, module and time.",
+        "features": {
+          "0": "Cross-module log",
+          "1": "Filter by person",
+          "2": "Filter by module",
+          "3": "Time-range search"
+        }
+      },
       "faq": {
         "label": "FAQ & Help",
         "description": "How-to answers for every module of the QC & production system, with search.",

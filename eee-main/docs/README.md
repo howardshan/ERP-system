@@ -95,7 +95,8 @@ eee-main/
     │   ├── 09_qc.md                 # Quality Control：烘干后检验闭环
     │   ├── 10_packaging.md          # Packaging：合格车出库/包装
     │   ├── 11_warehouse-inventory.md # Warehouse & Inventory：库存基座
-    │   └── 12_production-daily-report.md # Production 成型生产日报录入
+    │   ├── 12_production-daily-report.md # Production 成型生产日报录入
+    │   └── 13_logs.md               # Logs & Audit：跨模块中央系统日志
     └── database/
         ├── 01_schema.md             # 完整数据库表结构
         ├── 02_rpc-functions.md      # 所有 RPC / View
