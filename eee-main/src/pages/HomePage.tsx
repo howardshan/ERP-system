@@ -282,22 +282,22 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col">
       {/* Header */}
-      <header className="px-12 pt-12 pb-6 flex items-end justify-between">
-        <div>
+      <header className="px-4 sm:px-8 lg:px-12 pt-8 sm:pt-12 pb-6 flex flex-wrap items-center sm:items-end justify-between gap-x-3 gap-y-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
               <BarChart3 size={18} className="text-white" />
             </div>
             <span className="text-slate-900 font-bold text-lg tracking-tight">PetFood ERP</span>
           </div>
-          <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight">
             {t('homePage.moduleHub')}
           </h1>
           <p className="text-slate-500 text-sm mt-2">
             {t('homePage.selectModule')}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center flex-wrap justify-end gap-2 sm:gap-3">
           <LanguageSwitcher />
           <PrinterSettingsPopover />
           <div className="w-px h-5 bg-slate-200" />
@@ -334,10 +334,10 @@ export default function HomePage({ onNavigate, onLogout, userName, userEmail }: 
       </header>
 
       {/* Divider */}
-      <div className="mx-12 h-px bg-slate-200 mb-10" />
+      <div className="mx-4 sm:mx-8 lg:mx-12 h-px bg-slate-200 mb-10" />
 
       {/* Module Grid */}
-      <main className="flex-1 px-12 pb-12">
+      <main className="flex-1 px-4 sm:px-8 lg:px-12 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {MODULES.filter((mod) => isVisible(mod.id) && (mod.id === 'faq' || canAccessModule(mod.id))).map((mod) => {
             const Icon = mod.icon;

@@ -4,14 +4,16 @@ import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { LanguageSwitcher } from '../LanguageSwitcher';
+import { SidebarToggle } from './mobileNav';
 
 interface TopBarProps {
   userName: string;
   userEmail: string;
   onLogout: () => void;
+  onMenuClick?: () => void;
 }
 
-export function TopBar({ userName, userEmail, onLogout }: TopBarProps) {
+export function TopBar({ userName, userEmail, onLogout, onMenuClick }: TopBarProps) {
   const { reload } = usePermissions();
   const { t } = useTranslation();
   const [reloading, setReloading] = useState(false);
@@ -30,19 +32,20 @@ export function TopBar({ userName, userEmail, onLogout }: TopBarProps) {
     .slice(0, 2);
 
   return (
-    <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-30">
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded text-blue-700 font-bold text-[11px] uppercase tracking-wider">
+    <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-20">
+      <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+        {onMenuClick && <SidebarToggle onClick={onMenuClick} className="-ml-1" />}
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded text-blue-700 font-bold text-[11px] uppercase tracking-wider shrink-0">
           {t('period')}
         </div>
-        <div className="h-6 w-px bg-slate-200" />
-        <p className="text-xs text-slate-500 font-medium tracking-wide">
+        <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+        <p className="text-xs text-slate-500 font-medium tracking-wide hidden sm:block truncate">
           {format(new Date(), 'EEEE, MMMM do, yyyy')}
         </p>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+        <div className="relative hidden lg:block">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -55,8 +58,8 @@ export function TopBar({ userName, userEmail, onLogout }: TopBarProps) {
           <Bell size={18} />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
         </button>
-        <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
-          <div className="text-right">
+        <div className="flex items-center gap-3 sm:pl-3 sm:border-l border-slate-200">
+          <div className="text-right hidden sm:block">
             <p className="text-xs font-bold text-slate-900">{userName}</p>
             <p className="text-[10px] text-slate-400 tracking-tight">{userEmail}</p>
           </div>

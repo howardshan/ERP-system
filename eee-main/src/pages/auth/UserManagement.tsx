@@ -199,7 +199,7 @@ export default function UserManagement({ onHome }: Props) {
           ) : filteredUsers.length === 0 ? (
             <div className="py-20 text-center text-slate-400 text-sm">{t('userManagement.noMatches')}</div>
           ) : (
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">

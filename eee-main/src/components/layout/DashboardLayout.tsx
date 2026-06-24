@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { useSidebar, SidebarScrim } from './mobileNav';
 import { getPendingApprovals } from '../../services/api';
 
 interface DashboardLayoutProps {
@@ -16,6 +17,7 @@ export function DashboardLayout({ children, onHome, onLogout, userName, userEmai
   const { t } = useTranslation('nav');
   const [activeScreen, setActiveScreen] = useState('dashboard');
   const [pendingCount, setPendingCount] = useState(0);
+  const { open, openSidebar, closeSidebar } = useSidebar();
 
   useEffect(() => {
     getPendingApprovals()
@@ -27,13 +29,15 @@ export function DashboardLayout({ children, onHome, onLogout, userName, userEmai
     <div className="min-h-screen bg-[#faf8f5]">
       <Sidebar
         activeScreen={activeScreen}
-        setActiveScreen={setActiveScreen}
+        setActiveScreen={(s) => { setActiveScreen(s); closeSidebar(); }}
         pendingApprovalCount={pendingCount}
         onHome={onHome}
+        open={open}
       />
-      <div className="ml-64 flex flex-col min-h-screen">
-        <TopBar userName={userName} userEmail={userEmail} onLogout={onLogout} />
-        <main className="flex-1 p-8">
+      <SidebarScrim open={open} onClose={closeSidebar} />
+      <div className="lg:ml-64 flex flex-col min-h-screen">
+        <TopBar userName={userName} userEmail={userEmail} onLogout={onLogout} onMenuClick={openSidebar} />
+        <main className="flex-1 p-4 sm:p-8">
           {children(activeScreen, setActiveScreen)}
         </main>
         <footer className="px-8 py-3 bg-white border-t border-slate-200 text-[10px] text-slate-400 flex justify-between uppercase font-bold tracking-widest">
