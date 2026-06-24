@@ -83,7 +83,7 @@ export default function OvertimePage() {
         {loading ? (
           <div className="flex items-center gap-2 text-slate-400 py-16 justify-center"><Loader2 size={18} className="animate-spin" /></div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
             <table className="w-full">
               <thead><tr className="bg-slate-50 border-b border-slate-200">
                 {[['employee', t('overtimePage.colEmployee')], ['date', t('overtimePage.colDate')], ['hours', t('overtimePage.colHours')], ['type', t('overtimePage.colType')], ['rate', t('overtimePage.colRate')], ['reason', t('overtimePage.colReason')], ['status', t('overtimePage.colStatus')], ['actions', '']].map(([k, h]) => <th key={k} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}

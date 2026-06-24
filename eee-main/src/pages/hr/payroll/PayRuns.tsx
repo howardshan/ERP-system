@@ -89,7 +89,7 @@ export default function PayRuns() {
         ) : (
           <div className="flex gap-6">
             <div className="flex-1">
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="bg-slate-50 border-b border-slate-200">
                     {[t('payRuns.colName'),t('payRuns.colPeriod'),t('payRuns.colPayDate'),t('payRuns.colGross'),t('payRuns.colNet'),t('payRuns.colStatus'),''].map((h, i) => <th key={i} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}

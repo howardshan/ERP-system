@@ -78,14 +78,14 @@ export default function UserManagement({ onHome }: Props) {
       </div>
 
       {/* Page header */}
-      <div className="px-10 pt-8 pb-5 flex items-end justify-between border-b border-slate-200 bg-white">
+      <div className="px-4 sm:px-10 pt-6 sm:pt-8 pb-5 flex flex-wrap items-center justify-between gap-y-3 border-b border-slate-200 bg-white">
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t('userManagement.administration')}</p>
           <h1 className="text-2xl font-bold text-slate-900">{t('userManagement.title')}</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 overflow-x-auto max-w-full">
           {/* View toggle */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 shrink-0">
             <button
               onClick={() => setView('users')}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${

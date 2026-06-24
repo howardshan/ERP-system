@@ -142,7 +142,7 @@ export default function ReviewCycles() {
                 {myReviews.length > 0 && (
                   <div>
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{t('reviewCycles.myReviews')}</h3>
-                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
                       <table className="w-full">
                         <thead><tr className="bg-slate-50 border-b border-slate-200">
                           {[t('reviewCycles.colReviewer'),t('reviewCycles.colSelfRating'),t('reviewCycles.colManagerRating'),t('reviewCycles.colFinal'),t('reviewCycles.colStatus'),''].map((h, i) =>
@@ -173,7 +173,7 @@ export default function ReviewCycles() {
                 {managerReviews.length > 0 && (
                   <div>
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{t('reviewCycles.reviewsToComplete')}</h3>
-                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
                       <table className="w-full">
                         <thead><tr className="bg-slate-50 border-b border-slate-200">
                           {[t('reviewCycles.colEmployee'),t('reviewCycles.colSelfRating'),t('reviewCycles.colManagerRating'),t('reviewCycles.colStatus'),''].map((h, i) =>
@@ -203,7 +203,7 @@ export default function ReviewCycles() {
                 {canManage && (
                   <div>
                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">{t('reviewCycles.allReviews', { count: reviews.length })}</h3>
-                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
                       <table className="w-full">
                         <thead><tr className="bg-slate-50 border-b border-slate-200">
                           {[t('reviewCycles.colEmployee'),t('reviewCycles.colReviewer'),t('reviewCycles.colSelf'),t('reviewCycles.colManager'),t('reviewCycles.colFinal'),t('reviewCycles.colStatus')].map((h, i) =>

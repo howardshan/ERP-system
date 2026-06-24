@@ -68,6 +68,7 @@ export default function TestingDashboard() {
               {day.products.length === 0 ? (
                 <p className="px-4 py-3 text-xs text-slate-400">{t('testingDashboard.noCarts')}</p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-slate-100">
                     {day.products.map(p => (
@@ -84,6 +85,7 @@ export default function TestingDashboard() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           ))}

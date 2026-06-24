@@ -232,7 +232,7 @@ export default function HRModule({ onHome }: Props) {
       </aside>
 
       {/* Main content */}
-      <div className="lg:ml-64 flex-1 min-h-screen">
+      <div className="lg:ml-64 flex-1 min-w-0 min-h-screen">
         {/* Mobile-only bar to open the nav (HR has no desktop top bar). */}
         <div className="lg:hidden sticky top-0 z-20 bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2">
           <SidebarToggle onClick={openSidebar} className="-ml-1" />

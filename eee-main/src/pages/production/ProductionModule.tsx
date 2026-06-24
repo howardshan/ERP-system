@@ -213,7 +213,7 @@ export default function ProductionModule({ onHome }: Props) {
         </div>
       </aside>
 
-      <div className="lg:ml-64 flex-1 min-h-screen flex flex-col">
+      <div className="lg:ml-64 flex-1 min-w-0 min-h-screen flex flex-col">
         <header className="sticky top-0 z-20 bg-white/85 backdrop-blur border-b border-slate-200 px-4 sm:px-6 py-2 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-1.5">
             <SidebarToggle onClick={openSidebar} className="-ml-1" />
@@ -231,7 +231,7 @@ export default function ProductionModule({ onHome }: Props) {
             </span>
           </div>
         </header>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {renderContent()}
         </div>
       </div>

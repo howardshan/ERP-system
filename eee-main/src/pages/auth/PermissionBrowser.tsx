@@ -217,7 +217,7 @@ export default function PermissionBrowser() {
                 {t('permissionBrowser.noHolders')}
               </div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
