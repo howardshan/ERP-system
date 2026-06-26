@@ -119,6 +119,32 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
   }, [awaiting, awaitingRecheck]);
   const dryingCarts = useMemo(() => inDryer.filter(s => s.status === 'drying'), [inDryer]);
 
+  // Group the awaiting list by Product (SKU) → Work Order (production lot) so the
+  // operator can check a whole product or work order in at once (group select).
+  type AwaitLot = { key: string; label: string; carts: SubLot[] };
+  type AwaitProduct = { skuId: string; skuName: string; lots: AwaitLot[]; carts: SubLot[] };
+  const awaitingGroups = useMemo<AwaitProduct[]>(() => {
+    const prodMap = new Map<string, AwaitProduct>();
+    for (const s of eligible) {
+      const skuKey = s.sku_id ?? 'unknown';
+      let pg = prodMap.get(skuKey);
+      if (!pg) {
+        pg = { skuId: skuKey, skuName: s.sku_name ?? tr('dryRoomListMode.unknownSku'), lots: [], carts: [] };
+        prodMap.set(skuKey, pg);
+      }
+      pg.carts.push(s);
+      const woKey = s.production_lot_id ?? 'unknown';
+      let lot = pg.lots.find(l => l.key === woKey);
+      if (!lot) {
+        lot = { key: woKey, label: s.lot_number ?? s.lot_barcode ?? '—', carts: [] };
+        pg.lots.push(lot);
+      }
+      lot.carts.push(s);
+    }
+    // `eligible` is already seq-sorted, so carts keep cart-number order within each WO.
+    return Array.from(prodMap.values()).sort((a, b) => a.skuName.localeCompare(b.skuName));
+  }, [eligible]);
+
   const toggle = (id: string) => {
     setSelected(prev => {
       const next = new Set(prev);
@@ -130,6 +156,16 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
     if (selected.size === eligible.length) setSelected(new Set());
     else setSelected(new Set(eligible.map(s => s.id)));
   };
+  // Group-level select: add/remove a whole product or work order at once.
+  const setManyIn = (ids: string[], on: boolean) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (on) ids.forEach(id => next.add(id));
+      else ids.forEach(id => next.delete(id));
+      return next;
+    });
+  };
+  const selCountIn = (ids: string[]) => ids.reduce((n, id) => n + (selected.has(id) ? 1 : 0), 0);
 
   const toggleOut = (id: string) => {
     setSelectedOut(prev => {

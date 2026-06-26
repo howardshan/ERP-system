@@ -13,9 +13,14 @@
 --    pre-fill the next cart's fields (env is stable across the day's run).
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- Adding p_env changes the arg count, so CREATE OR REPLACE would make a SECOND
+-- Adding p_env changes the arg count, so CREATE OR REPLACE would make a NEW
 -- overload (Postgres keys functions by name + arg types) and PostgREST would then
--- fail to choose a candidate. Drop the prior 6-arg signature first.
+-- fail to choose a candidate. Earlier migrations also left stale overloads
+-- (2/3/5/6-arg) behind. Drop every prior signature so exactly one
+-- qc_submit_inspection (the 7-arg below) remains and all calls resolve uniquely.
+DROP FUNCTION IF EXISTS qc_submit_inspection(uuid, numeric);
+DROP FUNCTION IF EXISTS qc_submit_inspection(uuid, numeric, uuid);
+DROP FUNCTION IF EXISTS qc_submit_inspection(uuid, numeric, uuid, text, text);
 DROP FUNCTION IF EXISTS qc_submit_inspection(uuid, numeric, uuid, text, text, jsonb);
 
 CREATE OR REPLACE FUNCTION qc_submit_inspection(
