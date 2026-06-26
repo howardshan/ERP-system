@@ -2727,7 +2727,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-155 | 20260623000009_qc_testing_export_rows.sql · Testing 导出页取数(WA/MC 模板):按日期+产品+工单返回每条检测一行 |
 | M-156 | 20260623000010_qc_inspection_env_readings.sql · 检测时录入环境读数(Testing Temp / Humidity / Room Temp),存入 `qc_inspection_record.values_json.env`;`qc_submit_inspection` 加 `p_env`,新增 `qc_latest_test_env()` 当日默认 |
 | M-157 | 20260623000011_qc_dashboard_work_order_pipeline.sql · 新建 Dashboard 模块:`qc_dashboard_work_order_pipeline()`(产品→工单 8 阶段车数)+ `qc_dashboard_drying_exit_forecast()`(在烘干车按 ETA 日分桶)+ seed dashboard 模块访问/权限 |
-| **M-158** | _(下一个)_ |
+| M-158 | 20260623000012_system_audit_log_view_production_events.sql · 修正中央日志 `v_system_audit_log`:`qc_quality_event` 的 `sub_lot_created`(车间建车)改归 `production` 模块,其余烘干/检测/处置事件仍归 `qc`(CREATE OR REPLACE VIEW) |
+| **M-159** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

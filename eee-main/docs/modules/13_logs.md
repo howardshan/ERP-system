@@ -22,7 +22,7 @@
 | hr_audit_log | hr | changed_at | actor_name | action | description |
 | qc_product_audit_log | qc | changed_at | actor_name | action | description |
 | auth_audit_log | auth | changed_at | actor_name | action | description |
-| qc_quality_event | qc | created_at | LEFT JOIN erp_user→full_name | event_type | `qc_quality_event_summary()` |
+| qc_quality_event | qc（`sub_lot_created` → production，见 M-158） | created_at | LEFT JOIN erp_user→full_name | event_type | `qc_quality_event_summary()` |
 | prod_downtime_event | production | created_at | created_by(文本) | `downtime` | reason(label) + note |
 | notification_log | notifications | created_at | —（无操作人） | status | subject |
 
