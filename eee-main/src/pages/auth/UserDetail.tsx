@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Save, Loader2, KeyRound, Eye, EyeOff, CheckCircle2, AlertCircle, ShieldCheck, Bell } from 'lucide-react';
-import { getUser, getUsers, getUserPermissions, setPermission, setModuleAccess, updateUser, resetUserPassword, logAuthAction } from '../../services/authApi';
+import { getUser, getUsers, getUserPermissions, setPermission, setModuleAccess, updateUser, resetUserPassword, resetUserMfa, logAuthAction } from '../../services/authApi';
 import {
   getNotificationTypes,
   getUserNotificationSettings,
@@ -21,7 +21,8 @@ interface Props {
 type LeftPanel = 'account' | string; // 'account' or a module id
 
 export default function UserDetail({ userId, onBack }: Props) {
-  const { reload: reloadPermissions } = usePermissions();
+  const { reload: reloadPermissions, can } = usePermissions();
+  const canResetMfa = can('auth', 'users', 'reset_mfa');
   const { isVisible } = useModuleVisibility();
   const visibleModuleKeys = Object.keys(PERMISSION_STRUCTURE).filter(isVisible);
   const { t } = useTranslation('auth');
@@ -41,6 +42,11 @@ export default function UserDetail({ userId, onBack }: Props) {
   const [showPw, setShowPw] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetMsg, setResetMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  // Reset MFA (admin recovery for a lost authenticator)
+  const [resettingMfa, setResettingMfa] = useState(false);
+  const [confirmResetMfa, setConfirmResetMfa] = useState(false);
+  const [mfaMsg, setMfaMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   // Permission local state
   const [localModules, setLocalModules] = useState<Set<string>>(new Set());
@@ -313,6 +319,36 @@ export default function UserDetail({ userId, onBack }: Props) {
     setTimeout(() => setResetMsg(null), 4000);
   }
 
+  // ── Reset MFA (admin recovery) ──────────────────────────────────────────
+
+  async function handleResetMfa() {
+    if (!user?.auth_user_id) return;
+    if (!confirmResetMfa) {
+      setConfirmResetMfa(true);
+      setTimeout(() => setConfirmResetMfa(false), 3000);
+      return;
+    }
+    setResettingMfa(true);
+    setConfirmResetMfa(false);
+    setMfaMsg(null);
+    try {
+      await resetUserMfa(user.auth_user_id);
+      void logAuthAction({
+        action: 'mfa_reset',
+        target_auth_id: user.auth_user_id,
+        target_user_id: user.id,
+        target_name: user.full_name,
+        target_email: user.email,
+        description: `Reset MFA for ${user.email}`,
+      });
+      setMfaMsg({ type: 'ok', text: t('userDetail.mfaReset') });
+    } catch (err: any) {
+      setMfaMsg({ type: 'err', text: err?.message ?? t('userDetail.failed') });
+    }
+    setResettingMfa(false);
+    setTimeout(() => setMfaMsg(null), 4000);
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────
 
   if (loading || !user) {
@@ -531,6 +567,37 @@ export default function UserDetail({ userId, onBack }: Props) {
                   <p className="text-xs text-slate-400">
                     {t('userDetail.noAuthAccount')}
                   </p>
+                </div>
+              )}
+
+              {/* Reset MFA — admin recovery for a lost authenticator */}
+              {user.auth_user_id && canResetMfa && (
+                <div className="bg-white border border-slate-200 rounded-xl p-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldCheck size={14} className="text-slate-500" />
+                    <h3 className="text-sm font-bold text-slate-900">{t('userDetail.resetMfa')}</h3>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-4">{t('userDetail.resetMfaDesc')}</p>
+                  {mfaMsg && (
+                    <div className={`flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg mb-3 ${
+                      mfaMsg.type === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+                    }`}>
+                      {mfaMsg.type === 'ok' ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                      {mfaMsg.text}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleResetMfa}
+                    disabled={resettingMfa}
+                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-colors ${
+                      confirmResetMfa
+                        ? 'bg-red-600 hover:bg-red-500 text-white'
+                        : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200'
+                    }`}
+                  >
+                    {resettingMfa ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
+                    {confirmResetMfa ? t('userDetail.confirmResetMfa') : t('userDetail.resetMfa')}
+                  </button>
                 </div>
               )}
             </div>

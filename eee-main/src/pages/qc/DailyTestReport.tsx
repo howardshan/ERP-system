@@ -206,7 +206,7 @@ function ReportTab({
       </div>
 
       {/* Test table */}
-      <div className="bg-white border rounded-xl overflow-hidden">
+      <div className="bg-white border rounded-xl overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
             <tr>
@@ -346,7 +346,7 @@ function HistoryTab({ reports, onError }: { reports: DailyReportListItem[]; onEr
   }
 
   return (
-    <div className="bg-white border rounded-xl overflow-hidden">
+    <div className="bg-white border rounded-xl overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500">
           <tr>

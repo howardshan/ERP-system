@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
+import { useSidebar, sidebarOffCanvas, SidebarScrim, SidebarToggle } from '../../components/layout/mobileNav';
 import QcHome from './QcHome';
 import LotsList from './LotsList';
 import LotDetail from './LotDetail';
@@ -87,9 +88,11 @@ export default function QualityControlModule({ onHome }: Props) {
   const canViewProductLog = can('qc', 'products', 'view_log');
 
   const isActive = (id: string) => screen === id || screen.startsWith(id + ':');
+  const { open, openSidebar, closeSidebar } = useSidebar();
 
   function navigate(s: string) {
     setScreen(s);
+    closeSidebar();
   }
 
   function renderContent() {
@@ -202,7 +205,8 @@ export default function QualityControlModule({ onHome }: Props) {
   return (
     <div className="min-h-screen bg-[#faf8f5] flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#0a0f1d] border-r border-white/10 flex flex-col h-screen fixed left-0 top-0">
+      <SidebarScrim open={open} onClose={closeSidebar} />
+      <aside className={cn('w-64 bg-[#0a0f1d] border-r border-white/10 flex flex-col h-screen fixed left-0 top-0', sidebarOffCanvas(open))}>
         <div className="p-5 mb-1">
           <button
             onClick={onHome}
@@ -268,20 +272,23 @@ export default function QualityControlModule({ onHome }: Props) {
         </div>
       </aside>
 
-      <div className="ml-64 flex-1 min-h-screen flex flex-col">
+      <div className="lg:ml-64 flex-1 min-w-0 min-h-screen flex flex-col">
         {/* Top action bar — visible on every QC page so the user always has a clear way home */}
-        <header className="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-slate-200 px-6 py-2 flex items-center justify-between shrink-0">
-          <button
-            onClick={onHome}
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
-          >
-            <ArrowLeft size={14} /> {t('qualityControlModule.moduleHub')}
-          </button>
+        <header className="sticky top-0 z-20 bg-white/85 backdrop-blur border-b border-slate-200 px-4 sm:px-6 py-2 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-1.5">
+            <SidebarToggle onClick={openSidebar} className="-ml-1" />
+            <button
+              onClick={onHome}
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+            >
+              <ArrowLeft size={14} /> {t('qualityControlModule.moduleHub')}
+            </button>
+          </div>
           <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400">
             {t('qualityControlModule.title')}
           </span>
         </header>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {renderContent()}
         </div>
       </div>

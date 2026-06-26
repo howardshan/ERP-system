@@ -10,6 +10,10 @@
     "email": "Correo electrónico",
     "role": "Rol",
     "department": "Departamento",
+    "mfaTitle": "Verificación en dos pasos",
+    "mfaEnabled": "Activada",
+    "mfaNotSet": "Aún no configurada",
+    "mfaDesc": "Su cuenta está protegida con una aplicación de autenticación (p. ej. Microsoft Authenticator). Para configurarla de nuevo en un dispositivo nuevo, pida a un administrador que restablezca su MFA.",
     "notificationSettings": "Configuración de notificaciones",
     "noNotifications": "Aún no tienes configuraciones de notificaciones. Tu administrador gestiona qué notificaciones recibes.",
     "managedByAdmin": "Gestionado por tu administrador",
@@ -157,6 +161,16 @@
           "1": "Roles y permisos",
           "2": "Niveles de aprobación",
           "3": "Registro de auditoría"
+        }
+      },
+      "logs": {
+        "label": "Registros y auditoría",
+        "description": "Registro de operaciones de todo el sistema en todos los módulos, filtrable por persona, módulo y fecha.",
+        "features": {
+          "0": "Registro multimódulo",
+          "1": "Filtrar por persona",
+          "2": "Filtrar por módulo",
+          "3": "Búsqueda por rango de fechas"
         }
       },
       "faq": {

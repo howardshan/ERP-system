@@ -109,6 +109,7 @@ export default function EmployeeDirectory({ onSelectEmployee }: Props) {
                 <p className="text-sm">{t('employeeDirectory.noEmployees')}</p>
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
@@ -143,6 +144,7 @@ export default function EmployeeDirectory({ onSelectEmployee }: Props) {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         )}

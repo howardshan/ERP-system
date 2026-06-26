@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { logAuthAction } from './services/authApi';
@@ -7,6 +7,7 @@ import { ModuleVisibilityProvider, useModuleVisibility } from './contexts/Module
 import { SuperuserApp } from './pages/superuser/SuperuserDashboard';
 import TabletApp from './pages/tablet/TabletApp';
 import LoginPage from './pages/LoginPage';
+import MfaGate from './pages/MfaGate';
 import HomePage from './pages/HomePage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import FinanceDashboard from './pages/FinanceDashboard';
@@ -21,6 +22,7 @@ import WorkflowList from './pages/WorkflowList';
 import WorkflowBuilder from './pages/WorkflowBuilder';
 import DocsPage from './pages/DocsPage';
 import UserManagement from './pages/auth/UserManagement';
+import LogsModule from './pages/logs/LogsModule';
 import HRModule from './pages/hr/HRModule';
 import QualityControlModule from './pages/qc/QualityControlModule';
 import PackagingModule from './pages/packaging/PackagingModule';
@@ -49,7 +51,18 @@ export default function App() {
 
 function MainApp() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  // MFA gate: null = checking AAL, true = at aal2 (cleared), false = needs MFA.
+  const [aalOk, setAalOk] = useState<boolean | null>(null);
   const [activeModule, setActiveModule] = useState<string>('home');
+
+  const checkAal = useCallback(async () => {
+    try {
+      const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      setAalOk(data?.currentLevel === 'aal2');
+    } catch {
+      setAalOk(false);
+    }
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -57,14 +70,21 @@ function MainApp() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Whenever the session changes, (re)evaluate the MFA assurance level.
+  useEffect(() => {
+    if (!session) { setAalOk(null); return; }
+    setAalOk(null);
+    checkAal();
+  }, [session, checkAal]);
+
+  const spinner = (
+    <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
   // Loading while session is being checked
-  if (session === undefined) {
-    return (
-      <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (session === undefined) return spinner;
 
   if (session === null) {
     return <LoginPage />;
@@ -72,6 +92,20 @@ function MainApp() {
 
   const userEmail = session.user.email ?? '';
   const userName = session.user.user_metadata?.full_name ?? userEmail.split('@')[0];
+
+  // Logged in but MFA not yet satisfied (mandatory org-wide) → gate.
+  if (aalOk === null) return spinner;
+  if (!aalOk) {
+    return (
+      <MfaGate
+        userId={session.user.id}
+        userName={userName}
+        userEmail={userEmail}
+        onVerified={checkAal}
+        onSignOut={handleLogout}
+      />
+    );
+  }
 
   async function handleLogout() {
     // Log while still authenticated — after signOut the RLS insert would fail.
@@ -193,6 +227,10 @@ function AppShell({
 
   if (activeModule === 'auth') {
     return <UserManagement onHome={() => setActiveModule('home')} />;
+  }
+
+  if (activeModule === 'logs') {
+    return <LogsModule onHome={() => setActiveModule('home')} />;
   }
 
   if (activeModule === 'account-settings') {

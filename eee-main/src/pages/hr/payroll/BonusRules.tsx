@@ -124,7 +124,7 @@ export default function BonusRules() {
         {loading ? (
           <div className="flex items-center gap-2 text-slate-400 py-16 justify-center"><Loader2 size={18} className="animate-spin" /></div>
         ) : view === 'templates' ? (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
             <table className="w-full">
               <thead><tr className="bg-slate-50 border-b border-slate-200">
                 {[t('bonusRules.colName'),t('bonusRules.colDept'),t('bonusRules.colFormula'),t('bonusRules.colBase'),t('bonusRules.colMultiplierTiers'),t('bonusRules.colMinTenure'),t('bonusRules.colPerfWeight'),t('bonusRules.colStatus'),''].map(h => <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
@@ -155,7 +155,7 @@ export default function BonusRules() {
         ) : (
           <div className="flex gap-6">
             <div className="flex-1">
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="bg-slate-50 border-b border-slate-200">
                     {[t('bonusRules.colName'),t('bonusRules.colTemplate'),t('bonusRules.colPeriod'),t('bonusRules.colTotal'),t('bonusRules.colStatus'),''].map(h => <th key={h} className="px-5 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}

@@ -10,6 +10,10 @@
     "email": "Email",
     "role": "Role",
     "department": "Department",
+    "mfaTitle": "Two-factor authentication",
+    "mfaEnabled": "Enabled",
+    "mfaNotSet": "Not set up yet",
+    "mfaDesc": "Your account is protected with an authenticator app (e.g. Microsoft Authenticator). To set it up again on a new device, ask an administrator to reset your MFA.",
     "notificationSettings": "Notification Settings",
     "noNotifications": "You have no notification settings yet. Your administrator manages which notifications you receive.",
     "managedByAdmin": "Managed by your administrator",
@@ -157,6 +161,16 @@
           "1": "Role & Permissions",
           "2": "Approval Tiers",
           "3": "Audit Trail"
+        }
+      },
+      "logs": {
+        "label": "Logs & Audit",
+        "description": "System-wide operation log across all modules, filterable by person, module and time.",
+        "features": {
+          "0": "Cross-module log",
+          "1": "Filter by person",
+          "2": "Filter by module",
+          "3": "Time-range search"
         }
       },
       "faq": {

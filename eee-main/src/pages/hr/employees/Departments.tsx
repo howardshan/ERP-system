@@ -62,6 +62,7 @@ export default function Departments() {
                 <p className="text-sm">{t('departments.empty')}</p>
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead><tr className="bg-slate-50 border-b border-slate-200">
                   {[
@@ -98,6 +99,7 @@ export default function Departments() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         )}

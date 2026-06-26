@@ -95,6 +95,7 @@ export default function SalaryRecords() {
               {history.length === 0 ? (
                 <p className="text-sm text-slate-400 px-6 py-8 text-center">{t('salaryRecords.noRecords')}</p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="bg-slate-50 border-b border-slate-200">
                     {[t('salaryRecords.colEffectiveDate'),t('salaryRecords.colSalary'),t('salaryRecords.colFrequency'),t('salaryRecords.colCurrency'),t('salaryRecords.colGrade'),t('salaryRecords.colReason')].map(h => <th key={h} className="px-5 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>)}
@@ -112,6 +113,7 @@ export default function SalaryRecords() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </div>

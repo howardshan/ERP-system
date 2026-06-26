@@ -435,6 +435,7 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
           { id: 'edit',           label: 'Edit User',      prereq: 'view' },
           { id: 'delete',         label: 'Delete User',    prereq: 'edit' },
           { id: 'reset_password', label: 'Reset Password', prereq: 'view' },
+          { id: 'reset_mfa',      label: 'Reset MFA',      prereq: 'view' },
         ],
       },
       roles: {
@@ -456,6 +457,24 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
         label: 'User Activity Log',
         permissions: [
           { id: 'view', label: 'View Activity Log', prereq: null },
+        ],
+      },
+    },
+  },
+  // M-155 — Central, cross-module system log (reads v_system_audit_log).
+  logs: {
+    label: 'Logs & Audit',
+    resources: {
+      module_permissions: {
+        label: 'Module Permissions',
+        permissions: [
+          { id: 'manage', label: 'Manage User Permissions', prereq: null },
+        ],
+      },
+      entries: {
+        label: 'System Log',
+        permissions: [
+          { id: 'view', label: 'View System Log', prereq: null },
         ],
       },
     },

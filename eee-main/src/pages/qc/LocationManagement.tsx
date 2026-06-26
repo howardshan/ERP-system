@@ -167,6 +167,7 @@ export default function LocationManagement() {
         {rooms.length === 0 ? (
           <p className="text-slate-400 text-sm p-4">{t('locationManagement.empty')}</p>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
@@ -228,6 +229,7 @@ export default function LocationManagement() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

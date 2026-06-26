@@ -181,7 +181,7 @@ export default function BalancePage({ onOpenLot }: { onOpenLot?: (lotId: number)
       </div>
 
       <div className="flex gap-4 items-start">
-        <div className="flex-1 overflow-hidden rounded-xl border bg-white">
+        <div className="flex-1 overflow-x-auto rounded-xl border bg-white">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
             <tr>

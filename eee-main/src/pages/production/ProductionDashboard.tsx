@@ -71,7 +71,7 @@ export default function ProductionDashboard() {
           {t('productionDashboard.empty')}
         </div>
       ) : (
-        <div className="mt-5 bg-white border-2 border-slate-200 rounded-xl overflow-hidden">
+        <div className="mt-5 bg-white border-2 border-slate-200 rounded-xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase tracking-wider font-bold text-slate-500">

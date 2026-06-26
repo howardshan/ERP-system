@@ -16,6 +16,7 @@ export const ALL_MODULES: ModuleInfo[] = [
   { id: 'docs',       label: '文档' },
   { id: 'auth',       label: '用户与权限' },
   { id: 'sales',      label: '销售与分销' },
+  { id: 'logs',       label: '日志与审计' },
   { id: 'faq',        label: '常见问题' },
 ];
 

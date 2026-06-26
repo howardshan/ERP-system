@@ -229,7 +229,7 @@ export default function Interviews() {
         ) : loading ? (
           <div className="flex items-center gap-2 text-slate-400 py-16 justify-center"><Loader2 size={18} className="animate-spin" /></div>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
             <table className="w-full">
               <thead><tr className="bg-slate-50 border-b border-slate-200">
                 {[['candidate', t('interviews.col.candidate')],['round', t('interviews.col.round')],['type', t('interviews.col.type')],['scheduled', t('interviews.col.scheduled')],['duration', t('interviews.col.duration')],['status', t('interviews.col.status')],['actions','']].map(([k, h]) =>

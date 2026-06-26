@@ -280,6 +280,31 @@ supabase functions deploy send-notification --no-verify-jwt
 
 ---
 
+### EF-005 `reset-user-mfa`
+**目录**: `supabase/functions/reset-user-mfa/index.ts`
+**用途**: 管理员重置（删除）某用户的全部 MFA(TOTP) factor——用户丢失验证器时的找回（仿 EF-003 reset-user-password）。配合 M-156 的 `auth.users.reset_mfa` 权限。
+
+**请求**:
+```
+POST /functions/v1/reset-user-mfa
+Authorization: Bearer <JWT>
+{ "auth_user_id": "<uuid>" }
+```
+
+**响应**: `{ "success": true, "removed": <n> }` / `{ "error": "..." }`
+
+**技术细节**:
+- 校验调用者已认证（`callerClient.auth.getUser`）；用 `SUPABASE_SERVICE_ROLE_KEY` 的 `auth.admin.mfa.listFactors({userId})` 列出再 `deleteFactor` 逐个删除。
+- 前端 `authApi.resetUserMfa` 调用；UI 在 `UserDetail` 的「Reset MFA」按钮，gate `auth.users.reset_mfa`。
+- 与正常用户 JWT 一致鉴权，**按默认（verify-jwt）部署**即可。
+
+**部署命令**:
+```bash
+supabase functions deploy reset-user-mfa
+```
+
+---
+
 ## 变更操作规范
 
 ### 新增 Migration
@@ -2711,4 +2736,5 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | EF-002 | functions/create-auth-user/ |
 | EF-003 | functions/reset-user-password/ |
 | EF-004 | functions/send-notification/ |
-| **EF-005** | _(下一个)_ |
+| EF-005 | functions/reset-user-mfa/ |
+| **EF-006** | _(下一个)_ |
