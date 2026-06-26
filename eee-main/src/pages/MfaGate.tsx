@@ -54,7 +54,13 @@ export default function MfaGate({ userId, userName, userEmail, onVerified, onSig
         await supabase.auth.mfa.unenroll({ factorId: f.id }).catch(() => {});
       }
     }
-    const { data, error: enrollErr } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+    // `issuer` is what the authenticator app shows as the account name. Without
+    // it Supabase falls back to the site origin (e.g. "localhost:3000" in dev),
+    // which renders as garbled text — set a clean brand name instead.
+    const { data, error: enrollErr } = await supabase.auth.mfa.enroll({
+      factorType: 'totp',
+      issuer: 'NPIC ERP',
+    });
     if (enrollErr || !data) { setError(enrollErr?.message ?? 'Enroll failed'); return; }
     setFactorId(data.id);
     setQr(data.totp.qr_code);
