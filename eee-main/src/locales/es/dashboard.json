@@ -1,0 +1,49 @@
+{
+  "module": {
+    "title": "Panel",
+    "allModules": "Todos los módulos",
+    "moduleHub": "Centro de módulos",
+    "navPipeline": "Flujo por orden de trabajo",
+    "navForecast": "Pronóstico de salida",
+    "support": "Ayuda y soporte",
+    "noAccess": "No tiene permiso para ver el panel."
+  },
+  "stage": {
+    "created": "Creado",
+    "dry_room": "Secado",
+    "waiting_test": "Esperando prueba",
+    "sampled": "Muestreado",
+    "passed": "Aprobado / Liberar",
+    "retest": "Reprueba / Retenido",
+    "released": "Liberado",
+    "dispatched": "Despachado"
+  },
+  "pipeline": {
+    "title": "Flujo por orden de trabajo",
+    "subtitle": "Conteo de carros en cada etapa de producción, agrupado por producto → orden de trabajo.",
+    "product": "Producto",
+    "total": "Total",
+    "workOrdersShort": "OT",
+    "refresh": "Actualizar",
+    "loading": "Cargando flujo…",
+    "empty": "Aún no hay carros en el flujo.",
+    "loadFailed": "Error al cargar el flujo.",
+    "passedNote": "Mapeo de etapas — Creado: created · Secado: secando / secado a temp. ambiente / esperando recontrol · Esperando prueba: retirado, aún sin muestrear · Muestreado: muestreado / inspeccionando / esperando resultado de grupo · Aprobado / Liberar: passed (estos carros son los que esperan ser liberados) · Reprueba / Retenido: falló, esperando disposición · Liberado: liberado a empaque, esperando empaque · Despachado: entregado a empaque."
+  },
+  "forecast": {
+    "title": "Pronóstico de salida del secado",
+    "subtitle": "Carros aún en secado, agrupados por el día en que se espera que salgan del secador.",
+    "refresh": "Actualizar",
+    "loading": "Cargando pronóstico…",
+    "empty": "No hay carros en secado actualmente.",
+    "loadFailed": "Error al cargar el pronóstico.",
+    "totalDrying": "{{count}} carro(s) en secado actualmente",
+    "cartsUnit": "carros",
+    "overdue": "Atrasado",
+    "today": "Hoy",
+    "tomorrow": "Mañana",
+    "inDays": "En {{days}} días",
+    "later": "Después de {{days}} días",
+    "unknown": "ETA desconocido"
+  }
+}

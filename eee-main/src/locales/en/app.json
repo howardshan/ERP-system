@@ -53,6 +53,16 @@
     "openModule": "Open Module",
     "inDevelopment": "In Development",
     "modules": {
+      "dashboard": {
+        "label": "Dashboard",
+        "description": "Per work-order cart pipeline across every production stage, plus a drying-room exit forecast.",
+        "features": {
+          "0": "Work-Order Pipeline",
+          "1": "Stage Cart Counts",
+          "2": "Drying Exit Forecast",
+          "3": "Live Refresh"
+        }
+      },
       "finance": {
         "label": "Financial Management",
         "description": "General ledger, journal entries, AP/AR, trial balance, and multi-level approval workflows.",

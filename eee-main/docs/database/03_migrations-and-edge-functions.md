@@ -2562,34 +2562,22 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
-### M-155 `20260623000009_system_audit_log_view.sql`
-**用途**: 中央「Logs & Audit」模块的统一只读视图——把各模块分散的审计/事件表聚合到一处，供新顶层 Logs 模块按人员/模块/时间/关键词筛选。
+### M-157 `20260623000011_qc_dashboard_work_order_pipeline.sql`
+**用途**: 新建顶层 **Dashboard 模块**的两个只读取数 RPC——按「产品 → 工单」展示每辆车(`qc_drying_sub_lot`)所处的生产阶段,以及烘干房出房预测。
 
-**设计**:
-- `CREATE VIEW v_system_audit_log AS` UNION ALL 7 张源表，归一为 `id / source / module / ts / actor_auth_id / actor_name / action / entity_type / entity_id / summary / detail(jsonb)`。`detail` 把各源表的 diff/before/after/payload 一并带出，前端展开行无需二次回查。
-- 源表与映射：`finance/hr/qc_product/auth_audit_log`(4 张结构统一的用户操作审计) + `qc_quality_event`(actor 名 LEFT JOIN erp_user、summary 用 `qc_quality_event_summary`) + `prod_downtime_event`(actor=created_by 文本、reason 取 `prod_downtime_reason.label`) + `notification_log`(投递日志、无 actor)。
-- **不新建中央表、不改各模块写入**——纯读时聚合，现有数据自动可见，将来新模块加审计只需更新视图。
-- **设计取舍**：排除 `journal_entry_edit_log`(与 finance_audit_log 重复)、`hr_calendar_event`(面试排程业务数据)。视图以 owner 身份运行(默认非 invoker)，可跨表读取，安全门控放在 app 层 `logs.entries.view`(与现有审计表「表可读、页面门控」一致)。
-- seed `logs.entries.view` 权限 + `user_module_access('logs')` 给 `ysha@smu.edu`(否则首页卡片不显示)。
+**改动**:
+- `qc_dashboard_work_order_pipeline()` → jsonb:嵌套结构(产品分组,内含 `work_orders[]` + 产品级 `totals`)。比 M-093 的 per-SKU 粗看板更细——按工单拆分,并把单一的 testing 桶拆成 4 个操作员真正关心的子阶段。阶段↔状态映射:
+  - `created` = created · `dry_room` = drying / room_temp_drying / awaiting_recheck
+  - `waiting_test` = pending 且无 pending `qc_sample` · `sampled` = (pending 且有 pending sample) / inspecting / awaiting_group_result
+  - `passed` = passed(**即「待放行」同一批车**:系统里 passed 一直停到 QC 点放行才 → closed,所以是一列不是两列)
+  - `retest` = hold / disposing · `released` = closed(已放行待打包) · `dispatched` = dispatched
+  - 工单关联:`qc_drying_sub_lot → qc_production_lot.work_order_barcode`(车上活跃工单)+ `.sku_id → qc_product_sku`。
+- `qc_dashboard_drying_exit_forecast(p_days int default 7)` → jsonb:对 `status='drying'` 的车算 ETA(`now() + (expected_dry_minutes − qc_total_dried_minutes(id))`,复用 M-020 的算法),按本地日(America/Chicago,与前端 Dallas 助手一致)分桶为 `overdue / day(0..p_days) / later / unknown`;前端用 `grp + days_from_today` 渲染可翻译的标签。
+- 两个函数都遵循 M-093:纯 `LANGUAGE sql STABLE`,无 SECURITY DEFINER,`authenticated` 默认可执行。末尾 seed:给所有已有 `production`/`qc` 模块访问的用户补 `dashboard` 模块访问 + `dashboard.pipeline.view` 权限,使看板开箱即用。
 
-**前端配套**: 新增顶层模块 `logs`——[`permissionStructure.ts`](../../src/lib/permissionStructure.ts)、[`HomePage.tsx`](../../src/pages/HomePage.tsx)(卡片)、[`App.tsx`](../../src/App.tsx)(路由)、[`lib/moduleVisibility.ts`](../../src/lib/moduleVisibility.ts)、[`services/logsApi.ts`](../../src/services/logsApi.ts)(`getSystemLog`)、[`pages/logs/LogsModule.tsx`](../../src/pages/logs/LogsModule.tsx)(筛选+表格+展开)、i18n 新命名空间 `logs`。
+**前端配套**: 新增 [`src/services/qcApi.ts`](../../src/services/qcApi.ts) 的 `dashboardWorkOrderPipeline` / `dashboardDryingExitForecast`;新模块目录 [`src/pages/dashboard/`](../../src/pages/dashboard/)(`DashboardModule` + `WorkOrderPipelinePage` + `DryingExitForecastPage`);接线 `App.tsx`(`activeModule==='dashboard'`)、`HomePage.tsx`(MODULES 新增 dashboard 卡)、`i18n/index.ts`(新 `dashboard` namespace + `locales/{en,zh,es}/dashboard.json`)、`locales/*/app.json` 的 `homePage.modules.dashboard.*`。
 
-**边界**: 中央页只显示已被记录的操作；warehouse/sales/workflow/packaging/production 工单等未埋点模块本期不覆盖(后续增量)。**关联文档**: [`docs/modules/13_logs.md`](../modules/13_logs.md)。
-
----
-
-### M-156 `20260623000010_auth_reset_mfa_permission.sql`
-**用途**: 登录双因子验证（MFA / TOTP）配套——seed 新权限 `auth.users.reset_mfa`。
-
-**背景**: 客户要求登录加 Microsoft Authenticator 双重验证。MS Authenticator = 标准 TOTP，直接用 **Supabase 原生 MFA**（`supabase.auth.mfa.*`），factor 存在 Supabase auth schema，**不新建业务表**。强制范围 = **全员强制**，找回 = **管理员重置**（EF-005）。本迁移只 seed `auth.users.reset_mfa` 给 dev admin。
-
-**前端配套**:
-- 门控 [`MfaGate.tsx`](../../src/pages/MfaGate.tsx) + [`App.tsx`](../../src/App.tsx)：密码登录后查 `getAuthenticatorAssuranceLevel`，未达 aal2 → 渲染 MfaGate（已绑定=输验证码 challenge；未绑定=强制扫码 enroll），到 aal2 才进系统。
-- 自助查看 [`AccountSettings.tsx`](../../src/pages/AccountSettings.tsx)（MFA 已启用状态）。
-- 管理员重置 [`UserDetail.tsx`](../../src/pages/auth/UserDetail.tsx)（Reset MFA 按钮，gate `auth.users.reset_mfa`）+ [`authApi.resetUserMfa`](../../src/services/authApi.ts) + **EF-005**。
-- 审计新 action：`mfa_enrolled` / `mfa_reset` / `mfa_removed`（写入 `auth_audit_log`）。
-
-**关联文档**: [`docs/modules/06_users-auth.md`](../modules/06_users-auth.md)。
+**关联文档**: [`docs/modules/13_dashboard.md`](../modules/13_dashboard.md)。
 
 ---
 
@@ -2736,9 +2724,10 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-152 | 20260623000006_qc_seed_test_parameters.sql · 从 docs/Testing Parameters.xlsx 导入每个产品的 MC% + Aw 检测项(硬限)及软限;新增 qc_test_type「Moisture Content (MC%)」;软限规则:非红底 Aw±0.005、MC%±0.5(后由 M-153 更正为 ±0.05),红底(21 个 SWD/46xx 产品)无软限(soft=hard);重复 Item 取更严范围;仅更新已存在(按 code 匹配)的产品 |
 | M-153 | 20260623000007_qc_fix_mc_soft_band.sql · 更正 M-152 的 MC% 软限:非红底产品 MC% 软限从 ±0.5 改为 **±0.05**(UPDATE soft_lower=lower-0.05、soft_upper=upper+0.05;红底保持 soft=hard 不动,硬限和 Aw 不动) |
 | M-154 | 20260623000008_qc_drying_sub_lot_dryer_number_dynamic.sql · 放宽 `qc_drying_sub_lot.dryer_number` 的 CHECK 从 1..5 改为 ≥1(补 M-126 数据化烘干房遗漏:RPC 已按 qc_dry_room 校验,但旧列约束仍卡 Dryer 6..16 的 check-in) |
-| M-155 | 20260623000009_system_audit_log_view.sql · 中央 Logs 模块:建只读视图 `v_system_audit_log`(UNION finance/hr/qc/auth 审计 + qc_quality_event/prod_downtime/notification_log),归一为 module/actor/action/ts/summary/detail;新增顶层 `logs` 模块 + `logs.entries.view` 权限,seed + user_module_access 给 ysha |
-| M-156 | 20260623000010_auth_reset_mfa_permission.sql · 登录 MFA(TOTP)配套:seed `auth.users.reset_mfa` 权限(Supabase 原生 MFA + 全员强制 + 管理员重置 EF-005) |
-| **M-157** | _(下一个)_ |
+| M-155 | 20260623000009_qc_testing_export_rows.sql · Testing 导出页取数(WA/MC 模板):按日期+产品+工单返回每条检测一行 |
+| M-156 | 20260623000010_qc_inspection_env_readings.sql · 检测时录入环境读数(Testing Temp / Humidity / Room Temp),存入 `qc_inspection_record.values_json.env`;`qc_submit_inspection` 加 `p_env`,新增 `qc_latest_test_env()` 当日默认 |
+| M-157 | 20260623000011_qc_dashboard_work_order_pipeline.sql · 新建 Dashboard 模块:`qc_dashboard_work_order_pipeline()`(产品→工单 8 阶段车数)+ `qc_dashboard_drying_exit_forecast()`(在烘干车按 ETA 日分桶)+ seed dashboard 模块访问/权限 |
+| **M-158** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

@@ -53,6 +53,16 @@
     "openModule": "打开模块",
     "inDevelopment": "开发中",
     "modules": {
+      "dashboard": {
+        "label": "数据看板",
+        "description": "按工单展示每个生产阶段的车数,并提供烘干房出房预测。",
+        "features": {
+          "0": "工单流水线",
+          "1": "各阶段车数统计",
+          "2": "出房预测",
+          "3": "实时刷新"
+        }
+      },
       "finance": {
         "label": "财务管理",
         "description": "总账、记账凭证、应付/应收、试算平衡表以及多级审批流程。",
