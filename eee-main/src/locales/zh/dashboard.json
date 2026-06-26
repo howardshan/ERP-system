@@ -1,0 +1,49 @@
+{
+  "module": {
+    "title": "数据看板",
+    "allModules": "所有模块",
+    "moduleHub": "模块中心",
+    "navPipeline": "工单流水线",
+    "navForecast": "出房预测",
+    "support": "帮助与支持",
+    "noAccess": "您没有查看数据看板的权限。"
+  },
+  "stage": {
+    "created": "已创建",
+    "dry_room": "烘干房",
+    "waiting_test": "等待测试",
+    "sampled": "已取样",
+    "passed": "通过 / 待放行",
+    "retest": "复测 / 暂扣",
+    "released": "已放行",
+    "dispatched": "已送包装"
+  },
+  "pipeline": {
+    "title": "工单流水线",
+    "subtitle": "按产品 → 工单分组,展示每个生产阶段的车数。",
+    "product": "产品",
+    "total": "合计",
+    "workOrdersShort": "个工单",
+    "refresh": "刷新",
+    "loading": "正在加载流水线…",
+    "empty": "流水线中暂无车辆。",
+    "loadFailed": "加载流水线失败。",
+    "passedNote": "阶段对应 — 已创建:created · 烘干房:drying / 常温烘干 / 待复检 · 等待测试:已出房但未取样 · 已取样:已取样 / 检测中 / 等待组结果 · 通过/待放行:passed(这些车就是等待放行的车) · 复测/暂扣:测试失败,等待处置 · 已放行:已放行至包装,等待打包 · 已送包装:已交付包装。"
+  },
+  "forecast": {
+    "title": "烘干房出房预测",
+    "subtitle": "仍在烘干的车辆,按预计出房日期分组。",
+    "refresh": "刷新",
+    "loading": "正在加载预测…",
+    "empty": "当前没有正在烘干的车辆。",
+    "loadFailed": "加载预测失败。",
+    "totalDrying": "当前有 {{count}} 辆车正在烘干",
+    "cartsUnit": "辆车",
+    "overdue": "已逾期",
+    "today": "今天",
+    "tomorrow": "明天",
+    "inDays": "{{days}} 天后",
+    "later": "{{days}} 天以后",
+    "unknown": "无预计时间"
+  }
+}

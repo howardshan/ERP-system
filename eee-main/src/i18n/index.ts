@@ -4,6 +4,7 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 import en_app from '../locales/en/app.json';
 import en_auth from '../locales/en/auth.json';
+import en_dashboard from '../locales/en/dashboard.json';
 import en_faq from '../locales/en/faq.json';
 import en_common from '../locales/en/common.json';
 import en_finance from '../locales/en/finance.json';
@@ -17,6 +18,7 @@ import en_warehouse from '../locales/en/warehouse.json';
 import en_workflowBuilder from '../locales/en/workflowBuilder.json';
 import zh_app from '../locales/zh/app.json';
 import zh_auth from '../locales/zh/auth.json';
+import zh_dashboard from '../locales/zh/dashboard.json';
 import zh_faq from '../locales/zh/faq.json';
 import zh_common from '../locales/zh/common.json';
 import zh_finance from '../locales/zh/finance.json';
@@ -30,6 +32,7 @@ import zh_warehouse from '../locales/zh/warehouse.json';
 import zh_workflowBuilder from '../locales/zh/workflowBuilder.json';
 import es_app from '../locales/es/app.json';
 import es_auth from '../locales/es/auth.json';
+import es_dashboard from '../locales/es/dashboard.json';
 import es_faq from '../locales/es/faq.json';
 import es_common from '../locales/es/common.json';
 import es_finance from '../locales/es/finance.json';
@@ -49,7 +52,7 @@ export const SUPPORTED_LANGS = [
   { code: 'es', label: 'Español' },
 ] as const;
 
-export const NAMESPACES = ["app","auth","common","faq","finance","hr","nav","packaging","production","qc","ui","warehouse","workflowBuilder"] as const;
+export const NAMESPACES = ["app","auth","common","dashboard","faq","finance","hr","nav","packaging","production","qc","ui","warehouse","workflowBuilder"] as const;
 
 void i18n
   .use(LanguageDetector)
@@ -59,6 +62,7 @@ void i18n
     en: {
       app: en_app,
       auth: en_auth,
+      dashboard: en_dashboard,
       faq: en_faq,
       common: en_common,
       finance: en_finance,
@@ -74,6 +78,7 @@ void i18n
     zh: {
       app: zh_app,
       auth: zh_auth,
+      dashboard: zh_dashboard,
       faq: zh_faq,
       common: zh_common,
       finance: zh_finance,
@@ -89,6 +94,7 @@ void i18n
     es: {
       app: es_app,
       auth: es_auth,
+      dashboard: es_dashboard,
       faq: es_faq,
       common: es_common,
       finance: es_finance,

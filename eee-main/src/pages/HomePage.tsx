@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  LayoutDashboard,
   BarChart3,
   Package,
   ShoppingCart,
@@ -41,6 +42,24 @@ interface Module {
 }
 
 const MODULES: Module[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    description: 'Per work-order cart pipeline across every production stage, plus a drying-room exit forecast.',
+    icon: LayoutDashboard,
+    status: 'active',
+    color: {
+      bg: 'bg-indigo-50',
+      border: 'border-indigo-200',
+      icon: 'text-indigo-600',
+      iconBg: 'bg-indigo-100',
+      badge: 'bg-indigo-100 border-indigo-200',
+      badgeText: 'text-indigo-700',
+      button: 'bg-indigo-600 hover:bg-indigo-500 text-white',
+      chevron: 'text-indigo-500',
+    },
+    features: ['Work-Order Pipeline', 'Stage Cart Counts', 'Drying Exit Forecast', 'Live Refresh'],
+  },
   {
     id: 'finance',
     label: 'Financial Management',

@@ -1,0 +1,49 @@
+{
+  "module": {
+    "title": "Dashboard",
+    "allModules": "All Modules",
+    "moduleHub": "Module Hub",
+    "navPipeline": "Work-Order Pipeline",
+    "navForecast": "Exit Forecast",
+    "support": "Help & Support",
+    "noAccess": "You don't have permission to view the dashboard."
+  },
+  "stage": {
+    "created": "Created",
+    "dry_room": "Dry Room",
+    "waiting_test": "Waiting Test",
+    "sampled": "Sampled",
+    "passed": "Passed / Release",
+    "retest": "Retest / Hold",
+    "released": "Released",
+    "dispatched": "Dispatched"
+  },
+  "pipeline": {
+    "title": "Work-Order Pipeline",
+    "subtitle": "Cart count at every production stage, grouped by product → work order.",
+    "product": "Product",
+    "total": "Total",
+    "workOrdersShort": "WOs",
+    "refresh": "Refresh",
+    "loading": "Loading pipeline…",
+    "empty": "No carts in the pipeline yet.",
+    "loadFailed": "Failed to load pipeline.",
+    "passedNote": "Stage mapping — Created: created · Dry Room: drying / room-temp drying / awaiting recheck · Waiting Test: checked out, not yet sampled · Sampled: sampled / inspecting / awaiting group result · Passed / Release: passed (these carts are the ones waiting to be released) · Retest / Hold: failed, awaiting disposition · Released: released to packaging, waiting packing · Dispatched: handed to packing."
+  },
+  "forecast": {
+    "title": "Drying-Room Exit Forecast",
+    "subtitle": "Carts still drying, grouped by the day they are expected to leave the dryer.",
+    "refresh": "Refresh",
+    "loading": "Loading forecast…",
+    "empty": "No carts are currently drying.",
+    "loadFailed": "Failed to load forecast.",
+    "totalDrying": "{{count}} cart(s) currently drying",
+    "cartsUnit": "carts",
+    "overdue": "Overdue",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "inDays": "In {{days}} days",
+    "later": "After {{days}} days",
+    "unknown": "Unknown ETA"
+  }
+}

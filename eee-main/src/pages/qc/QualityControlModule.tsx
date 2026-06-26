@@ -12,7 +12,6 @@ import {
   Package,
   FlaskConical,
   History,
-  FileSignature,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -33,6 +32,7 @@ import ProductManagement from './ProductManagement';
 import TestTypesPage from './TestTypesPage';
 import ProductAuditLog from './ProductAuditLog';
 import DailyTestReport from './DailyTestReport';
+import TestingExportPage from './TestingExportPage';
 
 interface Props {
   onHome: () => void;
@@ -77,7 +77,6 @@ export default function QualityControlModule({ onHome }: Props) {
   // the Production module — their `can()` checks live in ProductionModule.tsx.
   const canViewDryRooms   = can('qc', 'dry_rooms', 'view_status');
   const canViewTesting    = can('qc', 'testing', 'view_status');
-  const canViewDailyReport = can('qc', 'daily_report', 'view');
   const canViewLocations  = can('qc', 'locations', 'view');
   // Analysis is a read-only reporting page — visible to anyone who can access
   // the QC dashboard (dashboard.view) or has the explicit analysis.view grant.
@@ -138,10 +137,19 @@ export default function QualityControlModule({ onHome }: Props) {
       );
     }
     if (screen === 'testing') {
-      return <TestingPage onOpenHistory={(id) => setHistorySubLotId(id)} />;
+      return (
+        <TestingPage
+          onOpenHistory={(id) => setHistorySubLotId(id)}
+          onOpenDailyReport={() => navigate('daily-report')}
+          onOpenTestingExport={() => navigate('testing-export')}
+        />
+      );
     }
     if (screen === 'daily-report') {
-      return <DailyTestReport />;
+      return <DailyTestReport onBack={() => navigate('testing')} />;
+    }
+    if (screen === 'testing-export') {
+      return <TestingExportPage onBack={() => navigate('testing')} />;
     }
     if (screen === 'room-temp') {
       return (
@@ -220,7 +228,7 @@ export default function QualityControlModule({ onHome }: Props) {
                      onClick={() => navigate('analysis')} />
           )}
 
-          {(canViewDryRooms || canViewTesting || canViewDailyReport) && <NavSection title={t('qualityControlModule.floor')} />}
+          {(canViewDryRooms || canViewTesting) && <NavSection title={t('qualityControlModule.floor')} />}
           {canViewDryRooms && (
             <NavItem icon={Grid3X3} label={t('qualityControlModule.dryRooms')}
                      isActive={isActive('dry-rooms') || isActive('dry-room-detail')}
@@ -228,13 +236,8 @@ export default function QualityControlModule({ onHome }: Props) {
           )}
           {canViewTesting && (
             <NavItem icon={ListChecks} label={t('qualityControlModule.testing')}
-                     isActive={isActive('testing') || isActive('pending') || isActive('inspect')}
+                     isActive={isActive('testing') || isActive('pending') || isActive('inspect') || isActive('daily-report') || isActive('testing-export')}
                      onClick={() => navigate('testing')} />
-          )}
-          {canViewDailyReport && (
-            <NavItem icon={FileSignature} label={t('qualityControlModule.dailyReport')}
-                     isActive={isActive('daily-report')}
-                     onClick={() => navigate('daily-report')} />
           )}
           {/* Room Temp Dry is now managed inside Dry Rooms (card on DryRoomsList) — no separate sidebar entry */}
           {/* Production / Batch Trace / Products & Templates moved to the Production module (BR-Q51) */}

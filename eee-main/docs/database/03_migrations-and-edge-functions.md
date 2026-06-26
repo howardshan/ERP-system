@@ -2537,6 +2537,25 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 ---
 
+### M-157 `20260623000011_qc_dashboard_work_order_pipeline.sql`
+**用途**: 新建顶层 **Dashboard 模块**的两个只读取数 RPC——按「产品 → 工单」展示每辆车(`qc_drying_sub_lot`)所处的生产阶段,以及烘干房出房预测。
+
+**改动**:
+- `qc_dashboard_work_order_pipeline()` → jsonb:嵌套结构(产品分组,内含 `work_orders[]` + 产品级 `totals`)。比 M-093 的 per-SKU 粗看板更细——按工单拆分,并把单一的 testing 桶拆成 4 个操作员真正关心的子阶段。阶段↔状态映射:
+  - `created` = created · `dry_room` = drying / room_temp_drying / awaiting_recheck
+  - `waiting_test` = pending 且无 pending `qc_sample` · `sampled` = (pending 且有 pending sample) / inspecting / awaiting_group_result
+  - `passed` = passed(**即「待放行」同一批车**:系统里 passed 一直停到 QC 点放行才 → closed,所以是一列不是两列)
+  - `retest` = hold / disposing · `released` = closed(已放行待打包) · `dispatched` = dispatched
+  - 工单关联:`qc_drying_sub_lot → qc_production_lot.work_order_barcode`(车上活跃工单)+ `.sku_id → qc_product_sku`。
+- `qc_dashboard_drying_exit_forecast(p_days int default 7)` → jsonb:对 `status='drying'` 的车算 ETA(`now() + (expected_dry_minutes − qc_total_dried_minutes(id))`,复用 M-020 的算法),按本地日(America/Chicago,与前端 Dallas 助手一致)分桶为 `overdue / day(0..p_days) / later / unknown`;前端用 `grp + days_from_today` 渲染可翻译的标签。
+- 两个函数都遵循 M-093:纯 `LANGUAGE sql STABLE`,无 SECURITY DEFINER,`authenticated` 默认可执行。末尾 seed:给所有已有 `production`/`qc` 模块访问的用户补 `dashboard` 模块访问 + `dashboard.pipeline.view` 权限,使看板开箱即用。
+
+**前端配套**: 新增 [`src/services/qcApi.ts`](../../src/services/qcApi.ts) 的 `dashboardWorkOrderPipeline` / `dashboardDryingExitForecast`;新模块目录 [`src/pages/dashboard/`](../../src/pages/dashboard/)(`DashboardModule` + `WorkOrderPipelinePage` + `DryingExitForecastPage`);接线 `App.tsx`(`activeModule==='dashboard'`)、`HomePage.tsx`(MODULES 新增 dashboard 卡)、`i18n/index.ts`(新 `dashboard` namespace + `locales/{en,zh,es}/dashboard.json`)、`locales/*/app.json` 的 `homePage.modules.dashboard.*`。
+
+**关联文档**: [`docs/modules/13_dashboard.md`](../modules/13_dashboard.md)。
+
+---
+
 ## 快速 Migration 编号参考
 
 | 编号 | 文件 |
@@ -2680,7 +2699,10 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-152 | 20260623000006_qc_seed_test_parameters.sql · 从 docs/Testing Parameters.xlsx 导入每个产品的 MC% + Aw 检测项(硬限)及软限;新增 qc_test_type「Moisture Content (MC%)」;软限规则:非红底 Aw±0.005、MC%±0.5(后由 M-153 更正为 ±0.05),红底(21 个 SWD/46xx 产品)无软限(soft=hard);重复 Item 取更严范围;仅更新已存在(按 code 匹配)的产品 |
 | M-153 | 20260623000007_qc_fix_mc_soft_band.sql · 更正 M-152 的 MC% 软限:非红底产品 MC% 软限从 ±0.5 改为 **±0.05**(UPDATE soft_lower=lower-0.05、soft_upper=upper+0.05;红底保持 soft=hard 不动,硬限和 Aw 不动) |
 | M-154 | 20260623000008_qc_drying_sub_lot_dryer_number_dynamic.sql · 放宽 `qc_drying_sub_lot.dryer_number` 的 CHECK 从 1..5 改为 ≥1(补 M-126 数据化烘干房遗漏:RPC 已按 qc_dry_room 校验,但旧列约束仍卡 Dryer 6..16 的 check-in) |
-| **M-155** | _(下一个)_ |
+| M-155 | 20260623000009_qc_testing_export_rows.sql · Testing 导出页取数(WA/MC 模板):按日期+产品+工单返回每条检测一行 |
+| M-156 | 20260623000010_qc_inspection_env_readings.sql · 检测时录入环境读数(Testing Temp / Humidity / Room Temp),存入 `qc_inspection_record.values_json.env`;`qc_submit_inspection` 加 `p_env`,新增 `qc_latest_test_env()` 当日默认 |
+| M-157 | 20260623000011_qc_dashboard_work_order_pipeline.sql · 新建 Dashboard 模块:`qc_dashboard_work_order_pipeline()`(产品→工单 8 阶段车数)+ `qc_dashboard_drying_exit_forecast()`(在烘干车按 ETA 日分桶)+ seed dashboard 模块访问/权限 |
+| **M-158** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

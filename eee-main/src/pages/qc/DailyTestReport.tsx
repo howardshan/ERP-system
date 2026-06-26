@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  FileSignature, History, ClipboardList, CheckCircle2, Download, Lock, AlertTriangle,
+  FileSignature, History, ClipboardList, CheckCircle2, Download, Lock, AlertTriangle, ArrowLeft,
 } from 'lucide-react';
 import {
   getDailyTestData, listDailyReports, signDailyReport, getDailyReportPdfUrl,
@@ -22,7 +22,7 @@ function todayStr(): string {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
-export default function DailyTestReport() {
+export default function DailyTestReport({ onBack }: { onBack?: () => void }) {
   const { t } = useTranslation('qc');
   const { can, erpUser } = usePermissions();
   const canView = can('qc', 'daily_report', 'view');
@@ -45,6 +45,15 @@ export default function DailyTestReport() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 mb-3"
+        >
+          <ArrowLeft size={14} /> {t('dailyTestReport.backToTesting')}
+        </button>
+      )}
       <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('dailyTestReport.title')}</h1>
       <p className="text-xs text-slate-500 mb-4">{t('dailyTestReport.subtitle')}</p>
 

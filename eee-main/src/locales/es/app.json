@@ -49,6 +49,16 @@
     "openModule": "Abrir módulo",
     "inDevelopment": "En desarrollo",
     "modules": {
+      "dashboard": {
+        "label": "Panel",
+        "description": "Flujo de carros por orden de trabajo en cada etapa de producción, más un pronóstico de salida del secado.",
+        "features": {
+          "0": "Flujo por orden de trabajo",
+          "1": "Conteo de carros por etapa",
+          "2": "Pronóstico de salida del secado",
+          "3": "Actualización en vivo"
+        }
+      },
       "finance": {
         "label": "Gestión financiera",
         "description": "Libro mayor, pólizas contables, CxP/CxC, balanza de comprobación y flujos de aprobación de varios niveles.",

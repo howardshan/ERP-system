@@ -95,7 +95,8 @@ eee-main/
     │   ├── 09_qc.md                 # Quality Control：烘干后检验闭环
     │   ├── 10_packaging.md          # Packaging：合格车出库/包装
     │   ├── 11_warehouse-inventory.md # Warehouse & Inventory：库存基座
-    │   └── 12_production-daily-report.md # Production 成型生产日报录入
+    │   ├── 12_production-daily-report.md # Production 成型生产日报录入
+    │   └── 13_dashboard.md          # Dashboard：按工单的生产流水看板 + 出房预测
     └── database/
         ├── 01_schema.md             # 完整数据库表结构
         ├── 02_rpc-functions.md      # 所有 RPC / View
@@ -116,6 +117,7 @@ eee-main/
 | `activeModule` | 渲染内容 | 文件路径 | 状态 |
 |----------------|---------|---------|------|
 | `home` | `HomePage` | `src/pages/HomePage.tsx` | ✅ 已完成（模块卡片按 `canAccessModule()` 过滤，无访问权限则不显示） |
+| `dashboard` | `DashboardModule` → Work-Order Pipeline / Exit Forecast | `src/pages/dashboard/DashboardModule.tsx` | ✅ 已完成（按工单的生产流水看板 + 出房预测，M-157，见 `docs/modules/13_dashboard.md`） |
 | `finance` | `DashboardLayout` + 财务子页面 | `src/components/layout/DashboardLayout.tsx` | ✅ 已完成 |
 | `workflow` | `WorkflowModule` → `WorkflowList` / `WorkflowBuilder` | `src/pages/WorkflowList.tsx`, `src/pages/WorkflowBuilder.tsx` | ✅ 已完成（执行引擎待开发） |
 | `warehouse` | `WarehouseModule` → Overview / Items / Locations | `src/pages/warehouse/WarehouseModule.tsx` | 🚧 Sprint 0（物料 CRUD + 7 库区只读 + QC↔item 关联），见 `docs/modules/11_warehouse-inventory.md` |

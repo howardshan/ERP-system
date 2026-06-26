@@ -26,6 +26,7 @@ import QualityControlModule from './pages/qc/QualityControlModule';
 import PackagingModule from './pages/packaging/PackagingModule';
 import ProductionModule from './pages/production/ProductionModule';
 import WarehouseModule from './pages/warehouse/WarehouseModule';
+import DashboardModule from './pages/dashboard/DashboardModule';
 import AuditLog from './pages/finance/AuditLog';
 import FaqModule from './pages/faq/FaqModule';
 import ProfitLoss from './pages/finance/ProfitLoss';
@@ -200,6 +201,10 @@ function AppShell({
 
   if (activeModule === 'hr') {
     return <HRModule onHome={() => setActiveModule('home')} />;
+  }
+
+  if (activeModule === 'dashboard') {
+    return <DashboardModule onHome={() => setActiveModule('home')} />;
   }
 
   if (activeModule === 'qc') {
