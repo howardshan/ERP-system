@@ -1233,12 +1233,21 @@ export async function inspectionTemplatesForSubLot(subLotId: string): Promise<{
 }
 
 /** Submit one reading per test (keyed by template id) in a single inspection. */
+// M-156: environment readings captured alongside the test (testing temp /
+// humidity / room temp). Persisted into qc_inspection_record.values_json.env.
+export interface TestEnv {
+  testing_temp: number;
+  humidity: number;
+  room_temp: number;
+}
+
 export async function submitInspectionMulti(
   subLotId: string,
   values: Record<string, number>,
   samplePk?: string | null,
   result?: 'pass' | 'fail' | null,
   remark?: string | null,
+  env?: TestEnv | null,
 ): Promise<InspectionResult> {
   return rpc<InspectionResult>('qc_submit_inspection', {
     p_sub_lot_id: subLotId,
@@ -1246,7 +1255,13 @@ export async function submitInspectionMulti(
     p_sample_pk: samplePk ?? null,
     p_result: result ?? null,
     p_remark: remark ?? null,
+    p_env: env ?? null,
   });
+}
+
+/** Most recent env readings entered today — used to default the next cart's env. */
+export async function getLatestTestEnv(): Promise<TestEnv | null> {
+  return rpc<TestEnv | null>('qc_latest_test_env');
 }
 
 // ── Samples ───────────────────────────────────────────────────────────────────
@@ -1454,6 +1469,42 @@ export interface ProductionPipelineItem {
 
 export async function productionPipelineSummary(): Promise<ProductionPipelineItem[]> {
   return rpc<ProductionPipelineItem[]>('qc_production_pipeline_summary');
+}
+
+// M-157: Dashboard module — per work-order cart pipeline, grouped product → WO.
+export interface WorkOrderPipelineRow {
+  work_order_no: string;
+  created: number;       // status='created'
+  dry_room: number;      // drying / room_temp_drying / awaiting_recheck
+  waiting_test: number;  // pending, not yet sampled
+  sampled: number;       // pending+sample / inspecting / awaiting_group_result
+  passed: number;        // status='passed' (= waiting release)
+  retest: number;        // hold / disposing
+  released: number;      // status='closed' (waiting packing)
+  dispatched: number;    // status='dispatched'
+  total: number;
+}
+export type WorkOrderPipelineTotals = Omit<WorkOrderPipelineRow, 'work_order_no'>;
+export interface ProductPipelineGroup {
+  sku_id: string;
+  sku_code: string;
+  sku_name: string;
+  totals: WorkOrderPipelineTotals;
+  work_orders: WorkOrderPipelineRow[];
+}
+export async function dashboardWorkOrderPipeline(): Promise<ProductPipelineGroup[]> {
+  return rpc<ProductPipelineGroup[]>('qc_dashboard_work_order_pipeline');
+}
+
+// M-157: drying-room exit forecast — carts still drying, bucketed by ETA day.
+export interface DryingExitBucket {
+  bucket_date: string | null;            // YYYY-MM-DD (null for overdue/later/unknown)
+  grp: 'overdue' | 'day' | 'later' | 'unknown';
+  days_from_today: number | null;        // 0 = today, 1 = tomorrow, …
+  cart_count: number;
+}
+export async function dashboardDryingExitForecast(days = 7): Promise<DryingExitBucket[]> {
+  return rpc<DryingExitBucket[]>('qc_dashboard_drying_exit_forecast', { p_days: days });
 }
 
 // M-050: analysis page metrics with filters (BR-Q32).
@@ -2123,4 +2174,45 @@ export async function getDailyReportPdfUrl(storagePath: string): Promise<string>
     .createSignedUrl(storagePath, 3600);
   if (error) throw new Error(error.message);
   return data.signedUrl;
+}
+
+// ─── Testing data export (WA / MC% template, M-155) ─────────────────────────
+
+/** One inspection row shaped for the WA_MC export template. */
+export interface TestingExportRow {
+  inspection_id: string;
+  product_name: string | null;
+  item_no: string | null;
+  test_date: string;            // ISO; rendered as the Date column
+  wo_lot: string | null;
+  sample_id: string | null;     // Carts# column = sample number
+  sub_lot_code: string;
+  mc_value: number | null;
+  aw_value: number | null;
+  testing_temp: number | null;
+  humidity: number | null;
+  room_temp: number | null;
+  inspector: string | null;
+  result: 'pass' | 'fail';
+  mc_min: number | null;
+  mc_max: number | null;
+  aw_min: number | null;
+  aw_max: number | null;
+  retest_accept: string;        // 'Accept' | 'Retest' | ''
+  note: string | null;
+}
+
+/** Filtered testing rows for the export page (by date range / SKU / work order). */
+export async function getTestingExportRows(filters: {
+  sku_id?: string | null;
+  from_date?: string | null;          // YYYY-MM-DD
+  to_date?: string | null;
+  production_lot_id?: string | null;
+}): Promise<TestingExportRow[]> {
+  return rpc<TestingExportRow[]>('qc_testing_export_rows', {
+    p_sku_id: filters.sku_id ?? null,
+    p_from_date: filters.from_date ?? null,
+    p_to_date: filters.to_date ?? null,
+    p_production_lot_id: filters.production_lot_id ?? null,
+  });
 }

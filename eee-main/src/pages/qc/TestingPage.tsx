@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { CheckCircle2, XCircle, FlaskConical, History, RotateCcw, Hourglass, Users, LayoutDashboard, ListChecks, ChevronDown, ChevronRight, Check } from 'lucide-react';
+import { CheckCircle2, XCircle, FlaskConical, History, RotateCcw, Hourglass, Users, LayoutDashboard, ListChecks, ChevronDown, ChevronRight, Check, FileSignature, FileSpreadsheet } from 'lucide-react';
 import TestingDashboard from './TestingDashboard';
 import {
   listPendingInspections,
@@ -9,10 +9,12 @@ import {
   submitInspectionMulti,
   listSamplesForSubLot,
   getGroupMembers,
+  getLatestTestEnv,
   formatQcDateTime,
   Sample,
   SubLot,
   TestTemplateLimits,
+  TestEnv,
 } from '../../services/qcApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { NumericKeypad } from './components/NumericKeypad';
@@ -21,6 +23,8 @@ import { PermissionDenied } from './components/PermissionDenied';
 
 interface Props {
   onOpenHistory: (subLotId: string) => void;
+  onOpenDailyReport?: () => void;
+  onOpenTestingExport?: () => void;
 }
 
 type Phase = 'idle' | 'sample' | 'measure' | 'done';
@@ -39,13 +43,21 @@ type Phase = 'idle' | 'sample' | 'measure' | 'done';
 
 const TESTING_DRAFT_KEY = 'qc.testing.draft.v1';
 
+interface EnvDraft {
+  testing_temp: string;
+  humidity: string;
+  room_temp: string;
+}
+
 interface TestingDraft {
   readings: Record<string, string>;
   remark: string;
   expandedId: string | null;
+  env: EnvDraft;
 }
 
-const EMPTY_DRAFT: TestingDraft = { readings: {}, remark: '', expandedId: null };
+const EMPTY_ENV: EnvDraft = { testing_temp: '', humidity: '', room_temp: '' };
+const EMPTY_DRAFT: TestingDraft = { readings: {}, remark: '', expandedId: null, env: EMPTY_ENV };
 
 function readDraftMap(): Record<string, TestingDraft> {
   if (typeof window === 'undefined') return {};
@@ -76,6 +88,11 @@ function loadDraft(subLotId: string): TestingDraft {
     readings: d.readings ?? {},
     remark: typeof d.remark === 'string' ? d.remark : '',
     expandedId: typeof d.expandedId === 'string' ? d.expandedId : null,
+    env: {
+      testing_temp: d.env?.testing_temp ?? '',
+      humidity: d.env?.humidity ?? '',
+      room_temp: d.env?.room_temp ?? '',
+    },
   };
 }
 
@@ -93,7 +110,7 @@ function clearDraft(subLotId: string) {
   }
 }
 
-export default function TestingPage({ onOpenHistory }: Props) {
+export default function TestingPage({ onOpenHistory, onOpenDailyReport, onOpenTestingExport }: Props) {
   const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'testing', 'view_status');
@@ -104,6 +121,7 @@ export default function TestingPage({ onOpenHistory }: Props) {
   // for any decision when the reading sits inside the soft band but outside
   // the hard band, and for flipping the verdict inside the hard band.
   const canSupervise = can('qc', 'testing', 'supervisor_judge');
+  const canViewDailyReport = can('qc', 'daily_report', 'view');
 
   const [activeTab, setActiveTab] = useState<'queue' | 'dashboard'>('queue');
   const [pending, setPending] = useState<SubLot[]>([]);
@@ -131,29 +149,55 @@ export default function TestingPage({ onOpenHistory }: Props) {
         {t('testingPage.subtitle')}
       </p>
 
-      {/* Tab toggle — Dashboard tab only shown when user has view_dashboard. */}
-      {canViewDashboard && (
-        <div className="flex gap-1 mb-5 bg-slate-100 rounded-lg p-1 w-fit">
-          <button
-            type="button"
-            onClick={() => setActiveTab('queue')}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
-              activeTab === 'queue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+      {/* Header row: tab toggle on the left, report/export buttons on the right. */}
+      {(canViewDashboard || (canViewDailyReport && (onOpenDailyReport || onOpenTestingExport))) && (
+        <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
+          {/* Tab toggle — Dashboard tab only shown when user has view_dashboard. */}
+          {canViewDashboard ? (
+            <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+              <button
+                type="button"
+                onClick={() => setActiveTab('queue')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
+                  activeTab === 'queue' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+                )}
+              >
+                <ListChecks size={12} /> {t('testingPage.tabQueue')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('dashboard')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
+                  activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+                )}
+              >
+                <LayoutDashboard size={12} /> {t('testingPage.tabDashboard')}
+              </button>
+            </div>
+          ) : <span />}
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {canViewDailyReport && onOpenDailyReport && (
+              <button
+                type="button"
+                onClick={onOpenDailyReport}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-blue-400 hover:text-blue-700 transition-colors"
+              >
+                <FileSignature size={13} /> {t('testingPage.dailyReportBtn')}
+              </button>
             )}
-          >
-            <ListChecks size={12} /> {t('testingPage.tabQueue')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('dashboard')}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-colors',
-              activeTab === 'dashboard' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+            {onOpenTestingExport && (
+              <button
+                type="button"
+                onClick={onOpenTestingExport}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition-colors"
+              >
+                <FileSpreadsheet size={13} /> {t('testingPage.testingExportBtn')}
+              </button>
             )}
-          >
-            <LayoutDashboard size={12} /> {t('testingPage.tabDashboard')}
-          </button>
+          </div>
         </div>
       )}
 
@@ -298,6 +342,8 @@ function TestWorkflow({
   const [busy, setBusy] = useState(false);
   const [decision, setDecision] = useState<'pass' | 'fail' | null>(null); // operator's final call (overall)
   const [remark, setRemark] = useState<string>(() => loadDraft(subLot.id).remark);
+  // M-156: environment readings (testing temp / humidity / room temp), required.
+  const [env, setEnv] = useState<EnvDraft>(() => loadDraft(subLot.id).env);
   const [finalResult, setFinalResult] = useState<'pass' | 'fail' | null>(null);
   const [groupMembers, setGroupMembers] = useState<Array<{ id: string; sub_lot_code: string; is_test_champion: boolean; status: string }>>([]);
 
@@ -309,6 +355,20 @@ function TestWorkflow({
       setGroupMembers([]);
     }
   }, [subLot.test_group_id]);
+
+  // M-156: default env from the day's previous entry — only when this cart's
+  // draft has none yet, so the operator types it once and the rest auto-fill.
+  useEffect(() => {
+    const d = loadDraft(subLot.id).env;
+    if (d.testing_temp || d.humidity || d.room_temp) return;
+    getLatestTestEnv().then(e => {
+      if (e) setEnv({
+        testing_temp: e.testing_temp != null ? String(e.testing_temp) : '',
+        humidity: e.humidity != null ? String(e.humidity) : '',
+        room_temp: e.room_temp != null ? String(e.room_temp) : '',
+      });
+    }).catch(() => {});
+  }, [subLot.id]);
 
   // Load templates + existing samples
   useEffect(() => {
@@ -352,6 +412,14 @@ function TestWorkflow({
 
   const judged: 'pass' | 'fail' | null = overallBand ? (overallBand === 'hard' ? 'pass' : 'fail') : null;
 
+  // All three env fields must be valid numbers before the inspection can be saved.
+  const envComplete = useMemo(() => (
+    (['testing_temp', 'humidity', 'room_temp'] as const).every(k => {
+      const v = env[k];
+      return v.trim() !== '' && Number.isFinite(parseFloat(v));
+    })
+  ), [env]);
+
   // Default decision once every test has a reading: hard → pass, out → forced
   // fail, soft → unset (supervisor consciously decides).
   useEffect(() => {
@@ -369,8 +437,8 @@ function TestWorkflow({
       clearDraft(subLot.id);
       return;
     }
-    saveDraft(subLot.id, { readings, remark, expandedId });
-  }, [subLot.id, readings, remark, expandedId, phase]);
+    saveDraft(subLot.id, { readings, remark, expandedId, env });
+  }, [subLot.id, readings, remark, expandedId, env, phase]);
 
   const handleTakeSample = async () => {
     setBusy(true);
@@ -398,12 +466,17 @@ function TestWorkflow({
   };
 
   const handleConfirm = async () => {
-    if (!activeSample || !allEntered || !decision) return;
+    if (!activeSample || !allEntered || !decision || !envComplete) return;
     setBusy(true);
     try {
       const values: Record<string, number> = {};
       for (const tmpl of templates) values[tmpl.id] = parseFloat(readings[tmpl.id]);
-      const res = await submitInspectionMulti(subLot.id, values, activeSample.id, decision, remark.trim() || null);
+      const envPayload: TestEnv = {
+        testing_temp: parseFloat(env.testing_temp),
+        humidity: parseFloat(env.humidity),
+        room_temp: parseFloat(env.room_temp),
+      };
+      const res = await submitInspectionMulti(subLot.id, values, activeSample.id, decision, remark.trim() || null, envPayload);
       setFinalResult(res.result as 'pass' | 'fail');
       setPhase('done');
     } catch (e) {
@@ -650,6 +723,41 @@ function TestWorkflow({
             )}
           </div>
 
+          {/* M-156: environment readings — required, default from today's last entry */}
+          <div className="mt-4">
+            <p className="text-xs font-bold text-slate-700 mb-1.5">
+              {t('testingPage.envSection')} <span className="text-red-600">*</span>
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { key: 'testing_temp', label: t('testingPage.envTestingTemp') },
+                { key: 'humidity', label: t('testingPage.envHumidity') },
+                { key: 'room_temp', label: t('testingPage.envRoomTemp') },
+              ] as const).map(f => {
+                const v = env[f.key];
+                const invalid = v.trim() !== '' && !Number.isFinite(parseFloat(v));
+                return (
+                  <div key={f.key}>
+                    <label className="block text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">{f.label}</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      value={v}
+                      onChange={e => setEnv(prev => ({ ...prev, [f.key]: e.target.value }))}
+                      className={cn(
+                        'w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1',
+                        invalid ? 'border-red-300 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500',
+                      )}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            {!envComplete && (
+              <p className="mt-1.5 text-[11px] text-amber-700">{t('testingPage.envRequiredHint')}</p>
+            )}
+          </div>
+
           {/* Remark (optional) */}
           <div className="mt-3">
             <p className="text-xs font-bold text-slate-700 mb-1.5">
@@ -675,7 +783,7 @@ function TestWorkflow({
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={busy || !canSubmit || !decision || !allEntered}
+              disabled={busy || !canSubmit || !decision || !allEntered || !envComplete}
               className={cn(
                 'px-4 py-3 rounded-lg text-sm font-bold text-white disabled:opacity-50 transition-colors',
                 decision === 'pass'
@@ -689,9 +797,11 @@ function TestWorkflow({
                 ? t('testingPage.submitting')
                 : !allEntered
                   ? t('testingPage.completeAllTests')
-                  : decision
-                    ? t('testingPage.confirmPersist', { verdict: decision === 'pass' ? t('testingPage.pass') : t('testingPage.fail') })
-                    : t('testingPage.choosePassOrFail')}
+                  : !decision
+                    ? t('testingPage.choosePassOrFail')
+                    : !envComplete
+                      ? t('testingPage.envRequiredHint')
+                      : t('testingPage.confirmPersist', { verdict: decision === 'pass' ? t('testingPage.pass') : t('testingPage.fail') })}
             </button>
           </div>
         </Step>
