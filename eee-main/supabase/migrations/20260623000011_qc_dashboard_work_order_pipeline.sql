@@ -7,9 +7,8 @@
 -- four sub-stages an operator actually tracks.
 --
 -- Stage → status mapping (single qc_drying_sub_lot.status column drives all):
---   created       — status='created'                            (not yet in dryer)
 --   dry_room      — drying | room_temp_drying | awaiting_recheck (in / re-drying)
---   waiting_test  — pending AND no pending qc_sample             (checked out, not sampled)
+--   waiting_test  — pending AND no pending qc_sample             (checked out, waiting to be sampled)
 --   sampled       — (pending AND pending sample) | inspecting | awaiting_group_result
 --   passed        — passed                                      (= waiting release; same carts)
 --   retest        — hold | disposing                            (failed, awaiting disposition)
@@ -19,6 +18,10 @@
 -- Note: "passed" and "waiting release" are the SAME carts in this system — a
 -- cart stays at status='passed' until QC clicks Release (→ 'closed'). So they
 -- are one column, not two.
+--
+-- Carts in status='created' (not yet placed in a dryer) are intentionally NOT
+-- shown — the board only tracks carts that have entered the pipeline. `total`
+-- therefore counts every non-'created' cart.
 --
 -- Work-order link: qc_drying_sub_lot → qc_production_lot.work_order_barcode
 -- (the live cart's work order) and .sku_id → qc_product_sku.
@@ -49,7 +52,6 @@ RETURNS jsonb LANGUAGE sql STABLE AS $$
   wo AS (
     SELECT
       sku_id, sku_code, sku_name, work_order_no,
-      COUNT(*) FILTER (WHERE status = 'created')::int                                              AS created,
       COUNT(*) FILTER (WHERE status IN ('drying','room_temp_drying','awaiting_recheck'))::int      AS dry_room,
       COUNT(*) FILTER (WHERE status = 'pending' AND NOT has_pending_sample)::int                   AS waiting_test,
       COUNT(*) FILTER (WHERE (status = 'pending' AND has_pending_sample)
@@ -58,7 +60,7 @@ RETURNS jsonb LANGUAGE sql STABLE AS $$
       COUNT(*) FILTER (WHERE status IN ('hold','disposing'))::int                                  AS retest,
       COUNT(*) FILTER (WHERE status = 'closed')::int                                               AS released,
       COUNT(*) FILTER (WHERE status = 'dispatched')::int                                           AS dispatched,
-      COUNT(*)::int                                                                                AS total
+      COUNT(*) FILTER (WHERE status <> 'created')::int                                              AS total
     FROM cart
     GROUP BY sku_id, sku_code, sku_name, work_order_no
   ),
@@ -68,14 +70,14 @@ RETURNS jsonb LANGUAGE sql STABLE AS $$
       jsonb_agg(
         jsonb_build_object(
           'work_order_no', work_order_no,
-          'created', created, 'dry_room', dry_room,
+          'dry_room', dry_room,
           'waiting_test', waiting_test, 'sampled', sampled,
           'passed', passed, 'retest', retest,
           'released', released, 'dispatched', dispatched,
           'total', total
         ) ORDER BY work_order_no
       ) FILTER (WHERE total > 0) AS work_orders,
-      SUM(created)::int AS created, SUM(dry_room)::int AS dry_room,
+      SUM(dry_room)::int AS dry_room,
       SUM(waiting_test)::int AS waiting_test, SUM(sampled)::int AS sampled,
       SUM(passed)::int AS passed, SUM(retest)::int AS retest,
       SUM(released)::int AS released, SUM(dispatched)::int AS dispatched,
@@ -87,7 +89,7 @@ RETURNS jsonb LANGUAGE sql STABLE AS $$
     jsonb_build_object(
       'sku_id', sku_id, 'sku_code', sku_code, 'sku_name', sku_name,
       'totals', jsonb_build_object(
-        'created', created, 'dry_room', dry_room,
+        'dry_room', dry_room,
         'waiting_test', waiting_test, 'sampled', sampled,
         'passed', passed, 'retest', retest,
         'released', released, 'dispatched', dispatched, 'total', total
