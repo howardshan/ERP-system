@@ -2567,10 +2567,11 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 
 **改动**:
 - `qc_dashboard_work_order_pipeline()` → jsonb:嵌套结构(产品分组,内含 `work_orders[]` + 产品级 `totals`)。比 M-093 的 per-SKU 粗看板更细——按工单拆分,并把单一的 testing 桶拆成 4 个操作员真正关心的子阶段。阶段↔状态映射:
-  - `created` = created · `dry_room` = drying / room_temp_drying / awaiting_recheck
-  - `waiting_test` = pending 且无 pending `qc_sample` · `sampled` = (pending 且有 pending sample) / inspecting / awaiting_group_result
+  - `dry_room` = drying / room_temp_drying / awaiting_recheck
+  - `waiting_test`(UI 标签「等待取样 / Waiting Sampling」)= pending 且无 pending `qc_sample` · `sampled` = (pending 且有 pending sample) / inspecting / awaiting_group_result
   - `passed` = passed(**即「待放行」同一批车**:系统里 passed 一直停到 QC 点放行才 → closed,所以是一列不是两列)
   - `retest` = hold / disposing · `released` = closed(已放行待打包) · `dispatched` = dispatched
+  - **`status='created'`(未进烘干房)的车不计入**——不返回该列,`total` 只数非 created 的车。
   - 工单关联:`qc_drying_sub_lot → qc_production_lot.work_order_barcode`(车上活跃工单)+ `.sku_id → qc_product_sku`。
 - `qc_dashboard_drying_exit_forecast(p_days int default 7)` → jsonb:对 `status='drying'` 的车算 ETA(`now() + (expected_dry_minutes − qc_total_dried_minutes(id))`,复用 M-020 的算法),按本地日(America/Chicago,与前端 Dallas 助手一致)分桶为 `overdue / day(0..p_days) / later / unknown`;前端用 `grp + days_from_today` 渲染可翻译的标签。
 - 两个函数都遵循 M-093:纯 `LANGUAGE sql STABLE`,无 SECURITY DEFINER,`authenticated` 默认可执行。末尾 seed:给所有已有 `production`/`qc` 模块访问的用户补 `dashboard` 模块访问 + `dashboard.pipeline.view` 权限,使看板开箱即用。

@@ -525,6 +525,7 @@
     "checkedOutSomeSkipped": "Salida de {{count}} carro(s) → {{groups}} grupo(s) de muestreo. {{failed}} omitidos.",
     "checkedOutCarts": "Salida de {{count}} carro(s) → {{groups}} grupo(s) de muestreo formados.",
     "unknownSku": "SKU desconocido",
+    "toggleGroup": "Mostrar/ocultar grupo",
     "dismiss": "Descartar",
     "cannotProceed": "No se puede continuar",
     "scanActionFailed": "Escaneo / acción fallida",

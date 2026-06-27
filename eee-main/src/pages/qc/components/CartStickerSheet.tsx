@@ -85,36 +85,46 @@ function drawStickerPdfPage(
   doc.setLineWidth(0.4);
   doc.rect(P, P, LW, MM_H - 2 * P);
 
-  // QR code — robust on thermal, orientation-independent. The QR itself is
-  // centered (both axes) within the left column; CART#/code sit just below it.
-  const qrSize = Math.min(LW - 1, 30);
+  const cxL = P + LW / 2;
+
+  // WT# + Item# — moved ABOVE the QR (top of the left column). Auto-shrink so a
+  // long work-order number still fits the narrow column.
+  doc.setFont('helvetica', 'bold');
+  const fitL = (text: string, yPos: number, startMm: number, minMm: number) => {
+    let f = ptFromMm(startMm);
+    doc.setFontSize(f);
+    while (doc.getTextWidth(text) > LW - 2 && f > ptFromMm(minMm)) { f -= 0.3; doc.setFontSize(f); }
+    doc.text(text, cxL, yPos, { align: 'center' });
+  };
+  fitL(`WT# ${workOrderBarcode}`, P + 4, 3, 1.8);
+  fitL(`Item: ${skuCode ?? '—'}`, P + 8, 3, 1.8);
+
+  // QR — below the WT#/Item# header, horizontally centered. Robust on thermal,
+  // orientation-independent.
+  const qrSize = Math.min(LW - 2, 30);
   const qrX = P + (LW - qrSize) / 2;
-  const colInnerH = MM_H - 2 * P;
-  const qrY = P + (colInnerH - qrSize) / 2;  // QR vertically centered in the column
+  const qrY = P + 10;
   const qrImg = qrDataUrl(c.sub_lot_code, dpi, qrSize);
   if (qrImg) {
     doc.addImage(qrImg, 'PNG', qrX, qrY, qrSize, qrSize, undefined, 'NONE');
   }
 
   // CART # + sub_lot_code — below the QR (human-readable)
-  const textTop = qrY + qrSize + 4;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(ptFromMm(3.5));
-  doc.text('CART #', P + LW / 2, textTop + 4, { align: 'center' });
+  const textTop = qrY + qrSize + 2;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(ptFromMm(3.2));
+  doc.text('CART #', cxL, textTop + 3.5, { align: 'center' });
 
-  let fs = ptFromMm(3.5);
+  let fs = ptFromMm(4);
   doc.setFont('courier', 'bold'); doc.setFontSize(fs);
   while (doc.getTextWidth(c.sub_lot_code) > LW - 2 && fs > ptFromMm(2)) { fs -= 0.5; doc.setFontSize(fs); }
-  doc.text(c.sub_lot_code, P + LW / 2, textTop + 9, { align: 'center' });
+  doc.text(c.sub_lot_code, cxL, textTop + 8.5, { align: 'center' });
 
-  // Right column header
+  // Right column — product name moved to the very top (WT#/Item# now on the left).
   doc.setLineWidth(0.2);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(ptFromMm(3.5));
-  doc.text(`WT# ${workOrderBarcode}`, RX, P + 5);
-  doc.text(`Item: ${skuCode ?? '—'}`, RX, P + 10);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(ptFromMm(3));
-  doc.text(skuName.length > 55 ? skuName.slice(0, 55) + '…' : skuName, RX, P + 14.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(ptFromMm(3.4));
+  doc.text(skuName.length > 55 ? skuName.slice(0, 55) + '…' : skuName, RX, P + 3.5);
 
-  let y = P + 16;
+  let y = P + 6;
   const hdrH = 5;
   const drawHdr = (text: string, x: number, w: number) => {
     doc.setLineWidth(0.2);
@@ -137,7 +147,7 @@ function drawStickerPdfPage(
   doc.rect(RX, y + hdrH, RW, notesH);
   y += hdrH + notesH + 2;
 
-  // 4 × 2 form grid
+  // 4 × 2 form grid — enlarged (taller rows + bigger fonts)
   const seq = c.sub_lot_code.match(/(\d{3})$/)?.[1] ?? '';
   const rows: [string, string, string, string][] = [
     ['Batch#', '',  'MFG',     ''],
@@ -145,16 +155,16 @@ function drawStickerPdfPage(
     ['Tray#',  '',  'DR in',   ''],
     ['Qty',    '',  'DR out',  ''],
   ];
-  const rowH = 4.5, cw = RW / 2;
+  const rowH = 6, cw = RW / 2;
   for (const [l1, v1, l2, v2] of rows) {
     doc.setLineWidth(0.2);
     doc.rect(RX, y, cw, rowH);
     doc.rect(RX + cw, y, cw, rowH);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(ptFromMm(2.6));
-    doc.text(l1, RX + 1.2, y + 3.2);
-    doc.text(l2, RX + cw + 1.2, y + 3.2);
-    if (v1) { doc.setFont('courier', 'bold'); doc.setFontSize(ptFromMm(3.5)); doc.text(v1, RX + 10, y + 3.4); }
-    if (v2) { doc.setFont('courier', 'bold'); doc.setFontSize(ptFromMm(3.5)); doc.text(v2, RX + cw + 10, y + 3.4); }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(ptFromMm(3.4));
+    doc.text(l1, RX + 1.5, y + 4);
+    doc.text(l2, RX + cw + 1.5, y + 4);
+    if (v1) { doc.setFont('courier', 'bold'); doc.setFontSize(ptFromMm(4.5)); doc.text(v1, RX + 13, y + 4.3); }
+    if (v2) { doc.setFont('courier', 'bold'); doc.setFontSize(ptFromMm(4.5)); doc.text(v2, RX + cw + 13, y + 4.3); }
     y += rowH;
   }
 }
@@ -188,42 +198,55 @@ function drawStickerCanvas(
 
     const P = mm(3), LW = mm(30), G = mm(3), RX = P + LW + G, RW = W - RX - P;
     const lw = Math.max(1, mm(0.2));
+    const cxL = P + LW / 2;
 
     ctx.strokeStyle = '#000'; ctx.lineWidth = lw * 2;
     ctx.strokeRect(P, P, LW, H - 2 * P);
 
-    const bcTopMargin = mm(2), bcMaxLen = (H - 2 * P) * 0.57, bcH = mm(16);
-    const bcCY = P + bcTopMargin + bcMaxLen / 2;
+    // WT# + Item# above the barcode, auto-shrunk to fit the column.
+    ctx.fillStyle = '#000'; ctx.textAlign = 'center';
+    const fitL = (text: string, yPos: number, startMm: number, minMm: number) => {
+      let f = mm(startMm);
+      ctx.font = `bold ${f}px Arial, sans-serif`;
+      while (ctx.measureText(text).width > LW - mm(2) && f > mm(minMm)) {
+        f -= 1; ctx.font = `bold ${f}px Arial, sans-serif`;
+      }
+      ctx.fillText(text, cxL, yPos);
+    };
+    fitL(`WT# ${workOrderBarcode}`, P + mm(4), 3, 1.8);
+    fitL(`Item: ${skuCode ?? '—'}`, P + mm(8), 3, 1.8);
+
+    // Vertical barcode below the header.
+    const bcTop = P + mm(10), bcMaxLen = (H - 2 * P) * 0.45, bcH = mm(16);
+    const bcCY = bcTop + bcMaxLen / 2;
     try {
       const bc = document.createElement('canvas');
       JsBarcode(bc, c.sub_lot_code, { format: 'CODE128', displayValue: false, margin: 0, height: mm(16), width: 2 });
       ctx.save();
       ctx.imageSmoothingEnabled = false;
-      ctx.translate(P + LW / 2, bcCY);
+      ctx.translate(cxL, bcCY);
       ctx.rotate(-Math.PI / 2);
       ctx.drawImage(bc, -bcMaxLen / 2, -bcH / 2, bcMaxLen, bcH);
       ctx.restore();
     } catch { /* skip on bad barcode */ }
 
-    const textTop = P + bcTopMargin + bcMaxLen + mm(4);
+    const textTop = bcTop + bcMaxLen + mm(3);
     ctx.fillStyle = '#000'; ctx.textAlign = 'center';
-    ctx.font = `bold ${mm(4)}px Arial, sans-serif`;
-    ctx.fillText('CART #', P + LW / 2, textTop + mm(5));
+    ctx.font = `bold ${mm(3.8)}px Arial, sans-serif`;
+    ctx.fillText('CART #', cxL, textTop + mm(4));
     let codeFontPx = mm(4.5);
     ctx.font = `bold ${codeFontPx}px "Courier New", monospace`;
     while (ctx.measureText(c.sub_lot_code).width > LW - mm(2) && codeFontPx > mm(2)) {
       codeFontPx -= 1; ctx.font = `bold ${codeFontPx}px "Courier New", monospace`;
     }
-    ctx.fillText(c.sub_lot_code, P + LW / 2, textTop + mm(11));
+    ctx.fillText(c.sub_lot_code, cxL, textTop + mm(10));
 
-    let y = P;
+    // Right column — product name at the top.
+    let y = P + mm(1);
     ctx.textAlign = 'left'; ctx.fillStyle = '#000'; ctx.lineWidth = lw;
-    ctx.font = `bold ${mm(3.5)}px Arial, sans-serif`;
-    ctx.fillText(`WT# ${workOrderBarcode}`, RX, y + mm(5));
-    ctx.fillText(`Item: ${skuCode ?? '—'}`, RX, y + mm(10));
-    ctx.font = `${mm(3)}px Arial, sans-serif`;
-    ctx.fillText(skuName.length > 55 ? skuName.slice(0, 55) + '…' : skuName, RX, y + mm(14.5));
-    y += mm(16);
+    ctx.font = `bold ${mm(3.4)}px Arial, sans-serif`;
+    ctx.fillText(skuName.length > 55 ? skuName.slice(0, 55) + '…' : skuName, RX, y + mm(3));
+    y += mm(5.5);
 
     const hdrH = mm(5);
     const drawHdr = (text: string, x: number, w: number) => {
@@ -248,15 +271,15 @@ function drawStickerCanvas(
       ['Batch#', '', 'MFG', ''], ['Cart#', seq, 'Shift/M', ''],
       ['Tray#', '', 'DR in', ''], ['Qty', '', 'DR out', ''],
     ];
-    const rowH = mm(4.5), cw = Math.round(RW / 2);
+    const rowH = mm(6), cw = Math.round(RW / 2);
     ctx.lineWidth = lw;
     for (const [l1, v1, l2, v2] of rows) {
       ctx.strokeStyle = '#000';
       ctx.strokeRect(RX, y, cw, rowH); ctx.strokeRect(RX + cw, y, cw, rowH);
-      ctx.fillStyle = '#000'; ctx.font = `bold ${mm(2.6)}px Arial, sans-serif`;
-      ctx.fillText(l1, RX + mm(1.2), y + mm(3.2)); ctx.fillText(l2, RX + cw + mm(1.2), y + mm(3.2));
-      if (v1) { ctx.font = `bold ${mm(3.5)}px "Courier New", monospace`; ctx.fillText(v1, RX + mm(10), y + mm(3.4)); }
-      if (v2) { ctx.font = `bold ${mm(3.5)}px "Courier New", monospace`; ctx.fillText(v2, RX + cw + mm(10), y + mm(3.4)); }
+      ctx.fillStyle = '#000'; ctx.font = `bold ${mm(3.4)}px Arial, sans-serif`;
+      ctx.fillText(l1, RX + mm(1.5), y + mm(4)); ctx.fillText(l2, RX + cw + mm(1.5), y + mm(4));
+      if (v1) { ctx.font = `bold ${mm(4.5)}px "Courier New", monospace`; ctx.fillText(v1, RX + mm(13), y + mm(4.3)); }
+      if (v2) { ctx.font = `bold ${mm(4.5)}px "Courier New", monospace`; ctx.fillText(v2, RX + cw + mm(13), y + mm(4.3)); }
       y += rowH;
     }
 

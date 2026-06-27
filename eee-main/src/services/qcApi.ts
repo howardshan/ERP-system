@@ -1474,9 +1474,8 @@ export async function productionPipelineSummary(): Promise<ProductionPipelineIte
 // M-157: Dashboard module — per work-order cart pipeline, grouped product → WO.
 export interface WorkOrderPipelineRow {
   work_order_no: string;
-  created: number;       // status='created'
   dry_room: number;      // drying / room_temp_drying / awaiting_recheck
-  waiting_test: number;  // pending, not yet sampled
+  waiting_test: number;  // pending, waiting to be sampled
   sampled: number;       // pending+sample / inspecting / awaiting_group_result
   passed: number;        // status='passed' (= waiting release)
   retest: number;        // hold / disposing

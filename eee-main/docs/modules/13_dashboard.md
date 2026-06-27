@@ -25,9 +25,8 @@ Production 模块原有的 `ProductionDashboard`(M-093 `qc_production_pipeline_s
 
 | 看板列 | 定义 |
 |---|---|
-| **Created** 已创建(未进烘干房) | `status='created'` |
 | **Dry Room** 烘干房 | `status IN ('drying','room_temp_drying','awaiting_recheck')` |
-| **Waiting Test** 等待测试 | `status='pending'` 且无 pending `qc_sample`(已出房、未取样) |
+| **Waiting Sampling** 等待取样 | `status='pending'` 且无 pending `qc_sample`(已出房、未取样) |
 | **Sampled** 已取样(等结果) | (`status='pending'` 且有 pending `qc_sample`)OR `status IN ('inspecting','awaiting_group_result')` |
 | **Passed / Release** 通过·待放行 | `status='passed'` |
 | **Retest / Hold** 复测·暂扣 | `status IN ('hold','disposing')`(测试失败,等待处置) |
@@ -35,6 +34,8 @@ Production 模块原有的 `ProductionDashboard`(M-093 `qc_production_pipeline_s
 | **Dispatched** 已送包装 | `status='dispatched'` |
 
 > **注意:passed ≡ 待放行**。本系统里「pass 了」和「等待放行」是**同一批车**——车一直停在 `status='passed'`,直到 QC 点 Release 才 → `closed`。所以它是**一列**(`Passed / Release`),不是两列。
+
+> **未进烘干房(`status='created'`)的车不在看板显示**(操作员只关心已进入流水线的车);`totals.total` 因此只数非 `created` 的车。
 
 **出房预测**:对 `status='drying'` 的车,ETA = `now() + (expected_dry_minutes − qc_total_dried_minutes(id)) 分钟`(复用 M-020 算法)。按本地日(America/Chicago,与前端 Dallas 助手一致)分桶:`overdue`(逾期)/ `day`(today..+p_days,逐日)/ `later`(窗口之外)/ `unknown`(无 `expected_dry_minutes`)。前端用 `grp + days_from_today` 渲染可翻译标签。
 

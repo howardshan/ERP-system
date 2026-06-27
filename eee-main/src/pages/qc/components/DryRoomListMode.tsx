@@ -423,38 +423,87 @@ export function DryRoomListMode({ dryerNumber, onOpenHistory }: Props) {
             {eligible.length === 0 ? (
               <p className="text-xs text-slate-500 px-1">{tr('dryRoomListMode.noSubLotsAwaiting')}</p>
             ) : (
-              <ul className="space-y-1.5 max-h-[380px] overflow-auto">
-                {eligible.map(s => {
-                  const isSelected = selected.has(s.id);
-                  const recheck = s.status === 'awaiting_recheck';
+              <div className="space-y-2 max-h-[420px] overflow-auto">
+                {awaitingGroups.map(pg => {
+                  const pgIds = pg.carts.map(c => c.id);
+                  const pgKey = `awp:${pg.skuId}`;
+                  const open = expanded[pgKey] !== false;   // awaiting groups default open
                   return (
-                    <li key={s.id}>
-                      <label className={cn(
-                        'flex items-start gap-2 rounded-lg px-2 py-1.5 border-2 text-xs cursor-pointer transition-colors',
-                        isSelected ? 'border-blue-500 bg-blue-50'
-                          : recheck ? 'border-amber-200 hover:border-amber-400 bg-amber-50/30'
-                          : 'border-slate-200 hover:border-blue-300',
-                      )}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggle(s.id)}
-                          disabled={!canCheckIn}
-                          className="mt-0.5 accent-blue-600"
+                    <div key={pg.skuId} className="border border-slate-200 rounded-lg overflow-hidden">
+                      {/* Product header — select the whole product at once */}
+                      <div className="flex items-center gap-2 bg-slate-50 px-2 py-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setExpanded(e => ({ ...e, [pgKey]: !(e[pgKey] ?? true) }))}
+                          className="text-slate-400 hover:text-slate-600 shrink-0"
+                          aria-label={tr('dryRoomListMode.toggleGroup')}
+                        >
+                          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                        <SelectAllCheckbox
+                          total={pgIds.length}
+                          selected={selCountIn(pgIds)}
+                          onToggleAll={() => setManyIn(pgIds, selCountIn(pgIds) !== pgIds.length)}
+                          label={pg.skuName}
                         />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-mono font-bold text-slate-900">{s.sub_lot_code}</div>
-                          <div className="text-[10px] text-slate-500 mt-0.5">
-                            {s.sku_name ?? '—'}
-                            {recheck && <span className="ml-1 text-amber-700">· {tr('dryRoomListMode.rePlace')}</span>}
-                            {s.expected_dry_minutes ? ` · ${tr('dryRoomListMode.targetMinutes', { n: s.expected_dry_minutes })}` : ''}
-                          </div>
+                      </div>
+
+                      {open && (
+                        <div className="p-1.5 space-y-1.5">
+                          {pg.lots.map(lot => {
+                            const lotIds = lot.carts.map(c => c.id);
+                            return (
+                              <div key={lot.key} className="rounded-md bg-slate-50/60 border border-slate-100 p-1.5">
+                                {/* Work-order header — select the whole work order at once */}
+                                <div className="flex items-center gap-1.5 px-1 pb-1">
+                                  <Package size={11} className="text-slate-400 shrink-0" />
+                                  <SelectAllCheckbox
+                                    total={lotIds.length}
+                                    selected={selCountIn(lotIds)}
+                                    onToggleAll={() => setManyIn(lotIds, selCountIn(lotIds) !== lotIds.length)}
+                                    label={lot.label}
+                                  />
+                                </div>
+                                <ul className="space-y-1">
+                                  {lot.carts.map(s => {
+                                    const isSelected = selected.has(s.id);
+                                    const recheck = s.status === 'awaiting_recheck';
+                                    return (
+                                      <li key={s.id}>
+                                        <label className={cn(
+                                          'flex items-start gap-2 rounded-lg px-2 py-1.5 border-2 text-xs cursor-pointer transition-colors',
+                                          isSelected ? 'border-blue-500 bg-blue-50'
+                                            : recheck ? 'border-amber-200 hover:border-amber-400 bg-amber-50/30'
+                                            : 'border-slate-200 hover:border-blue-300 bg-white',
+                                        )}>
+                                          <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => toggle(s.id)}
+                                            disabled={!canCheckIn}
+                                            className="mt-0.5 accent-blue-600"
+                                          />
+                                          <div className="min-w-0 flex-1">
+                                            <div className="font-mono font-bold text-slate-900">{s.sub_lot_code}</div>
+                                            <div className="text-[10px] text-slate-500 mt-0.5">
+                                              {recheck && <span className="text-amber-700">{tr('dryRoomListMode.rePlace')} · </span>}
+                                              {s.expected_dry_minutes ? tr('dryRoomListMode.targetMinutes', { n: s.expected_dry_minutes }) : '—'}
+                                            </div>
+                                          </div>
+                                        </label>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            );
+                          })}
                         </div>
-                      </label>
-                    </li>
+                      )}
+                    </div>
                   );
                 })}
-              </ul>
+              </div>
             )}
 
             <button

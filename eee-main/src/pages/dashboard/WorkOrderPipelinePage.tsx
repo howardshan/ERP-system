@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   RefreshCw, ChevronRight, ChevronDown,
-  PackagePlus, Flame, FlaskConical, TestTube, CheckCircle2, RotateCcw, Send, Truck,
+  Flame, FlaskConical, TestTube, CheckCircle2, RotateCcw, Send, Truck,
 } from 'lucide-react';
 import {
   dashboardWorkOrderPipeline, ProductPipelineGroup, WorkOrderPipelineRow, WorkOrderPipelineTotals,
@@ -14,21 +14,20 @@ import { cn } from '../../lib/utils';
  * row per work order, with a column for every stage a cart passes through.
  * Data: qc_dashboard_work_order_pipeline() (M-157).
  *
- * Stage → status mapping (see migration header):
- *   Created       — created
- *   Dry Room      — drying / room_temp_drying / awaiting_recheck
- *   Waiting Test  — pending, not yet sampled
- *   Sampled       — pending+sample / inspecting / awaiting_group_result
- *   Passed        — passed   (= waiting release; same carts)
- *   Retest        — hold / disposing
- *   Released      — closed   (released, waiting packing)
- *   Dispatched    — dispatched
+ * Stage → status mapping (see migration header). Carts in status='created'
+ * (not yet in a dryer) are intentionally NOT shown.
+ *   Dry Room         — drying / room_temp_drying / awaiting_recheck
+ *   Waiting Sampling — pending, not yet sampled
+ *   Sampled          — pending+sample / inspecting / awaiting_group_result
+ *   Passed           — passed   (= waiting release; same carts)
+ *   Retest           — hold / disposing
+ *   Released         — closed   (released, waiting packing)
+ *   Dispatched       — dispatched
  */
 
 type StageKey = keyof WorkOrderPipelineTotals;
 
 const STAGES: { key: Exclude<StageKey, 'total'>; icon: React.ElementType; color: BucketColor }[] = [
-  { key: 'created',      icon: PackagePlus,   color: 'slate' },
   { key: 'dry_room',     icon: Flame,         color: 'amber' },
   { key: 'waiting_test', icon: FlaskConical,  color: 'sky' },
   { key: 'sampled',      icon: TestTube,      color: 'indigo' },
@@ -74,11 +73,10 @@ export default function WorkOrderPipelinePage() {
 
   const grandTotals = useMemo<WorkOrderPipelineTotals>(() => {
     const acc: WorkOrderPipelineTotals = {
-      created: 0, dry_room: 0, waiting_test: 0, sampled: 0,
+      dry_room: 0, waiting_test: 0, sampled: 0,
       passed: 0, retest: 0, released: 0, dispatched: 0, total: 0,
     };
     for (const g of groups) {
-      acc.created += g.totals.created;
       acc.dry_room += g.totals.dry_room;
       acc.waiting_test += g.totals.waiting_test;
       acc.sampled += g.totals.sampled;

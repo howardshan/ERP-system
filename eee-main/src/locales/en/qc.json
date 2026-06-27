@@ -527,6 +527,7 @@
     "checkedOutSomeSkipped": "Checked out {{count}} cart(s) → {{groups}} sampling group(s). {{failed}} skipped.",
     "checkedOutCarts": "Checked out {{count}} cart(s) → {{groups}} sampling group(s) formed.",
     "unknownSku": "Unknown SKU",
+    "toggleGroup": "Toggle group",
     "dismiss": "Dismiss",
     "cannotProceed": "Cannot proceed",
     "scanActionFailed": "Scan / action failed",
