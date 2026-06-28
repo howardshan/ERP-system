@@ -523,6 +523,7 @@
     "checkedOutSomeSkipped": "已出仓 {{count}} 个料车 → 形成 {{groups}} 个取样组。跳过 {{failed}} 个。",
     "checkedOutCarts": "已出仓 {{count}} 个料车 → 形成 {{groups}} 个取样组。",
     "unknownSku": "未知 SKU",
+    "toggleGroup": "展开/收起分组",
     "dismiss": "关闭",
     "cannotProceed": "无法继续",
     "scanActionFailed": "扫描 / 操作失败",

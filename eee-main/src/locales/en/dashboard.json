@@ -9,9 +9,8 @@
     "noAccess": "You don't have permission to view the dashboard."
   },
   "stage": {
-    "created": "Created",
     "dry_room": "Dry Room",
-    "waiting_test": "Waiting Test",
+    "waiting_test": "Waiting Sampling",
     "sampled": "Sampled",
     "passed": "Passed / Release",
     "retest": "Retest / Hold",
@@ -28,7 +27,7 @@
     "loading": "Loading pipeline…",
     "empty": "No carts in the pipeline yet.",
     "loadFailed": "Failed to load pipeline.",
-    "passedNote": "Stage mapping — Created: created · Dry Room: drying / room-temp drying / awaiting recheck · Waiting Test: checked out, not yet sampled · Sampled: sampled / inspecting / awaiting group result · Passed / Release: passed (these carts are the ones waiting to be released) · Retest / Hold: failed, awaiting disposition · Released: released to packaging, waiting packing · Dispatched: handed to packing."
+    "passedNote": "Stage mapping — Dry Room: drying / room-temp drying / awaiting recheck · Waiting Sampling: checked out of the dryer, not yet sampled · Sampled: sampled / inspecting / awaiting group result · Passed / Release: passed (these carts are the ones waiting to be released) · Retest / Hold: failed, awaiting disposition · Released: released to packaging, waiting packing · Dispatched: handed to packing. Carts not yet placed in a dryer (created) are not shown."
   },
   "forecast": {
     "title": "Drying-Room Exit Forecast",

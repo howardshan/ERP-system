@@ -9,9 +9,8 @@
     "noAccess": "No tiene permiso para ver el panel."
   },
   "stage": {
-    "created": "Creado",
     "dry_room": "Secado",
-    "waiting_test": "Esperando prueba",
+    "waiting_test": "Esperando muestreo",
     "sampled": "Muestreado",
     "passed": "Aprobado / Liberar",
     "retest": "Reprueba / Retenido",
@@ -28,7 +27,7 @@
     "loading": "Cargando flujo…",
     "empty": "Aún no hay carros en el flujo.",
     "loadFailed": "Error al cargar el flujo.",
-    "passedNote": "Mapeo de etapas — Creado: created · Secado: secando / secado a temp. ambiente / esperando recontrol · Esperando prueba: retirado, aún sin muestrear · Muestreado: muestreado / inspeccionando / esperando resultado de grupo · Aprobado / Liberar: passed (estos carros son los que esperan ser liberados) · Reprueba / Retenido: falló, esperando disposición · Liberado: liberado a empaque, esperando empaque · Despachado: entregado a empaque."
+    "passedNote": "Mapeo de etapas — Secado: secando / secado a temp. ambiente / esperando recontrol · Esperando muestreo: retirado del secador, aún sin muestrear · Muestreado: muestreado / inspeccionando / esperando resultado de grupo · Aprobado / Liberar: passed (estos carros son los que esperan ser liberados) · Reprueba / Retenido: falló, esperando disposición · Liberado: liberado a empaque, esperando empaque · Despachado: entregado a empaque. Los carros aún no colocados en un secador (created) no se muestran."
   },
   "forecast": {
     "title": "Pronóstico de salida del secado",
