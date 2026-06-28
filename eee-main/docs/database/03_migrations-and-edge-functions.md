@@ -2729,7 +2729,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-156 | 20260623000010_qc_inspection_env_readings.sql · 检测时录入环境读数(Testing Temp / Humidity / Room Temp),存入 `qc_inspection_record.values_json.env`;`qc_submit_inspection` 加 `p_env`,新增 `qc_latest_test_env()` 当日默认 |
 | M-157 | 20260623000011_qc_dashboard_work_order_pipeline.sql · 新建 Dashboard 模块:`qc_dashboard_work_order_pipeline()`(产品→工单 8 阶段车数)+ `qc_dashboard_drying_exit_forecast()`(在烘干车按 ETA 日分桶)+ seed dashboard 模块访问/权限 |
 | M-158 | 20260623000012_system_audit_log_view_production_events.sql · 修正中央日志 `v_system_audit_log`:`qc_quality_event` 的 `sub_lot_created`(车间建车)改归 `production` 模块,其余烘干/检测/处置事件仍归 `qc`(CREATE OR REPLACE VIEW) |
-| **M-159** | _(下一个)_ |
+| M-159 | 20260627000001_notify_base_url_from_vault.sql · `qc_notify_on_inspection()` 改从 Vault 读取 Edge Functions base URL(`notify_base_url`),不再硬编码项目 ref;消除跨环境隐患(phase2 不再误调 phase1 的 send-notification)。base_url 按环境在 Vault 配置(同 M-084 webhook secret 模式);未配置则静默跳过通知,绝不阻断检测插入 |
+| **M-160** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
