@@ -1,8 +1,9 @@
 # NPIC 第二阶段 — 生产与包装运营系统 · 详细开发计划书
 
-> **版本**: v1.3（草案）
-> **日期**: 2026-07-07
+> **版本**: v1.4（草案）
+> **日期**: 2026-07-10
 > **修订**:
+> - v1.4 — 新增第九节"开发进度日志"：PK0-c（`pkg_work_ticket` M-160）、PK0-a（`sku_config` + 新建 `product` 模块 M-161）+ product 模块 UI 已落地；记录标签页切换表单丢失的缺陷修复
 > - v1.3 — 决策 1 据 OQ-1 修正：产品主数据是**层级/BOM 关系**（最终产品 SKU ←N:M→ 生产 SKU ←N:M→ 原料），非扁平四套编码归并；枢纽按层级设计，与决策 2 合为完整 BOM 链
 > - v1.2 — 决策 1–7、10 已确认采纳；模块 J/K 暂缓（决策 8/9 搁置），**本期范围收窄为 A–I**；新增第八节"开发环境与协作约定"（开发路径 / 分支 / 双 Supabase / migration 基线 / 文档约定）
 > - v1.1 — 第六节从"开放问题清单"升级为"决策与建议方案"（每题给出建议方案+理由+决策速览表）
@@ -559,5 +560,37 @@
 
 ### 8.7 本期范围与已知素材
 - **本期范围**：模块 **A–I**（J、K 暂缓）。
-- **已具备素材**：模块 E/F 的纸质 Traveler Form 原件照片（`docs/Phase 2/微信图片_*.jpg`）——E=班次记录版、F=栈板+QC 版，共享同一表头（Work Ticket / Parent Item Code / Date Code）。
-- **待委托方补充**：模块 D 领料单实际样式（暂按合理系统格式开发，后续替换）；决策 7 的 HR 按人管理范围；决策 10 的抄读频次细节。
+- **已具备素材**：模块 E/F 的纸质 Traveler Form 原件照片（`docs/Phase 2/微信图片_*.jpg`）——E=班次记录版、F=栈板+QC 版，共享同一表头（Work Ticket / Parent Item Code / Date Code）；模块 D 的 Picking Sheet 原件照片（`微信图片_239`）。
+- **待委托方补充**：决策 7 的 HR 按人管理范围；决策 10 的抄读频次细节。
+
+---
+
+## 九、开发进度日志
+
+> 权威进度以 phase2 仓库（`npic-phase-2/ERP-system-main/eee-main`）代码与 `docs/database/03_migrations-and-edge-functions.md` 为准；本节为里程碑级摘要。SPEC 均在 phase2 仓库 `docs/`。
+
+### 已产出施工级 SPEC
+| SPEC | 覆盖 | 版本 |
+|------|------|------|
+| `PK0-产品层级与包装工票地基-SPEC.md` | 决策 1/2 产品层级、`sku_config`、`pkg_work_ticket` | v0.1 |
+| `Packaging模块-D-领料单-SPEC.md` | 模块 D 领料（Picking Sheet）| v0.1 |
+| `Packaging模块-EF-SPEC.md` | 模块 E 班次记录 / F 栈板+QC | v0.3 |
+
+### 已落地代码（phase2 仓库，分支 `npic-phase-2-tianzuo`）
+
+| 里程碑 | 内容 | Migration | 状态 |
+|--------|------|-----------|------|
+| **PK0-c** | `pkg_work_ticket` 包装工票（D/E/F 共享表头）+ Packaging 模块「包装工票」Tab + 管理页（列表/搜索/新建/编辑）+ 权限 `packaging.work_ticket.*` + 三语 i18n | **M-160** `20260708000001_pkg_work_ticket.sql` | ✅ 已建·已实测 |
+| **PK0-a** | `sku_config` 按 SKU 配置表（日期码默认 / 重量vs数量 / 金属 FE·NFE·SUS 阈值）+ **新建 `product` 权限模块**（登记进 `PERMISSION_STRUCTURE` + `ALL_MODULES`）| **M-161** `20260708000002_sku_config.sql` | ✅ 已建 |
+| **PK0-a UI** | `product` 模块 UI：模块壳 + SKU 配置页（列表/编辑）+ 首页卡片（violet）+ App 路由 + 三语 i18n；**日期码默认已接入工票表单**（选成品自动带出）| —（纯前端）| ✅ 已建 |
+
+### 缺陷修复
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| 切换浏览器标签页后，任何页面正在填写的表单/弹窗被清空（全站性）| `App.tsx` MFA/AAL 门禁 effect 依赖整个 `session` 对象；Supabase 在标签页重获焦点时触发 `TOKEN_REFRESHED` → `setSession(新对象)` → `setAalOk(null)` → 整棵已登录组件树被 spinner 卸载重挂 | 改为按 `user.id` 门控（`aalCheckedForUserId` ref）——token 刷新时用户没变则不重挂界面。见 `docs/modules/06_users-auth.md` |
+| 首页 product 卡片显示原始键 `homePage.modules.product.label` 等 | 首页模块文字经 `t('homePage.modules.<id>.*')` 渲染（键在 `locales/*/app.json`），新增 product 时漏配这些键 | 补 `homePage.modules.product.{label,description,features.0-3}` 到 en/zh/es 的 `app.json` |
+
+### 下一步候选
+- **PK-E / PK-F**：包装班次记录 / 栈板+QC（业务主线）。
+- **模块 D 编码**：领料单（D-1 纯记录 → D-2 接库存发料）。
+- **PK0-b/d**：`prod_bom_component`（成品↔生产SKU）、`prod_run_material`（车↔一级单）——补全决策 1/2 层级桥。
