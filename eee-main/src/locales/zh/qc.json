@@ -278,7 +278,11 @@
     "orderCount_other": "{{count}} 个工单",
     "allScanned": "所有料车已扫描入场",
     "cartsNotScanned_one": "{{count}} 个料车尚未扫描",
-    "cartsNotScanned_other": "{{count}} 个料车尚未扫描"
+    "cartsNotScanned_other": "{{count}} 个料车尚未扫描",
+    "searchPlaceholder": "按产品或子批次号搜索…",
+    "filterByDate": "按日期筛选",
+    "clearDates": "清除日期",
+    "noMatch": "没有符合筛选条件的工单。"
   },
   "addCartsDialog": {
     "addCarts": "添加料车",
@@ -686,11 +690,42 @@
     "minutesAgo": "{{count}} 分钟前",
     "hoursAgo": "{{count}} 小时前",
     "daysAgo": "{{count}} 天前",
-    "col": { "time": "时间", "who": "操作人", "action": "操作", "entity": "对象", "reference": "引用", "summary": "摘要" },
-    "action": { "create": "新建", "edit": "编辑", "update": "更新", "delete": "删除", "import": "导入" },
-    "entity": { "product": "产品", "test_type": "测试类型", "product_import": "导入" },
-    "entityOption": { "all": "全部对象", "product": "产品", "test_type": "测试类型", "product_import": "导入" },
-    "field": { "code": "S2 WIP", "name": "名称", "standard_drying_minutes": "参考烘干时间", "sample_every_n_carts": "抽样率", "cart_units": "每车单位", "unit": "单位", "description": "描述", "is_active": "启用" }
+    "col": {
+      "time": "时间",
+      "who": "操作人",
+      "action": "操作",
+      "entity": "对象",
+      "reference": "引用",
+      "summary": "摘要"
+    },
+    "action": {
+      "create": "新建",
+      "edit": "编辑",
+      "update": "更新",
+      "delete": "删除",
+      "import": "导入"
+    },
+    "entity": {
+      "product": "产品",
+      "test_type": "测试类型",
+      "product_import": "导入"
+    },
+    "entityOption": {
+      "all": "全部对象",
+      "product": "产品",
+      "test_type": "测试类型",
+      "product_import": "导入"
+    },
+    "field": {
+      "code": "S2 WIP",
+      "name": "名称",
+      "standard_drying_minutes": "参考烘干时间",
+      "sample_every_n_carts": "抽样率",
+      "cart_units": "每车单位",
+      "unit": "单位",
+      "description": "描述",
+      "is_active": "启用"
+    }
   },
   "production": {
     "errNoPermission": "您没有创建生产批次的权限。",

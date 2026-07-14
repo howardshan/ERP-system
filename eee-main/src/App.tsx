@@ -70,12 +70,20 @@ function MainApp() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Whenever the session changes, (re)evaluate the MFA assurance level.
+  // (Re)evaluate the MFA assurance level only when the authenticated USER
+  // changes — keyed on the user id (a stable string), NOT the session object.
+  // Supabase refreshes the token when the tab regains visibility, handing us a
+  // brand-new session object with the same user; depending on `session` here
+  // would flip aalOk back to null on every tab switch, briefly render the
+  // spinner, and unmount the whole app tree — throwing away in-module navigation
+  // (e.g. Batch Trace → back to the Production dashboard). Keying on the id skips
+  // that re-check on refresh while still re-gating on real login / account swap.
+  const userId = session?.user.id ?? null;
   useEffect(() => {
-    if (!session) { setAalOk(null); return; }
+    if (!userId) { setAalOk(null); return; }
     setAalOk(null);
     checkAal();
-  }, [session, checkAal]);
+  }, [userId, checkAal]);
 
   const spinner = (
     <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
