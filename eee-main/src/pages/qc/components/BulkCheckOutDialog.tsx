@@ -2,7 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, AlertTriangle, CheckCircle2, LogOut, FlaskConical, RefreshCw } from 'lucide-react';
 import { checkOutSubLotsBulk, SubLot, BulkCheckOutResult, SamplingMethod } from '../../../services/qcApi';
-import { planSamplingGroups, championOf, PlannedGroup } from '../../../lib/qcSampling';
+import { planSamplingGroups, championOf, partitionByIntimeWindow, PlannedGroup } from '../../../lib/qcSampling';
+
+// Same-batch check-in window (minutes) — mirrors WINDOW_MIN in the SQL (M-158).
+const INTIME_WINDOW_MIN = 60;
 import { cn } from '../../../lib/utils';
 
 interface Props {
@@ -105,20 +108,30 @@ export function BulkCheckOutDialog({
       }));
     }
 
+    // Sort each window's carts ascending by sub_lot_code before planning.
+    const ascByCode = (cs: SubLot[]) => cs.slice().sort((a, b) => a.sub_lot_code.localeCompare(b.sub_lot_code));
+
     const out: PreviewBucket[] = [];
     for (const { carts, meta } of bucketMap.values()) {
-      const asc = carts.slice().sort((a, b) => a.sub_lot_code.localeCompare(b.sub_lot_code));
+      // M-158: split each bucket into 1-hour check-in (in_time) batches first,
+      // then sample WITHIN each batch. Carts >1h apart are never in one group.
+      const windows = partitionByIntimeWindow(carts, INTIME_WINDOW_MIN);
       let groups: PlannedGroup<SubLot>[];
       if (meta.isRedry) {
-        // Redry keeps the original champion (whichever cart was sampled before),
-        // as one group — no re-chunking. Mirrors Step 2b in the SQL.
-        const desc = asc.slice().reverse();
-        const ci = Math.max(0, desc.findIndex(c => c.is_test_champion));
-        groups = [{ members: desc, championIndex: ci }];
+        const dryers = new Set(carts.map(c => c.dryer_number ?? -1));
+        if (windows.length === 1 && dryers.size === 1) {
+          // Truly one batch, one dryer → keep the original champion (Step 2b fast path).
+          const desc = ascByCode(carts).reverse();
+          const ci = Math.max(0, desc.findIndex(c => c.is_test_champion));
+          groups = [{ members: desc, championIndex: ci }];
+        } else {
+          // Split by time / dryer → re-sample method_2 per window.
+          groups = windows.flatMap(w => planSamplingGroups(ascByCode(w), meta.sampleN, 'method_2'));
+        }
       } else {
-        groups = planSamplingGroups(asc, meta.sampleN, samplingMethod);
+        groups = windows.flatMap(w => planSamplingGroups(ascByCode(w), meta.sampleN, samplingMethod));
       }
-      out.push({ ...meta, cartCount: asc.length, groups });
+      out.push({ ...meta, cartCount: carts.length, groups });
     }
     return out.sort((a, b) => {
       if (a.isRedry !== b.isRedry) return a.isRedry ? 1 : -1;
