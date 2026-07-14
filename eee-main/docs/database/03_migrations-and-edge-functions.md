@@ -2732,7 +2732,9 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-159 | 20260627000001_notify_base_url_from_vault.sql · `qc_notify_on_inspection()` 改从 Vault 读取 Edge Functions base URL(`notify_base_url`),不再硬编码项目 ref;消除跨环境隐患(phase2 不再误调 phase1 的 send-notification)。base_url 按环境在 Vault 配置(同 M-084 webhook secret 模式);未配置则静默跳过通知,绝不阻断检测插入 |
 | _(M-160~163)_ | phase2 仓库(npic-phase-2)已占用,eee-main 跳过以避免两仓库同步时撞号 |
 | M-164 | 20260714000001_qc_list_lots_sub_lot_codes.sql · Batch Trace 搜索:`qc_list_production_lots()` 每个工单多返 `sub_lot_codes`(该工单全部车的 `sub_lot_code` 数组),使追溯列表页可直接模糊匹配完整子批次号(含 M-053 之前前缀异于工单号的旧车)。仅此一字段变化,其余不变(CREATE OR REPLACE) |
-| **M-165** | _(下一个)_ |
+| M-165 | 20260714000002_qc_checkout_intime_window.sql · 出库取样按 **1 小时入烘干(in_time)窗口分批**(BR-Q84):新增 `qc__intime_windows()` 贪心锚点分窗(同一 WO、按 in_time 升序,超过 60 分钟另起一批);`qc_check_out_sub_lots_bulk` 的 Step 2a(首检)/2b(复烘)改为先按窗口分批、再在批内按 `sample_every_n_carts` 取样;复烘「保留原代表样」仅当单窗口+单烘干房时触发;顺带删除旧 2 参重载。前端 `qcSampling.ts`(`partitionByIntimeWindow`)+ `BulkCheckOutDialog` 同步 |
+| M-166 | 20260714000003_qc_withdraw_awaiting_check_in.sql · 撤销待入库车(BR-Q85):`qc_withdraw_awaiting_check_in(ids, reason, note)` 清 `scanned_for_check_in_at`(车退回未上架 `created`,可重扫)并按车写 `check_in_withdrawn` 质量事件(→ 车 timeline + `v_system_audit_log` 操作日志);原因 shift_change/scan_error/other(other 必填 note);仅撤销仍待入库(created+已扫)的车。`qc_quality_event_summary` 加 `check_in_withdrawn` 文案 |
+| **M-167** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

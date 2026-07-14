@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Grid3X3, Clock, Boxes, Thermometer, ArrowRight } from 'lucide-react';
+import { Grid3X3, Clock, Boxes, Thermometer, ArrowRight, Undo2 } from 'lucide-react';
 import {
   listDryRoomSummary,
   listRoomTempDrying,
@@ -11,6 +11,7 @@ import {
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { PermissionDenied } from './components/PermissionDenied';
+import { WithdrawCheckInDialog } from './components/WithdrawCheckInDialog';
 
 interface Props {
   onSelectDryer: (dryerNumber: number) => void;
@@ -32,9 +33,12 @@ export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Pro
   const { t } = useTranslation('qc');
   const { can } = usePermissions();
   const canView = can('qc', 'dry_rooms', 'view_status');
+  const canWithdraw = can('qc', 'dry_rooms', 'check_in');
   const [dryers, setDryers] = useState<DryRoomSummary[]>([]);
   const [roomTemp, setRoomTemp] = useState<RoomTempDryingSubLot[]>([]);
   const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
 
   const load = () => {
     listDryRoomSummary().then(setDryers).catch(e => setError(e.message));
@@ -57,12 +61,30 @@ export default function DryRoomsList({ onSelectDryer, onSelectRoomTempDry }: Pro
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('dryRoomsList.dryRooms')}</h1>
-      <p className="text-slate-600 mb-4 text-sm">
-        {t('dryRoomsList.subtitle')}
-      </p>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1">{t('dryRoomsList.dryRooms')}</h1>
+          <p className="text-slate-600 text-sm">{t('dryRoomsList.subtitle')}</p>
+        </div>
+        {canWithdraw && (
+          <button
+            type="button"
+            onClick={() => setWithdrawOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:border-amber-400 hover:text-amber-700 transition-colors bg-white"
+          >
+            <Undo2 size={13} /> {t('withdrawCheckIn.openBtn')}
+          </button>
+        )}
+      </div>
 
+      {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mb-3 text-sm">{msg}</p>}
       {error && <p className="text-red-600 bg-red-50 p-2 rounded-lg mb-3 text-sm">{error}</p>}
+
+      <WithdrawCheckInDialog
+        open={withdrawOpen}
+        onClose={() => setWithdrawOpen(false)}
+        onSuccess={(m) => { setMsg(m); setWithdrawOpen(false); load(); }}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Room Temp Dry card (managed alongside the 5 physical dryers) */}

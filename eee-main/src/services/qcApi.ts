@@ -24,6 +24,7 @@ export interface SubLot {
   total_dried_minutes: number | null;
   remaining_minutes: number | null;
   lot_number?: string | null;
+  work_order_barcode?: string | null;   // M-053: emitted by qc_sub_lot_to_json
   sku_id?: string | null;
   sku_code?: string | null;
   has_pending_sample?: boolean;
@@ -1035,6 +1036,30 @@ export async function scanCartForCheckIn(subLotId: string): Promise<{
   scanned_for_check_in_at: string | null;
 }> {
   return rpc('qc_scan_cart_for_check_in', { p_sub_lot_id: subLotId });
+}
+
+// M-166: reason codes for withdrawing carts from the awaiting-check-in queue.
+export type WithdrawReason = 'shift_change' | 'scan_error' | 'other';
+
+export interface WithdrawResult {
+  requested: number;
+  succeeded: Array<{ sub_lot_id: string; sub_lot_code: string }>;
+  failed: Array<{ sub_lot_id: string; sub_lot_code?: string; reason: string; status?: string }>;
+}
+
+// M-166: withdraw carts from the "awaiting check-in" queue with a reason.
+// Clears scanned_for_check_in_at (cart reverts to un-staged `created`) and logs
+// a `check_in_withdrawn` quality event per cart (→ cart timeline + audit log).
+export async function withdrawAwaitingCheckIn(
+  subLotIds: string[],
+  reason: WithdrawReason,
+  reasonNote?: string | null,
+): Promise<WithdrawResult> {
+  return rpc<WithdrawResult>('qc_withdraw_awaiting_check_in', {
+    p_sub_lot_ids: subLotIds,
+    p_reason: reason,
+    p_reason_note: reasonNote ?? null,
+  });
 }
 
 // List sub-lots in awaiting_recheck (displaced, paused)
