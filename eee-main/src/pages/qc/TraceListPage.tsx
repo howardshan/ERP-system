@@ -9,13 +9,16 @@ import DateRangeCalendar from './components/DateRangeCalendar';
 interface Props { onSelectLot: (id: string) => void; }
 
 // Fuzzy match a lot against the query. Covers product name / code, work-order
-// barcode, and lot number. Sub-lot codes are `<work_order>-NNN` (M-053), so
-// stripping a trailing "-NNN" off the query lets a full sub-lot number match its
-// parent work order without loading every cart into the list.
+// barcode, lot number, and every drying sub-lot code (M-164 — the list RPC now
+// returns sub_lot_codes, so full sub-lot numbers match directly regardless of
+// prefix). The "-NNN" strip is kept as a fallback for older payloads that predate
+// M-164 and don't carry sub_lot_codes.
 function matchesQuery(lot: ProductionLot, q: string): boolean {
   if (!q) return true;
-  const hay = [lot.sku_name, lot.sku_code, lot.work_order_barcode, lot.lot_number]
-    .filter(Boolean).join(' ').toLowerCase();
+  const hay = [
+    lot.sku_name, lot.sku_code, lot.work_order_barcode, lot.lot_number,
+    ...(lot.sub_lot_codes ?? []),
+  ].filter(Boolean).join(' ').toLowerCase();
   if (hay.includes(q)) return true;
   const base = q.replace(/-\d+$/, '');
   return base.length > 0 && base !== q && hay.includes(base);

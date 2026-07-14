@@ -553,7 +553,7 @@ HR 模块的 11 个 migration（`20260519000001` ~ `20260519000011`）以及 `hr
 | `qc_create_disposition(p_sub_lot_id, p_type, p_remark)` | uuid + enum + 可选 text | hold → disposing → closed,写 `qc_disposition` + `disposition_completed` 事件;仅允许 type ∈ rework/grind/scrap/concession |
 | `qc_dashboard_summary()` | — | 返回 pending/hold/今日通过/今日失败 计数、最长等待分钟数、今日通过率,以及详细的 pending_items / holds / today_passed_items / today_failed_items |
 | `qc_list_pending_inspections()` | — | 待检子批列表 |
-| `qc_list_production_lots()` | — | 生产批 + sku 关联 |
+| `qc_list_production_lots()` | — | 生产批 + sku 关联(含 scanned/total 车数 + `sub_lot_codes` 供搜索,M-164) |
 | `qc_list_sub_lots(p_production_lot_id?)` | 可选 uuid | 子批列表(可按 production_lot 过滤) |
 | `qc_list_products()` | — | SKU + 嵌套检验模板 |
 | `qc_list_locations()` | — | 烘干房位置 |
@@ -1735,7 +1735,7 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 **问题**: M-098 把「未扫码的 created 车」从 dry room awaiting 队列里隐藏掉了,但 Batch Trace 还是把它们一起列出来。操作员看到的车数 ≠ 已进入烘干流程的车数,容易误判现场进度;同时无从知晓某个 WO 到底还有多少车没推到 dryer。
 
 **变更**:
-- `qc_list_production_lots` 每个 lot 多返 `scanned_count`(`scanned_for_check_in_at IS NOT NULL` 的车数)和 `total_count`(全部车数)
+- `qc_list_production_lots` 每个 lot 多返 `scanned_count`(`scanned_for_check_in_at IS NOT NULL` 的车数)和 `total_count`(全部车数);**M-164** 起再多返 `sub_lot_codes`(该工单全部车的 `sub_lot_code` 数组,供 Batch Trace 搜索完整子批次号)
 - `qc_production_lot_detail`:
   - `sub_lots` 列表过滤 `scanned_for_check_in_at IS NOT NULL`(未扫的车不进 trace 视图)
   - `lot` 对象多 `scanned_count` / `total_count` / `max_seq` 三个字段
@@ -2730,7 +2730,9 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-157 | 20260623000011_qc_dashboard_work_order_pipeline.sql · 新建 Dashboard 模块:`qc_dashboard_work_order_pipeline()`(产品→工单 8 阶段车数)+ `qc_dashboard_drying_exit_forecast()`(在烘干车按 ETA 日分桶)+ seed dashboard 模块访问/权限 |
 | M-158 | 20260623000012_system_audit_log_view_production_events.sql · 修正中央日志 `v_system_audit_log`:`qc_quality_event` 的 `sub_lot_created`(车间建车)改归 `production` 模块,其余烘干/检测/处置事件仍归 `qc`(CREATE OR REPLACE VIEW) |
 | M-159 | 20260627000001_notify_base_url_from_vault.sql · `qc_notify_on_inspection()` 改从 Vault 读取 Edge Functions base URL(`notify_base_url`),不再硬编码项目 ref;消除跨环境隐患(phase2 不再误调 phase1 的 send-notification)。base_url 按环境在 Vault 配置(同 M-084 webhook secret 模式);未配置则静默跳过通知,绝不阻断检测插入 |
-| **M-160** | _(下一个)_ |
+| _(M-160~163)_ | phase2 仓库(npic-phase-2)已占用,eee-main 跳过以避免两仓库同步时撞号 |
+| M-164 | 20260714000001_qc_list_lots_sub_lot_codes.sql · Batch Trace 搜索:`qc_list_production_lots()` 每个工单多返 `sub_lot_codes`(该工单全部车的 `sub_lot_code` 数组),使追溯列表页可直接模糊匹配完整子批次号(含 M-053 之前前缀异于工单号的旧车)。仅此一字段变化,其余不变(CREATE OR REPLACE) |
+| **M-165** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
