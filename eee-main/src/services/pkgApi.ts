@@ -54,6 +54,19 @@ export async function getAvailableCarts(skuId?: string): Promise<PkgCart[]> {
   return rpc<PkgCart[]>('pkg_available_carts', skuId ? { p_sku_id: skuId } : {});
 }
 
+// M-167: per-work-order "entered dryer − dispatched" counts for the packaging
+// list denominator (shown as "N / remaining CART(S)").
+export interface WoDryDispatchCount {
+  work_order_barcode: string;
+  entered: number;
+  dispatched: number;
+  remaining: number;
+}
+
+export async function getWoDryDispatchCounts(skuId?: string): Promise<WoDryDispatchCount[]> {
+  return rpc<WoDryDispatchCount[]>('pkg_wo_dry_dispatch_counts', skuId ? { p_sku_id: skuId } : {});
+}
+
 export async function dispatchCarts(subLotIds: string[], note?: string): Promise<PkgDispatchResult> {
   return rpc<PkgDispatchResult>('pkg_dispatch_carts', {
     p_sub_lot_ids: subLotIds,

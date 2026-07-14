@@ -26,6 +26,7 @@
     "noWorkOrder": "(sin orden de trabajo)",
     "noPackagingAssigned": "Sin empaque asignado",
     "cartCount": "{{count}} carro(s)",
+    "cartCountRemaining": "{{count}}/{{remaining}} carro(s)",
     "cartsSelected": "{{count}} carro(s) seleccionado(s)",
     "notePlaceholder": "Nota de salida opcional...",
     "dispatchPermissionTitle": "Falta el permiso packaging.outbound.dispatch",

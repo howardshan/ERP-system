@@ -2734,7 +2734,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-164 | 20260714000001_qc_list_lots_sub_lot_codes.sql · Batch Trace 搜索:`qc_list_production_lots()` 每个工单多返 `sub_lot_codes`(该工单全部车的 `sub_lot_code` 数组),使追溯列表页可直接模糊匹配完整子批次号(含 M-053 之前前缀异于工单号的旧车)。仅此一字段变化,其余不变(CREATE OR REPLACE) |
 | M-165 | 20260714000002_qc_checkout_intime_window.sql · 出库取样按 **1 小时入烘干(in_time)窗口分批**(BR-Q84):新增 `qc__intime_windows()` 贪心锚点分窗(同一 WO、按 in_time 升序,超过 60 分钟另起一批);`qc_check_out_sub_lots_bulk` 的 Step 2a(首检)/2b(复烘)改为先按窗口分批、再在批内按 `sample_every_n_carts` 取样;复烘「保留原代表样」仅当单窗口+单烘干房时触发;顺带删除旧 2 参重载。前端 `qcSampling.ts`(`partitionByIntimeWindow`)+ `BulkCheckOutDialog` 同步 |
 | M-166 | 20260714000003_qc_withdraw_awaiting_check_in.sql · 撤销待入库车(BR-Q85):`qc_withdraw_awaiting_check_in(ids, reason, note)` 清 `scanned_for_check_in_at`(车退回未上架 `created`,可重扫)并按车写 `check_in_withdrawn` 质量事件(→ 车 timeline + `v_system_audit_log` 操作日志);原因 shift_change/scan_error/other(other 必填 note);仅撤销仍待入库(created+已扫)的车。`qc_quality_event_summary` 加 `check_in_withdrawn` 文案 |
-| **M-167** | _(下一个)_ |
+| M-167 | 20260714000004_pkg_wo_dry_dispatch_counts.sql · 打包页每工单车数加分母:`pkg_wo_dry_dispatch_counts(p_sku_id)` 返回每 WO 的 `entered`(有 `qc_sub_lot_spot_history` 记录 = 曾进过烘干房的 unique 车)、`dispatched`(status='dispatched')、`remaining=entered-dispatched`。前端 PackagingPage 工单行显示「N/remaining CART(S)」 |
+| **M-168** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
