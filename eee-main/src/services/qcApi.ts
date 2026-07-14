@@ -66,6 +66,9 @@ export interface ProductionLot {
   // can default start_seq = max_seq + 1 even when unscanned carts are hidden
   // from the detail page's sub_lots list. Only emitted by lot_detail RPC.
   max_seq?: number;
+  // M-164: every cart's sub_lot_code for this WO, so Batch Trace search can
+  // match a full sub-lot number directly. Only emitted by the list RPC.
+  sub_lot_codes?: string[];
 }
 
 export interface TestType {
