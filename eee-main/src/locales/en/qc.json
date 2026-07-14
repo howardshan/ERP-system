@@ -278,7 +278,11 @@
     "orderCount_other": "{{count}} orders",
     "allScanned": "All carts scanned in",
     "cartsNotScanned_one": "{{count}} cart not yet scanned",
-    "cartsNotScanned_other": "{{count}} carts not yet scanned"
+    "cartsNotScanned_other": "{{count}} carts not yet scanned",
+    "searchPlaceholder": "Search by product or sub-lot number…",
+    "filterByDate": "Filter by date",
+    "clearDates": "Clear dates",
+    "noMatch": "No orders match your filters."
   },
   "addCartsDialog": {
     "addCarts": "Add carts",
@@ -690,11 +694,42 @@
     "minutesAgo": "{{count}}m ago",
     "hoursAgo": "{{count}}h ago",
     "daysAgo": "{{count}}d ago",
-    "col": { "time": "Time", "who": "Who", "action": "Action", "entity": "Entity", "reference": "Reference", "summary": "Summary" },
-    "action": { "create": "Create", "edit": "Edit", "update": "Update", "delete": "Delete", "import": "Import" },
-    "entity": { "product": "Product", "test_type": "Test Type", "product_import": "Import" },
-    "entityOption": { "all": "All entities", "product": "Products", "test_type": "Test Types", "product_import": "Imports" },
-    "field": { "code": "S2 WIP", "name": "Name", "standard_drying_minutes": "Reference dry time", "sample_every_n_carts": "Sampling rate", "cart_units": "Units per cart", "unit": "Unit", "description": "Description", "is_active": "Active" }
+    "col": {
+      "time": "Time",
+      "who": "Who",
+      "action": "Action",
+      "entity": "Entity",
+      "reference": "Reference",
+      "summary": "Summary"
+    },
+    "action": {
+      "create": "Create",
+      "edit": "Edit",
+      "update": "Update",
+      "delete": "Delete",
+      "import": "Import"
+    },
+    "entity": {
+      "product": "Product",
+      "test_type": "Test Type",
+      "product_import": "Import"
+    },
+    "entityOption": {
+      "all": "All entities",
+      "product": "Products",
+      "test_type": "Test Types",
+      "product_import": "Imports"
+    },
+    "field": {
+      "code": "S2 WIP",
+      "name": "Name",
+      "standard_drying_minutes": "Reference dry time",
+      "sample_every_n_carts": "Sampling rate",
+      "cart_units": "Units per cart",
+      "unit": "Unit",
+      "description": "Description",
+      "is_active": "Active"
+    }
   },
   "production": {
     "errNoPermission": "You do not have permission to create production batches.",
