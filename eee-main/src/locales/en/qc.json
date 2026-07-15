@@ -1011,7 +1011,9 @@
     "dryRoom": "Dry room",
     "waiting": "waiting for result",
     "pass": "pass",
-    "fail": "fail"
+    "fail": "fail",
+    "subPage": "page {{page}}/{{total}}",
+    "lastUpdate": "Last update {{time}}"
   },
   "testingPage": {
     "awShort": "Aw",

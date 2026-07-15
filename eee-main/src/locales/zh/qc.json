@@ -1007,7 +1007,9 @@
     "dryRoom": "在烘",
     "waiting": "等待结果",
     "pass": "合格",
-    "fail": "不合格"
+    "fail": "不合格",
+    "subPage": "第 {{page}}/{{total}} 页",
+    "lastUpdate": "最后更新 {{time}}"
   },
   "testingPage": {
     "awShort": "水分活度",
