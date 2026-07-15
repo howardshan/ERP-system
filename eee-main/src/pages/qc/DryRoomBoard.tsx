@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import { getDryRoomBoard, DryRoomBoardProduct } from '../../services/qcApi';
@@ -8,10 +8,17 @@ import { PermissionDenied } from './components/PermissionDenied';
 
 const REFRESH_MS = 30_000;   // data reload
 const FLIP_MS = 10_000;      // page auto-advance
+const ROWS_PER_PAGE = 12;    // max table rows per slide; overflow → extra page
 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split('-');
   return `${m}/${d}/${y}`;
+}
+
+function fmtTime(d: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).format(d);
 }
 
 export default function DryRoomBoard() {
@@ -24,16 +31,34 @@ export default function DryRoomBoard() {
   const [error, setError] = useState('');
   const [paused, setPaused] = useState(false);
   const [isFs, setIsFs] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(() => {
     getDryRoomBoard()
       .then(data => {
         setProducts(data);
-        setIndex(i => (data.length === 0 ? 0 : i % data.length));
+        setLastUpdated(new Date());
       })
       .catch(e => setError(e instanceof Error ? e.message : String(e)));
   }, []);
+
+  // Split each product's rows into row-limited pages → a flat list of slides.
+  const slides = useMemo(() => {
+    const out: { product: DryRoomBoardProduct; rows: DryRoomBoardProduct['rows']; page: number; pageCount: number }[] = [];
+    for (const p of products) {
+      const pageCount = Math.max(1, Math.ceil(p.rows.length / ROWS_PER_PAGE));
+      for (let i = 0; i < pageCount; i++) {
+        out.push({ product: p, rows: p.rows.slice(i * ROWS_PER_PAGE, (i + 1) * ROWS_PER_PAGE), page: i + 1, pageCount });
+      }
+    }
+    return out;
+  }, [products]);
+
+  // Keep index in range as slides change on refresh.
+  useEffect(() => {
+    setIndex(i => (slides.length === 0 ? 0 : Math.min(i, slides.length - 1)));
+  }, [slides.length]);
 
   useEffect(() => {
     load();
@@ -43,10 +68,10 @@ export default function DryRoomBoard() {
 
   // Auto-advance one page every FLIP_MS (unless paused or single page).
   useEffect(() => {
-    if (paused || products.length <= 1) return;
-    const t = setInterval(() => setIndex(i => (i + 1) % products.length), FLIP_MS);
+    if (paused || slides.length <= 1) return;
+    const t = setInterval(() => setIndex(i => (i + 1) % slides.length), FLIP_MS);
     return () => clearInterval(t);
-  }, [paused, products.length]);
+  }, [paused, slides.length]);
 
   useEffect(() => {
     const onFs = () => setIsFs(!!document.fullscreenElement);
@@ -60,15 +85,16 @@ export default function DryRoomBoard() {
   };
 
   const go = (delta: number) => {
-    if (products.length === 0) return;
-    setIndex(i => (i + delta + products.length) % products.length);
+    if (slides.length === 0) return;
+    setIndex(i => (i + delta + slides.length) % slides.length);
   };
 
   if (!canView) {
     return <PermissionDenied permission="qc.dashboard.view" feature={t('dryRoomBoard.title')} />;
   }
 
-  const product = products[index] ?? null;
+  const slide = slides[index] ?? null;
+  const product = slide?.product ?? null;
 
   return (
     <div ref={rootRef} className="min-h-full bg-white flex flex-col">
@@ -76,10 +102,10 @@ export default function DryRoomBoard() {
       <div className="flex items-center gap-3 px-6 py-3 border-b border-slate-200 shrink-0">
         <h1 className="text-lg font-bold text-slate-900">{t('dryRoomBoard.title')}</h1>
         <span className="text-xs text-slate-400">
-          {products.length > 0 ? t('dryRoomBoard.pageOf', { n: index + 1, total: products.length }) : ''}
+          {slides.length > 0 ? t('dryRoomBoard.pageOf', { n: index + 1, total: slides.length }) : ''}
         </span>
         <span className="flex-1" />
-        <button type="button" onClick={() => go(-1)} disabled={products.length <= 1}
+        <button type="button" onClick={() => go(-1)} disabled={slides.length <= 1}
           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 disabled:opacity-30" aria-label="prev">
           <ChevronLeft size={18} />
         </button>
@@ -87,7 +113,7 @@ export default function DryRoomBoard() {
           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" aria-label="pause">
           {paused ? <Play size={16} /> : <Pause size={16} />}
         </button>
-        <button type="button" onClick={() => go(1)} disabled={products.length <= 1}
+        <button type="button" onClick={() => go(1)} disabled={slides.length <= 1}
           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 disabled:opacity-30" aria-label="next">
           <ChevronRight size={18} />
         </button>
@@ -99,10 +125,10 @@ export default function DryRoomBoard() {
 
       {error && <p className="text-red-600 bg-red-50 p-2 m-4 rounded-lg text-sm">{error}</p>}
 
-      {/* Slide */}
-      <div className="flex-1 flex flex-col justify-center px-8 py-6">
-        {!product ? (
-          <div className="text-center text-slate-400 text-lg">{t('dryRoomBoard.empty')}</div>
+      {/* Slide — top-aligned (fills from the top, paginates by row limit) */}
+      <div className="flex-1 flex flex-col px-8 pt-6 pb-2 min-h-0">
+        {!product || !slide ? (
+          <div className="flex-1 flex items-center justify-center text-slate-400 text-lg">{t('dryRoomBoard.empty')}</div>
         ) : (
           <div className="max-w-6xl w-full mx-auto">
             {/* Header */}
@@ -111,6 +137,9 @@ export default function DryRoomBoard() {
                 {t('dryRoomBoard.productName')}: {product.sku_name}
               </div>
               <div className="text-xl md:text-2xl font-mono text-slate-500">{product.sku_code}</div>
+              {slide.pageCount > 1 && (
+                <div className="text-sm font-bold text-slate-400">{t('dryRoomBoard.subPage', { page: slide.page, total: slide.pageCount })}</div>
+              )}
               <span className="flex-1" />
               <span className="text-sm font-bold text-white bg-emerald-600 px-3 py-1 rounded">{t('dryRoomBoard.today')}</span>
               <span className="text-sm font-bold text-white bg-orange-700 px-3 py-1 rounded">{t('dryRoomBoard.tomorrow')}</span>
@@ -129,7 +158,7 @@ export default function DryRoomBoard() {
                 </tr>
               </thead>
               <tbody>
-                {product.rows.map((r, i) => {
+                {slide.rows.map((r, i) => {
                   const tone = r.is_today ? 'today' : r.is_tomorrow ? 'tomorrow' : 'future';
                   return (
                     <tr key={`${r.work_order_barcode}-${r.date}-${i}`} className={cn(
@@ -153,20 +182,23 @@ export default function DryRoomBoard() {
         )}
       </div>
 
-      {/* Page dots */}
-      {products.length > 1 && (
-        <div className="flex items-center justify-center gap-1.5 pb-4 shrink-0">
-          {products.map((p, i) => (
-            <button
-              key={p.sku_id}
-              type="button"
-              onClick={() => setIndex(i)}
-              className={cn('h-2 rounded-full transition-all', i === index ? 'w-6 bg-emerald-600' : 'w-2 bg-slate-300 hover:bg-slate-400')}
-              aria-label={p.sku_code}
-            />
-          ))}
-        </div>
-      )}
+      {/* Footer: page dots (center) + last-update (bottom-right) */}
+      <div className="relative flex items-center justify-center gap-1.5 px-6 pb-3 pt-1 shrink-0">
+        {slides.length > 1 && slides.map((s, i) => (
+          <button
+            key={`${s.product.sku_id}-${s.page}`}
+            type="button"
+            onClick={() => setIndex(i)}
+            className={cn('h-2 rounded-full transition-all', i === index ? 'w-6 bg-emerald-600' : 'w-2 bg-slate-300 hover:bg-slate-400')}
+            aria-label={`${s.product.sku_code} ${s.page}`}
+          />
+        ))}
+        {lastUpdated && (
+          <span className="absolute right-6 bottom-3 text-[11px] text-slate-400 tabular-nums">
+            {t('dryRoomBoard.lastUpdate', { time: fmtTime(lastUpdated) })}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

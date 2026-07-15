@@ -1009,7 +1009,9 @@
     "dryRoom": "En secado",
     "waiting": "esperando resultado",
     "pass": "aprobado",
-    "fail": "rechazado"
+    "fail": "rechazado",
+    "subPage": "página {{page}}/{{total}}",
+    "lastUpdate": "Última actualización {{time}}"
   },
   "testingPage": {
     "awShort": "Aw",
