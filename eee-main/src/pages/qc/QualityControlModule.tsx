@@ -12,6 +12,7 @@ import {
   Package,
   FlaskConical,
   History,
+  Tv,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { usePermissions } from '../../contexts/PermissionContext';
@@ -34,6 +35,7 @@ import TestTypesPage from './TestTypesPage';
 import ProductAuditLog from './ProductAuditLog';
 import DailyTestReport from './DailyTestReport';
 import TestingExportPage from './TestingExportPage';
+import DryRoomBoard from './DryRoomBoard';
 
 interface Props {
   onHome: () => void;
@@ -181,6 +183,9 @@ export default function QualityControlModule({ onHome }: Props) {
     if (screen === 'dashboard') {
       return <AdminDashboard />;
     }
+    if (screen === 'dry-room-board') {
+      return <DryRoomBoard />;
+    }
     // Production / Batch Trace / Products & Templates / Test Types moved to
     // the Production module (BR-Q51).  Their old screen keys are no longer
     // routed here; navigating to them from inside QC falls through to QcHome.
@@ -230,6 +235,11 @@ export default function QualityControlModule({ onHome }: Props) {
             <NavItem icon={BarChart3} label={t('qualityControlModule.analysis')}
                      isActive={isActive('analysis')}
                      onClick={() => navigate('analysis')} />
+          )}
+          {canViewDashboard && (
+            <NavItem icon={Tv} label={t('qualityControlModule.dryRoomBoard')}
+                     isActive={isActive('dry-room-board')}
+                     onClick={() => navigate('dry-room-board')} />
           )}
 
           {(canViewDryRooms || canViewTesting) && <NavSection title={t('qualityControlModule.floor')} />}

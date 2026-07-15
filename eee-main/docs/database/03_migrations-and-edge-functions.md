@@ -2735,7 +2735,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-165 | 20260714000002_qc_checkout_intime_window.sql · 出库取样按 **1 小时入烘干(in_time)窗口分批**(BR-Q84):新增 `qc__intime_windows()` 贪心锚点分窗(同一 WO、按 in_time 升序,超过 60 分钟另起一批);`qc_check_out_sub_lots_bulk` 的 Step 2a(首检)/2b(复烘)改为先按窗口分批、再在批内按 `sample_every_n_carts` 取样;复烘「保留原代表样」仅当单窗口+单烘干房时触发;顺带删除旧 2 参重载。前端 `qcSampling.ts`(`partitionByIntimeWindow`)+ `BulkCheckOutDialog` 同步 |
 | M-166 | 20260714000003_qc_withdraw_awaiting_check_in.sql · 撤销待入库车(BR-Q85):`qc_withdraw_awaiting_check_in(ids, reason, note)` 清 `scanned_for_check_in_at`(车退回未上架 `created`,可重扫)并按车写 `check_in_withdrawn` 质量事件(→ 车 timeline + `v_system_audit_log` 操作日志);原因 shift_change/scan_error/other(other 必填 note);仅撤销仍待入库(created+已扫)的车。`qc_quality_event_summary` 加 `check_in_withdrawn` 文案 |
 | M-167 | 20260714000004_pkg_wo_dry_dispatch_counts.sql · 打包页每工单车数加分母:`pkg_wo_dry_dispatch_counts(p_sku_id)` 返回每 WO 的 `entered`(有 `qc_sub_lot_spot_history` 记录 = 曾进过烘干房的 unique 车)、`dispatched`(status='dispatched')、`remaining=entered-dispatched`。前端 PackagingPage 工单行显示「N/remaining CART(S)」 |
-| **M-168** | _(下一个)_ |
+| M-168 | 20260714000005_qc_dry_room_board.sql · 烘房看板数据(BR-Q86):`qc_dry_room_board()` 按 产品×工单×日期 聚合(锚定 America/Chicago 今天)。今天行 4 列(Dry room 今天出炉在烘 / waiting 递延所有等结果 / pass·fail 按当天最新结果事件,redry 当天 fail→pass 自动移动);未来行只显示 Dry room(预计出炉日 = in_time+expected_dry_minutes);不显示昨天;scrap 等终态不计 pass/fail。前端全屏轮播 `DryRoomBoard.tsx`(每页 10s 翻、数据 30s 刷) |
+| **M-169** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

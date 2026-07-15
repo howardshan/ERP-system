@@ -197,6 +197,7 @@
     "allModules": "← 所有模块",
     "qcHome": "质检首页",
     "analysis": "分析",
+    "dryRoomBoard": "烘房看板",
     "floor": "车间",
     "dryRooms": "烘干房",
     "testing": "检测",
@@ -993,6 +994,20 @@
     "done": "已撤销 {{count}} 车。",
     "doneSomeSkipped": "已撤销 {{count}} 车;{{failed}} 车跳过。",
     "failed": "撤销失败。"
+  },
+  "dryRoomBoard": {
+    "title": "烘房看板",
+    "pageOf": "{{n}} / {{total}}",
+    "empty": "暂无在制车的产品。",
+    "productName": "产品名称",
+    "today": "今天",
+    "tomorrow": "明天",
+    "workOrder": "工单",
+    "outDate": "出炉日期",
+    "dryRoom": "在烘",
+    "waiting": "等待结果",
+    "pass": "合格",
+    "fail": "不合格"
   },
   "testingPage": {
     "awShort": "水分活度",
