@@ -2243,3 +2243,28 @@ export async function getTestingExportRows(filters: {
     p_production_lot_id: filters.production_lot_id ?? null,
   });
 }
+
+// ─── Dry Room Board (M-168) ─────────────────────────────────────────────────
+
+export interface DryRoomBoardRow {
+  work_order_barcode: string;
+  date: string;          // YYYY-MM-DD (local)
+  is_today: boolean;
+  is_tomorrow: boolean;
+  dry_room: number;
+  waiting: number;
+  pass: number;
+  fail: number;
+}
+
+export interface DryRoomBoardProduct {
+  sku_id: string;
+  sku_code: string;
+  sku_name: string;
+  rows: DryRoomBoardRow[];
+}
+
+/** Full-screen dry-room slideshow data — one product per page, today-anchored. */
+export async function getDryRoomBoard(): Promise<DryRoomBoardProduct[]> {
+  return rpc<DryRoomBoardProduct[]>('qc_dry_room_board');
+}

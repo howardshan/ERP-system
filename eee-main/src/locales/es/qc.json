@@ -197,6 +197,7 @@
     "allModules": "← Todos los módulos",
     "qcHome": "Inicio de CC",
     "analysis": "Análisis",
+    "dryRoomBoard": "Panel de secado",
     "floor": "Planta",
     "dryRooms": "Salas de secado",
     "testing": "Pruebas",
@@ -995,6 +996,20 @@
     "done": "Se retiraron {{count}} carro(s) de la cola.",
     "doneSomeSkipped": "Se retiraron {{count}} carro(s); {{failed}} omitidos.",
     "failed": "Error al retirar."
+  },
+  "dryRoomBoard": {
+    "title": "Panel de secado",
+    "pageOf": "{{n}} / {{total}}",
+    "empty": "No hay productos con carros activos.",
+    "productName": "Producto",
+    "today": "Hoy",
+    "tomorrow": "Mañana",
+    "workOrder": "Orden de trabajo",
+    "outDate": "fecha de salida",
+    "dryRoom": "En secado",
+    "waiting": "esperando resultado",
+    "pass": "aprobado",
+    "fail": "rechazado"
   },
   "testingPage": {
     "awShort": "Aw",

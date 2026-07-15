@@ -14,6 +14,7 @@ import {
 import {
   getSkusWithStock,
   getAvailableCarts,
+  getWoDryDispatchCounts,
   dispatchCarts,
   PkgCart,
   PkgSku,
@@ -70,6 +71,9 @@ export default function PackagingPage() {
 
   const [carts, setCarts] = useState<PkgCart[]>([]);
   const [cartsLoading, setCartsLoading] = useState(false);
+  // M-167: work_order_barcode → remaining (unique carts that entered a dryer −
+  // dispatched), shown as the "/xx" denominator next to each WO's cart count.
+  const [woRemaining, setWoRemaining] = useState<Map<string, number>>(new Map());
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [note, setNote] = useState('');
@@ -98,8 +102,12 @@ export default function PackagingPage() {
     setSelectedIds(new Set());
     setScanError('');
     try {
-      const data = await getAvailableCarts(skuId);
+      const [data, counts] = await Promise.all([
+        getAvailableCarts(skuId),
+        getWoDryDispatchCounts(skuId).catch(() => []),
+      ]);
       setCarts(data);
+      setWoRemaining(new Map(counts.map(c => [c.work_order_barcode, c.remaining] as [string, number])));
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : t('packagingPage.errLoadCarts'));
     }
@@ -435,7 +443,12 @@ export default function PackagingPage() {
                         )}
                         <span className="flex-1" />
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {t('packagingPage.cartCount', { count: group.carts.length })}
+                          {group.workOrder != null && woRemaining.has(group.workOrder)
+                            ? t('packagingPage.cartCountRemaining', {
+                                count: group.carts.length,
+                                remaining: woRemaining.get(group.workOrder),
+                              })
+                            : t('packagingPage.cartCount', { count: group.carts.length })}
                         </span>
                       </div>
 

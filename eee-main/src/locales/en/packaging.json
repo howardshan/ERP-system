@@ -26,6 +26,7 @@
     "noWorkOrder": "(no work order)",
     "noPackagingAssigned": "No packaging assigned",
     "cartCount": "{{count}} cart(s)",
+    "cartCountRemaining": "{{count}}/{{remaining}} cart(s)",
     "cartsSelected": "{{count}} cart(s) selected",
     "notePlaceholder": "Optional dispatch note...",
     "dispatchPermissionTitle": "Missing packaging.outbound.dispatch permission",

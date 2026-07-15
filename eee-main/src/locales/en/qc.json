@@ -197,6 +197,7 @@
     "allModules": "← All Modules",
     "qcHome": "QC Home",
     "analysis": "Analysis",
+    "dryRoomBoard": "Dry Room Board",
     "floor": "Floor",
     "dryRooms": "Dry Rooms",
     "testing": "Testing",
@@ -997,6 +998,20 @@
     "done": "Withdrew {{count}} cart(s) from the queue.",
     "doneSomeSkipped": "Withdrew {{count}} cart(s); {{failed}} skipped.",
     "failed": "Withdraw failed."
+  },
+  "dryRoomBoard": {
+    "title": "Dry Room Board",
+    "pageOf": "{{n}} / {{total}}",
+    "empty": "No products with active carts.",
+    "productName": "Product Name",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "workOrder": "Work Order",
+    "outDate": "out date",
+    "dryRoom": "Dry room",
+    "waiting": "waiting for result",
+    "pass": "pass",
+    "fail": "fail"
   },
   "testingPage": {
     "awShort": "Aw",
