@@ -155,8 +155,8 @@ export default function DryRoomBoard() {
                   <th className="text-left font-semibold px-3 py-2">{t('dryRoomBoard.sku')}</th>
                   <th className="text-left font-semibold px-3 py-2">{t('dryRoomBoard.workOrder')}</th>
                   <th className="text-left font-semibold px-3 py-2">{t('dryRoomBoard.outDate')}</th>
-                  <th className="text-center font-semibold px-3 py-2">{countHeader('dryRoomBoard.dryRoom')}</th>
                   <th className="text-center font-semibold px-3 py-2">{t('dryRoomBoard.dryRoomNo')}</th>
+                  <th className="text-center font-semibold px-3 py-2">{countHeader('dryRoomBoard.dryRoom')}</th>
                   <th className="text-center font-semibold px-3 py-2">{countHeader('dryRoomBoard.waiting')}</th>
                   <th className="text-center font-semibold px-3 py-2">{countHeader('dryRoomBoard.pass')}</th>
                   <th className="text-center font-semibold px-3 py-2">{countHeader('dryRoomBoard.fail')}</th>
@@ -169,8 +169,8 @@ export default function DryRoomBoard() {
                     <td className="px-3 py-2.5 font-mono text-slate-600">{r.sku_code ?? '—'}</td>
                     <td className="px-3 py-2.5 font-mono text-slate-700">{r.work_order ?? '—'}</td>
                     <td className="px-3 py-2.5 text-slate-700">{fmtDate(r.out_date)}</td>
-                    <td className="px-3 py-2.5 text-center tabular-nums font-bold">{r.dry_room || ''}</td>
                     <td className="px-3 py-2.5 text-center tabular-nums text-slate-600">{r.dryer_number ?? ''}</td>
+                    <td className="px-3 py-2.5 text-center tabular-nums font-bold">{r.dry_room || ''}</td>
                     <td className="px-3 py-2.5 text-center tabular-nums font-bold">{r.waiting || ''}</td>
                     <td className="px-3 py-2.5 text-center tabular-nums font-bold text-emerald-700">{r.pass || ''}</td>
                     <td className="px-3 py-2.5 text-center tabular-nums font-bold text-red-700">{r.fail || ''}</td>

@@ -1007,16 +1007,16 @@
     "today": "Today",
     "tomorrow": "Tomorrow",
     "workOrder": "Work Order",
-    "outDate": "out date",
-    "dryRoom": "Dry room",
-    "waiting": "waiting for result",
-    "pass": "pass",
-    "fail": "fail",
+    "outDate": "Out Date",
+    "dryRoom": "Dry Room",
+    "waiting": "Waiting for Result",
+    "pass": "Pass",
+    "fail": "Fail",
     "subPage": "page {{page}}/{{total}}",
     "lastUpdate": "Last update {{time}}",
     "sku": "SKU",
     "qty": "Qty",
-    "dryRoomNo": "Dry room #"
+    "dryRoomNo": "Dry Room #"
   },
   "testingPage": {
     "awShort": "Aw",
