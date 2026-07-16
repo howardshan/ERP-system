@@ -1009,7 +1009,10 @@
     "pass": "合格",
     "fail": "不合格",
     "subPage": "第 {{page}}/{{total}} 页",
-    "lastUpdate": "最后更新 {{time}}"
+    "lastUpdate": "最后更新 {{time}}",
+    "sku": "SKU",
+    "qty": "数量",
+    "dryRoomNo": "烘干房号"
   },
   "testingPage": {
     "awShort": "水分活度",
@@ -1048,8 +1051,8 @@
     "overridden": "· 已推翻",
     "pass": "合格",
     "passBtn": "合格",
-    "passReleased": "合格 — 已放行",
-    "passStatusNote": "子批次状态:合格 · 历史已保留",
+    "passReleased": "通过 — 已放行至打包",
+    "passStatusNote": "已自动放行 → 进入打包队列。",
     "passedTitle": "合格",
     "pendingSubLots": "待检测子批次",
     "producedLabel": "生产",
@@ -1095,7 +1098,8 @@
     "titleSupervisorRequiredFail": "推翻判定为不合格需要主管权限",
     "viewFullHistoryTitle": "查看子批次完整历史",
     "waitingMinutes": "已等待 {{minutes}} 分钟",
-    "waterActivity": "水分活度"
+    "waterActivity": "水分活度",
+    "allReadings": "所有测试结果"
   },
   "tracePage": {
     "featureBatchTrace": "批次追溯",

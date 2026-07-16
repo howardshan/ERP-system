@@ -21,6 +21,7 @@ import {
   ProductionLot,
 } from '../../services/qcApi';
 import { fmtDays, cn, dallasToday, dallasDaysAgo, fmtDallasTime } from '../../lib/utils';
+import { formatReadings } from '../../lib/qcReadings';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { PermissionDenied } from './components/PermissionDenied';
 
@@ -724,8 +725,8 @@ function RecoveryDetailPanel({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-xs font-mono text-right text-slate-700">
-                    {item.next_aw != null ? item.next_aw.toFixed(3) : '—'}
+                  <td className="px-4 py-2.5 text-xs font-mono text-right text-slate-700 whitespace-nowrap">
+                    {formatReadings(item.next_readings, item.next_aw) ?? '—'}
                   </td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 max-w-[160px] truncate">
                     {item.remark ?? <span className="text-slate-300">—</span>}

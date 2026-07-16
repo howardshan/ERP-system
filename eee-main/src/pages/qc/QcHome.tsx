@@ -22,6 +22,7 @@ import {
 import { getInventorySummary, getAvailableCarts, PkgInventorySku, PkgCart } from '../../services/pkgApi';
 import { usePermissions } from '../../contexts/PermissionContext';
 import { cn, dallasToday, dallasDaysAgo } from '../../lib/utils';
+import { formatReadings } from '../../lib/qcReadings';
 import { HelpPopover } from '../../components/ui/HelpPopover';
 import { DisposeDialog } from './components/DisposeDialog';
 import { ReleaseDialog } from './components/ReleaseDialog';
@@ -626,10 +627,8 @@ function NeedsAttentionRow({
             )}>
               {item.result}
             </span>
-            {item.aw != null && (
-              <span className="text-[11px] text-slate-500">
-                Aw <span className="font-mono font-bold">{item.aw}</span>
-              </span>
+            {formatReadings(item.readings, item.aw) && (
+              <span className="text-[11px] text-slate-500 font-mono font-bold">{formatReadings(item.readings, item.aw)}</span>
             )}
           </div>
 
@@ -847,10 +846,8 @@ function FailDetailPanel({ items, loading, onClose, onOpenHistory }: {
                   <span className="font-mono font-bold text-sm text-red-700">
                     {item.sample_id ?? item.champion_code}
                   </span>
-                  {item.aw != null && (
-                    <span className="text-xs text-slate-500">
-                      Aw <span className="font-mono font-bold text-slate-800">{item.aw}</span>
-                    </span>
+                  {formatReadings(item.readings, item.aw) && (
+                    <span className="text-xs text-slate-500 font-mono font-bold text-slate-800">{formatReadings(item.readings, item.aw)}</span>
                   )}
                   <FailOutcomeBadge outcome={item.outcome} />
                   <span className="text-[11px] text-slate-400 ml-auto">
@@ -984,10 +981,8 @@ function PassDetailPanel({ items, loading, onClose, onOpenHistory }: {
                   <span className="font-mono font-bold text-sm text-emerald-700">
                     {item.sample_id ?? item.champion_code}
                   </span>
-                  {item.aw != null && (
-                    <span className="text-xs text-slate-500">
-                      Aw <span className="font-mono font-bold text-slate-800">{item.aw}</span>
-                    </span>
+                  {formatReadings(item.readings, item.aw) && (
+                    <span className="text-xs text-slate-500 font-mono font-bold text-slate-800">{formatReadings(item.readings, item.aw)}</span>
                   )}
                   <PassOutcomeBadge outcome={item.outcome} />
                   <span className="text-[11px] text-slate-400 ml-auto">

@@ -1013,7 +1013,10 @@
     "pass": "pass",
     "fail": "fail",
     "subPage": "page {{page}}/{{total}}",
-    "lastUpdate": "Last update {{time}}"
+    "lastUpdate": "Last update {{time}}",
+    "sku": "SKU",
+    "qty": "Qty",
+    "dryRoomNo": "Dry room #"
   },
   "testingPage": {
     "awShort": "Aw",
@@ -1052,8 +1055,8 @@
     "overridden": "· overridden",
     "pass": "PASS",
     "passBtn": "Pass",
-    "passReleased": "Pass — released",
-    "passStatusNote": "Sub-lot status: passed · history preserved",
+    "passReleased": "Pass — released to packaging",
+    "passStatusNote": "Auto-released → now in the packaging queue.",
     "passedTitle": "Passed",
     "pendingSubLots": "Pending sub-lots",
     "producedLabel": "Produced",
@@ -1099,7 +1102,8 @@
     "titleSupervisorRequiredFail": "Supervisor permission required to override to FAIL",
     "viewFullHistoryTitle": "View full sub-lot history",
     "waitingMinutes": "Waiting {{minutes}}m",
-    "waterActivity": "water activity"
+    "waterActivity": "water activity",
+    "allReadings": "All test results"
   },
   "tracePage": {
     "featureBatchTrace": "Batch trace",

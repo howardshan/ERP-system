@@ -10,6 +10,7 @@ import {
   TodayInspectionItem,
 } from '../../services/qcApi';
 import { usePermissions } from '../../contexts/PermissionContext';
+import { formatReadings } from '../../lib/qcReadings';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { SelectAllCheckbox } from './components/SelectAllCheckbox';
 import { PermissionDenied } from './components/PermissionDenied';
@@ -420,7 +421,8 @@ function TodayInspectionList({ items, emptyText }: { items: TodayInspectionItem[
             <QcStatusBadge status={item.status} />
           </div>
           <p className="text-xs mt-2 text-slate-600">
-            {t('adminDashboard.aw', { value: item.aw ?? '—', time: formatQcDateTime(item.submitted_at) })}
+            <span className="font-mono">{formatReadings(item.readings, item.aw) ?? '—'}</span>
+            <span className="text-slate-400"> · {formatQcDateTime(item.submitted_at)}</span>
           </p>
           {item.fail_reason && (
             <p className="text-xs text-red-700 mt-1">{item.fail_reason}</p>

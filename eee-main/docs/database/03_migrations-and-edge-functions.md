@@ -2736,7 +2736,10 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-166 | 20260714000003_qc_withdraw_awaiting_check_in.sql · 撤销待入库车(BR-Q85):`qc_withdraw_awaiting_check_in(ids, reason, note)` 清 `scanned_for_check_in_at`(车退回未上架 `created`,可重扫)并按车写 `check_in_withdrawn` 质量事件(→ 车 timeline + `v_system_audit_log` 操作日志);原因 shift_change/scan_error/other(other 必填 note);仅撤销仍待入库(created+已扫)的车。`qc_quality_event_summary` 加 `check_in_withdrawn` 文案 |
 | M-167 | 20260714000004_pkg_wo_dry_dispatch_counts.sql · 打包页每工单车数加分母:`pkg_wo_dry_dispatch_counts(p_sku_id)` 返回每 WO 的 `entered`(有 `qc_sub_lot_spot_history` 记录 = 曾进过烘干房的 unique 车)、`dispatched`(status='dispatched')、`remaining=entered-dispatched`。前端 PackagingPage 工单行显示「N/remaining CART(S)」 |
 | M-168 | 20260714000005_qc_dry_room_board.sql · 烘房看板数据(BR-Q86):`qc_dry_room_board()` 按 产品×工单×日期 聚合(锚定 America/Chicago 今天)。今天行 4 列(Dry room 今天出炉在烘 / waiting 递延所有等结果 / pass·fail 按当天最新结果事件,redry 当天 fail→pass 自动移动);未来行只显示 Dry room(预计出炉日 = in_time+expected_dry_minutes);不显示昨天;scrap 等终态不计 pass/fail。前端全屏轮播 `DryRoomBoard.tsx`(每页 10s 翻、数据 30s 刷) |
-| **M-169** | _(下一个)_ |
+| M-169 | 20260715000001_qc_autorelease_on_pass.sql · 检测通过即**自动放行**(BR-Q87):`qc_drying_sub_lot` 加触发器 `qc_autorelease_on_pass`(status→passed 且旧值非 passed 时 `PERFORM qc_release_passed_sub_lot(id, NULL)`,passed→closed 不过 ERP),覆盖 champion 传播的兄弟车;不再需要手动 Release。顺带删掉旧 1 参 `qc_release_passed_sub_lot(uuid)` 重载 |
+| M-170 | 20260715000002_qc_show_all_readings.sql · 仪表盘/列表显示**全部检测读数**(不止 Aw):`qc_today_inspection_item` / `qc_overview`(needs_attention)/ `qc_recent_failed_inspections` / `qc_recent_passed_inspections` 各加 `readings`=`_qc_flatten_readings(values_json)`;`qc_analysis_recovery_detail` 加 `next_readings`(下一次检测的全部读数,group 分支合成单条 Aw)。`aw` 保留兼容。前端新增 `lib/qcReadings.ts.formatReadings`,QcHome/AdminDashboard/AnalysisPage 改为渲染全部读数(如「MC% 14 · Aw 0.6」) |
+| M-171 | 20260715000003_qc_dry_room_board_by_day.sql · 烘房看板重构(BR-Q86 修订):`qc_dry_room_board()` 改为**一天一页**(`page_date=GREATEST(out_date, today)`,过去不成页);**out_date 用实际出烘日**(等结果车递延到今天页但 out 日期保留实际,不再变成今天);行按 产品×工单×出烘日×**烘干房号**分组(同批分散不同房拆多行);行字段 `product_name/sku_code/work_order/out_date/dry_room/dryer_number/waiting/pass/fail`。前端 `DryRoomBoard.tsx` 改为按天翻页、行数超限翻子页、Product/SKU 为前两列、计数列名加 (Qty)、新增 Dry room # 列 |
+| **M-172** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

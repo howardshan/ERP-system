@@ -153,6 +153,7 @@ export interface TodayInspectionItem {
   sub_lot_code: string;
   sku_name: string | null;
   aw: number | null;
+  readings?: InspectionReading[];   // M-170: all test readings (MC%, Aw, …)
   result: 'pass' | 'fail';
   submitted_at: string;
   status: SubLotStatus | 'unknown';
@@ -1582,6 +1583,7 @@ export interface RecoveryDetailItem {
   dwell_minutes: number | null;
   next_result: 'pass' | 'fail' | null;
   next_aw: number | null;
+  next_readings?: InspectionReading[];   // M-170: all readings of the next test
   remark: string | null;
 }
 
@@ -1736,6 +1738,7 @@ export interface NeedsAttentionItem {
   lot_number: string | null;
   work_order_barcode: string | null;
   aw: number | null;
+  readings?: InspectionReading[];   // M-170: all test readings
   result: 'pass' | 'fail';
   submitted_at: string;
   current_status: SubLotStatus;
@@ -2065,6 +2068,7 @@ export interface RecentFailItem {
   inspection_id: string;
   sample_id: string | null;
   aw: number | null;
+  readings?: InspectionReading[];   // M-170: all test readings
   submitted_at: string;
   sku_name: string | null;
   lot_number: string | null;
@@ -2089,6 +2093,7 @@ export interface RecentPassItem {
   inspection_id: string;
   sample_id: string | null;
   aw: number | null;
+  readings?: InspectionReading[];   // M-170: all test readings
   submitted_at: string;
   sku_name: string | null;
   lot_number: string | null;
@@ -2246,25 +2251,27 @@ export async function getTestingExportRows(filters: {
 
 // ─── Dry Room Board (M-168) ─────────────────────────────────────────────────
 
+// M-171: one page per DAY; each row = (product, work order, out day, dryer).
 export interface DryRoomBoardRow {
-  work_order_barcode: string;
-  date: string;          // YYYY-MM-DD (local)
-  is_today: boolean;
-  is_tomorrow: boolean;
+  product_name: string | null;
+  sku_code: string | null;
+  work_order: string | null;
+  out_date: string;              // ACTUAL out day (or expected finish day for drying)
   dry_room: number;
+  dryer_number: number | null;
   waiting: number;
   pass: number;
   fail: number;
 }
 
-export interface DryRoomBoardProduct {
-  sku_id: string;
-  sku_code: string;
-  sku_name: string;
+export interface DryRoomBoardPage {
+  page_date: string;             // YYYY-MM-DD (local); pages ordered today → future
+  is_today: boolean;
+  is_tomorrow: boolean;
   rows: DryRoomBoardRow[];
 }
 
-/** Full-screen dry-room slideshow data — one product per page, today-anchored. */
-export async function getDryRoomBoard(): Promise<DryRoomBoardProduct[]> {
-  return rpc<DryRoomBoardProduct[]>('qc_dry_room_board');
+/** Full-screen dry-room slideshow data — one day per page, today-anchored. */
+export async function getDryRoomBoard(): Promise<DryRoomBoardPage[]> {
+  return rpc<DryRoomBoardPage[]>('qc_dry_room_board');
 }
