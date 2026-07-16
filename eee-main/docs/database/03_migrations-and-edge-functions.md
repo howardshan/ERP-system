@@ -2732,7 +2732,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-159 | 20260627000001_notify_base_url_from_vault.sql · `qc_notify_on_inspection()` 改从 Vault 读取 Edge Functions base URL(`notify_base_url`),不再硬编码项目 ref;消除跨环境隐患(phase2 不再误调 phase1 的 send-notification)。base_url 按环境在 Vault 配置(同 M-084 webhook secret 模式);未配置则静默跳过通知,绝不阻断检测插入 |
 | _(M-160~163)_ | phase2 仓库(npic-phase-2)已占用,eee-main 跳过以避免两仓库同步时撞号 |
 | M-164 | 20260714000001_qc_list_lots_sub_lot_codes.sql · Batch Trace 搜索:`qc_list_production_lots()` 每个工单多返 `sub_lot_codes`(该工单全部车的 `sub_lot_code` 数组),使追溯列表页可直接模糊匹配完整子批次号(含 M-053 之前前缀异于工单号的旧车)。仅此一字段变化,其余不变(CREATE OR REPLACE) |
-| **M-165** | _(下一个)_ |
+| M-165 | 20260716000001_qc_regroup_pending_sampling.sql · 新增维护 RPC `qc_regroup_pending_sampling(p_production_lot_id, p_sampling_method)`:产品取样率改动后,把某工单**尚未判定**的车按 SKU 当前 `sample_every_n_carts` 重新分组。分组在 check-out 时固化,改产品设置只影响之后出库的车,已成组的车需本 RPC 重排(再跑 check-out 无效:它要求 `status='drying'`)。只解散**全员未判定**的 `sampling` 组(含 inspecting/passed/failed/hold 成员的组整组跳过,避免 `ON DELETE SET NULL` 把已出结果的车孤立);解散前把该组仍 `pending` 的样品置 `voided`(重排后 champion 多半换车,旧实体样品不再代表该组,行保留供审计)并写 `sample_voided` 事件;重排委托 `qc__assign_test_group`(champion/车状态/`group_assigned` 事件与正常流程一致),分块循环与 M-137 check-out Step 2a 逐字一致以防 method_2 尾部均分规则漂移。未接 UI,SQL 手动调用 |
+| **M-166** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|
