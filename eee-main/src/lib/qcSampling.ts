@@ -92,3 +92,45 @@ export function planSamplingGroups<T extends { sub_lot_code: string }>(
 export function championOf<T>(g: PlannedGroup<T>): T {
   return g.members[g.championIndex];
 }
+
+/**
+ * Partition carts into check-in ("in_time") batches — the counterpart to
+ * `qc__intime_windows` in the SQL (M-158). Carts are sorted by in_time ascending;
+ * a new batch starts whenever a cart's in_time is more than `minutes` after the
+ * current batch's EARLIEST (anchor) cart, so each batch spans ≤ `minutes`.
+ *
+ *   e.g. in_times 10:00, 10:50, 11:10, 11:20 with minutes=60
+ *        → [[10:00, 10:50], [11:10, 11:20]]
+ *
+ * Carts without an in_time each form their own batch. The MUST-stay-in-sync SQL
+ * runs the same greedy anchor algorithm at execution time.
+ */
+export function partitionByIntimeWindow<T extends { in_time?: string | null; sub_lot_code: string }>(
+  carts: T[],
+  minutes: number,
+): T[][] {
+  if (carts.length === 0) return [];
+  const sorted = carts.slice().sort((a, b) => {
+    const ta = a.in_time ? Date.parse(a.in_time) : Number.POSITIVE_INFINITY;
+    const tb = b.in_time ? Date.parse(b.in_time) : Number.POSITIVE_INFINITY;
+    if (ta !== tb) return ta - tb;
+    return a.sub_lot_code.localeCompare(b.sub_lot_code);
+  });
+  const windowMs = minutes * 60_000;
+  const out: T[][] = [];
+  let cur: T[] = [];
+  let anchor = NaN;
+  for (const c of sorted) {
+    const t = c.in_time ? Date.parse(c.in_time) : NaN;
+    const startNew = cur.length === 0 || Number.isNaN(t) || Number.isNaN(anchor) || (t - anchor) > windowMs;
+    if (startNew) {
+      if (cur.length) out.push(cur);
+      cur = [c];
+      anchor = t;
+    } else {
+      cur.push(c);
+    }
+  }
+  if (cur.length) out.push(cur);
+  return out;
+}

@@ -43,6 +43,7 @@ closed → dispatched
   - 点击选中，右栏同步刷新
 - **右栏：选中 SKU 的车辆列表**（`pkg_available_carts(sku_id)`），FIFO 排序（`released_at ASC`）
   - 列：车号、工单、入库日期、在库天数（彩色 badge）
+  - **工单行车数带分母（M-167）**：每个工单行右侧显示「N/remaining CART(S)」——N = 当前可打包车数，remaining = 该工单 `曾进过烘干房的 unique 车数 − 已 dispatch 车数`（`pkg_wo_dry_dispatch_counts(sku_id)`;「进过烘干房」以 `qc_sub_lot_spot_history` 有记录为准,对复烘稳健)。分母未知时回退为「N CART(S)」
   - 在库天数颜色：绿色 `<10` 天、琥珀色 `10-14` 天、红色 `≥15` 天
 - **顶部扫码框**：Enter 自动勾选对应车（USB 扫描枪友好，同 DryRoom 扫描逻辑）
 - **底部出库栏**：已选车辆数量 + 备注输入 + Dispatch 按钮
@@ -77,6 +78,7 @@ closed → dispatched
 | 函数 | 说明 |
 |------|------|
 | `pkg_available_carts(p_sku_id uuid)` | 返回指定 SKU 的 `closed` 车辆列表，按 `released_at` ASC（FIFO）；`p_sku_id` 为 NULL 时返回所有 SKU 的 closed 车 |
+| `pkg_wo_dry_dispatch_counts(p_sku_id uuid)` | M-167：每工单返回 `entered`（有 `qc_sub_lot_spot_history` = 曾进烘干房的 unique 车）/ `dispatched`（status='dispatched'）/ `remaining=entered-dispatched`,供打包页工单行「N/remaining」分母 |
 | `pkg_skus_with_stock()` | 返回有库存（至少 1 辆 `closed` 车）的 SKU 列表及各自数量 |
 | `pkg_dispatch_carts(p_sub_lot_ids uuid[], p_note text DEFAULT NULL)` | 原子出库：batch UPDATE cart 状态 `closed → dispatched`，写 `pkg_outbound` + `pkg_outbound_item` 记录；任一失败整批回滚（BR-P2） |
 | `pkg_inventory_summary()` | 按 SKU 统计 green（`<10d`）/ yellow（`10-14d`）/ red（`≥15d`）分桶数，供 QC Home Released Inventory 横向色条图使用 |

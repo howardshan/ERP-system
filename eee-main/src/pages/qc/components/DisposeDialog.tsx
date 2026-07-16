@@ -77,7 +77,7 @@ export function DisposeDialog({ open, subLot, subLotIds, subLotCodes, championSu
   const { t } = useTranslation('qc');
   const effectiveIds   = subLotIds   ?? (subLot ? [subLot.id] : []);
   const effectiveCodes = subLotCodes ?? (subLot ? [subLot.sub_lot_code] : []);
-  const [type, setType] = useState<DispositionType>('redry_dryer');
+  const [type, setType] = useState<DispositionType>('retest');
   const [remark, setRemark] = useState('');
   // UI uses hours; we convert to minutes when submitting
   const [redryHours, setRedryHours] = useState<string>(
@@ -92,9 +92,10 @@ export function DisposeDialog({ open, subLot, subLotIds, subLotCodes, championSu
       setError('');
       setRemark('');
       setRedryHours(String(Math.round((subLot?.expected_dry_minutes ?? 240) / 60 * 10) / 10));
-      // Default to the first option the user has permission for
-      const firstAllowed = OPTIONS.find(o => permissions[o.permKey]);
-      if (firstAllowed) setType(firstAllowed.value);
+      // Default to Retest when allowed; else the first option the user can use.
+      const preferred = OPTIONS.find(o => o.value === 'retest' && permissions[o.permKey])
+        ?? OPTIONS.find(o => permissions[o.permKey]);
+      if (preferred) setType(preferred.value);
     }
   }, [open, subLot, permissions]);
 

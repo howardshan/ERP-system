@@ -24,6 +24,7 @@ export interface SubLot {
   total_dried_minutes: number | null;
   remaining_minutes: number | null;
   lot_number?: string | null;
+  work_order_barcode?: string | null;   // M-053: emitted by qc_sub_lot_to_json
   sku_id?: string | null;
   sku_code?: string | null;
   has_pending_sample?: boolean;
@@ -152,6 +153,7 @@ export interface TodayInspectionItem {
   sub_lot_code: string;
   sku_name: string | null;
   aw: number | null;
+  readings?: InspectionReading[];   // M-170: all test readings (MC%, Aw, …)
   result: 'pass' | 'fail';
   submitted_at: string;
   status: SubLotStatus | 'unknown';
@@ -1037,6 +1039,30 @@ export async function scanCartForCheckIn(subLotId: string): Promise<{
   return rpc('qc_scan_cart_for_check_in', { p_sub_lot_id: subLotId });
 }
 
+// M-166: reason codes for withdrawing carts from the awaiting-check-in queue.
+export type WithdrawReason = 'shift_change' | 'scan_error' | 'other';
+
+export interface WithdrawResult {
+  requested: number;
+  succeeded: Array<{ sub_lot_id: string; sub_lot_code: string }>;
+  failed: Array<{ sub_lot_id: string; sub_lot_code?: string; reason: string; status?: string }>;
+}
+
+// M-166: withdraw carts from the "awaiting check-in" queue with a reason.
+// Clears scanned_for_check_in_at (cart reverts to un-staged `created`) and logs
+// a `check_in_withdrawn` quality event per cart (→ cart timeline + audit log).
+export async function withdrawAwaitingCheckIn(
+  subLotIds: string[],
+  reason: WithdrawReason,
+  reasonNote?: string | null,
+): Promise<WithdrawResult> {
+  return rpc<WithdrawResult>('qc_withdraw_awaiting_check_in', {
+    p_sub_lot_ids: subLotIds,
+    p_reason: reason,
+    p_reason_note: reasonNote ?? null,
+  });
+}
+
 // List sub-lots in awaiting_recheck (displaced, paused)
 export async function listAwaitingRecheck(): Promise<SubLot[]> {
   return rpc<SubLot[]>('qc_list_awaiting_recheck');
@@ -1557,6 +1583,7 @@ export interface RecoveryDetailItem {
   dwell_minutes: number | null;
   next_result: 'pass' | 'fail' | null;
   next_aw: number | null;
+  next_readings?: InspectionReading[];   // M-170: all readings of the next test
   remark: string | null;
 }
 
@@ -1711,6 +1738,7 @@ export interface NeedsAttentionItem {
   lot_number: string | null;
   work_order_barcode: string | null;
   aw: number | null;
+  readings?: InspectionReading[];   // M-170: all test readings
   result: 'pass' | 'fail';
   submitted_at: string;
   current_status: SubLotStatus;
@@ -2040,6 +2068,7 @@ export interface RecentFailItem {
   inspection_id: string;
   sample_id: string | null;
   aw: number | null;
+  readings?: InspectionReading[];   // M-170: all test readings
   submitted_at: string;
   sku_name: string | null;
   lot_number: string | null;
@@ -2064,6 +2093,7 @@ export interface RecentPassItem {
   inspection_id: string;
   sample_id: string | null;
   aw: number | null;
+  readings?: InspectionReading[];   // M-170: all test readings
   submitted_at: string;
   sku_name: string | null;
   lot_number: string | null;
@@ -2217,4 +2247,31 @@ export async function getTestingExportRows(filters: {
     p_to_date: filters.to_date ?? null,
     p_production_lot_id: filters.production_lot_id ?? null,
   });
+}
+
+// ─── Dry Room Board (M-168) ─────────────────────────────────────────────────
+
+// M-171: one page per DAY; each row = (product, work order, out day, dryer).
+export interface DryRoomBoardRow {
+  product_name: string | null;
+  sku_code: string | null;
+  work_order: string | null;
+  out_date: string;              // ACTUAL out day (or expected finish day for drying)
+  dry_room: number;
+  dryer_number: number | null;
+  waiting: number;
+  pass: number;
+  fail: number;
+}
+
+export interface DryRoomBoardPage {
+  page_date: string;             // YYYY-MM-DD (local); pages ordered today → future
+  is_today: boolean;
+  is_tomorrow: boolean;
+  rows: DryRoomBoardRow[];
+}
+
+/** Full-screen dry-room slideshow data — one day per page, today-anchored. */
+export async function getDryRoomBoard(): Promise<DryRoomBoardPage[]> {
+  return rpc<DryRoomBoardPage[]>('qc_dry_room_board');
 }

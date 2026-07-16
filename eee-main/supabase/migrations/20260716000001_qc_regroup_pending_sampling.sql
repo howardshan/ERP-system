@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- M-165  qc_regroup_pending_sampling: re-chunk a work order's un-judged carts
+-- M-172  qc_regroup_pending_sampling: re-chunk a work order's un-judged carts
 --        after its SKU's sampling rate changes
 --
 -- WHY: sample_every_n_carts lives on the SKU, but grouping is FROZEN at check-out
@@ -176,4 +176,4 @@ END;
 $$;
 
 COMMENT ON FUNCTION qc_regroup_pending_sampling(uuid, text) IS
-  'M-165: re-chunk a lot''s un-judged carts to the SKU''s CURRENT sample_every_n_carts. Dissolves only fully un-judged sampling groups, voids their pending samples, re-assigns via qc__assign_test_group. Change the product rate first, then call.';
+  'M-172: re-chunk a lot''s un-judged carts to the SKU''s CURRENT sample_every_n_carts. Dissolves only fully un-judged sampling groups, voids their pending samples, re-assigns via qc__assign_test_group. Change the product rate first, then call.';

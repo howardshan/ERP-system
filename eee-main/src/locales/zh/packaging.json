@@ -26,6 +26,7 @@
     "noWorkOrder": "（无工单）",
     "noPackagingAssigned": "未分配包装",
     "cartCount": "{{count}} 个料车",
+    "cartCountRemaining": "{{count}}/{{remaining}} 个料车",
     "cartsSelected": "已选择 {{count}} 个料车",
     "notePlaceholder": "可选出库备注……",
     "dispatchPermissionTitle": "缺少 packaging.outbound.dispatch 权限",
