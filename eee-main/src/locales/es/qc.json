@@ -1011,7 +1011,10 @@
     "pass": "aprobado",
     "fail": "rechazado",
     "subPage": "página {{page}}/{{total}}",
-    "lastUpdate": "Última actualización {{time}}"
+    "lastUpdate": "Última actualización {{time}}",
+    "sku": "SKU",
+    "qty": "Cant.",
+    "dryRoomNo": "N.º sala"
   },
   "testingPage": {
     "awShort": "Aw",
@@ -1050,8 +1053,8 @@
     "overridden": "· anulado",
     "pass": "APROBADO",
     "passBtn": "Aprobar",
-    "passReleased": "Aprobado — liberado",
-    "passStatusNote": "Estado del sublote: aprobado · historial conservado",
+    "passReleased": "Aprobado — liberado a embalaje",
+    "passStatusNote": "Liberado automáticamente → en la cola de embalaje.",
     "passedTitle": "Aprobado",
     "pendingSubLots": "Sublotes pendientes",
     "producedLabel": "Producido",
@@ -1097,7 +1100,8 @@
     "titleSupervisorRequiredFail": "Se requiere permiso de supervisor para anular y RECHAZAR",
     "viewFullHistoryTitle": "Ver historial completo del sublote",
     "waitingMinutes": "Esperando {{minutes}} min",
-    "waterActivity": "actividad de agua"
+    "waterActivity": "actividad de agua",
+    "allReadings": "Todos los resultados"
   },
   "tracePage": {
     "featureBatchTrace": "Trazabilidad de lote",

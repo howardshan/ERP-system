@@ -835,6 +835,44 @@ function TestWorkflow({
               <Trans i18nKey="testingPage.failedNote" t={t} components={{ strong: <strong /> }} />
             </p>
           </div>
+
+          {/* All test readings + operator note for this failed inspection */}
+          {templates.length > 0 && (
+            <div className="mt-3 bg-white border rounded-xl p-3">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">{t('testingPage.allReadings')}</p>
+              <ul className="space-y-1">
+                {templates.map(tmpl => {
+                  const raw = readings[tmpl.id] ?? '';
+                  const b = bandOf(raw, tmpl);
+                  return (
+                    <li key={tmpl.id} className="flex items-center gap-2 text-xs">
+                      <span className="font-bold text-slate-800 flex-1 min-w-0 truncate">
+                        {tmpl.item_name}{tmpl.unit ? ` (${tmpl.unit})` : ''}
+                      </span>
+                      <span className="font-mono tabular-nums text-slate-900">{raw || '—'}</span>
+                      {b && (
+                        <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0',
+                          b === 'hard' ? 'bg-emerald-100 text-emerald-700'
+                            : b === 'soft' ? 'bg-amber-100 text-amber-800'
+                            : 'bg-red-100 text-red-700')}>
+                          {b === 'hard' ? t('testingPage.bandInHardRange')
+                            : b === 'soft' ? t('testingPage.bandSoftSupervisor')
+                            : t('testingPage.bandOutsideTolerance')}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              {remark.trim() && (
+                <div className="mt-2 pt-2 border-t border-slate-100">
+                  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{t('testingPage.remark')}</span>
+                  <p className="text-xs text-slate-700 mt-0.5 whitespace-pre-wrap">{remark}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={onDone}
