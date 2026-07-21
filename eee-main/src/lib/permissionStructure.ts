@@ -194,9 +194,10 @@ export const PERMISSION_STRUCTURE: Record<string, ModuleDef> = {
       trace: {
         label: 'Batch Trace',
         permissions: [
-          { id: 'view',            label: 'View Trace',                       prereq: null },
-          { id: 'add_carts',       label: 'Add Carts to Existing Work Order', prereq: 'view' },
-          { id: 'reprint_sticker', label: 'Reprint Cart Sticker',             prereq: 'view' },
+          { id: 'view',              label: 'View Trace',                       prereq: null },
+          { id: 'add_carts',         label: 'Add Carts to Existing Work Order', prereq: 'view' },
+          { id: 'reprint_sticker',   label: 'Reprint Cart Sticker',             prereq: 'view' },
+          { id: 'delete_work_order', label: 'Delete Work Order (before production starts)', prereq: 'view' },
         ],
       },
       // M-147 (BR-Q80): edit rights returned to QC (qc.products.*).  Production

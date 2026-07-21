@@ -1121,6 +1121,12 @@
     "printConfirmBody": "已添加 {{count}} 辆料车。现在打印标签吗？",
     "reprintLaterHint": "您也可以稍后通过“重新打印标签”按钮重新打印。",
     "skip": "跳过",
-    "printNStickers": "打印 {{count}} 张标签"
+    "printNStickers": "打印 {{count}} 张标签",
+    "deleteWorkOrder": "删除工单",
+    "deleteWorkOrderHint": "仅在任何料车扫码入烘干房之前可用",
+    "deleteConfirmBody": "将永久删除工单 {{wo}} 及其 {{count}} 辆料车，此操作不可撤销。",
+    "deleteTypePrompt": "输入以确认：",
+    "deleteFailed": "无法删除工单。",
+    "cancel": "取消"
   }
 }

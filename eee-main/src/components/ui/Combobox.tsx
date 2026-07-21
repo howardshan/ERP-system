@@ -51,12 +51,30 @@ export function Combobox({
     return src.slice(0, limit);
   }, [options, query, limit]);
 
-  // Close + reset the typed query when clicking outside.
+  // Leaving the field with text still typed but never committed (no Enter / no
+  // click on a row) must NOT silently keep the previous value — that let an
+  // operator type a valid code, click away, and unknowingly submit the old
+  // selection. So on blur/outside-click: if the typed text exactly matches an
+  // option's label, commit it; if something was typed but matches nothing, clear
+  // the selection so required-field validation catches it. An empty query (just
+  // opened and clicked away) leaves the current selection untouched.
+  const commitOrReset = () => {
+    const q = query.trim();
+    if (q) {
+      const exact = options.find((o) => o.label.toLowerCase() === q.toLowerCase());
+      onChange(exact ? exact.value : '');
+    }
+    setOpen(false);
+    setQuery('');
+  };
+  // The document listener is registered once, so read the latest impl via a ref.
+  const commitRef = useRef(commitOrReset);
+  commitRef.current = commitOrReset;
+
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery('');
+        commitRef.current();
       }
     };
     document.addEventListener('mousedown', onDoc);
@@ -96,6 +114,10 @@ export function Combobox({
     } else if (e.key === 'Escape') {
       setOpen(false);
       setQuery('');
+    } else if (e.key === 'Tab') {
+      // Tabbing away is a blur too — commit an exact typed match or drop a stale
+      // selection, same as an outside click. Don't preventDefault: let focus move.
+      commitOrReset();
     }
   };
 

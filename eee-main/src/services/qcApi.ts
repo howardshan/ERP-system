@@ -865,6 +865,20 @@ export async function productionLotDetail(lotId: string): Promise<ProductionLotD
   return rpc<ProductionLotDetail>('qc_production_lot_detail', { p_lot_id: lotId });
 }
 
+// M-174: delete a work order that hasn't started production. The RPC enforces the
+// not-started invariant (all carts still 'created', no groups/samples/inspections)
+// and cascades the carts + removes the empty pre-created quarantine warehouse lot.
+export interface DeleteLotResult {
+  deleted: boolean;
+  work_order_barcode: string;
+  lot_number: string;
+  carts_deleted: number;
+  warehouse_lot_deleted: boolean;
+}
+export async function deleteProductionLot(lotId: string): Promise<DeleteLotResult> {
+  return rpc<DeleteLotResult>('qc_delete_production_lot', { p_production_lot_id: lotId });
+}
+
 // ── Production batch creation (creates 1 Dry Room + N Sub-lots in one go) ─────
 //
 // Production is a temporary creation wizard until a real Production module
