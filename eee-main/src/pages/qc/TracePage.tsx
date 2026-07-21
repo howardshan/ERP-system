@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, History, Plus, Printer } from 'lucide-react';
-import { productionLotDetail, ProductionLotDetail, formatQcDateTime, SubLot, listSubLotsForLot } from '../../services/qcApi';
+import { ArrowLeft, History, Plus, Printer, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { productionLotDetail, ProductionLotDetail, formatQcDateTime, SubLot, listSubLotsForLot, deleteProductionLot } from '../../services/qcApi';
 import { QcStatusBadge } from './components/QcStatusBadge';
 import { PermissionDenied } from './components/PermissionDenied';
 import { AddCartsDialog } from './components/AddCartsDialog';
@@ -27,6 +27,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
   const canView = can('production', 'trace', 'view');
   const canAddCarts = can('production', 'trace', 'add_carts');
   const canReprint = can('production', 'trace', 'reprint_sticker');
+  const canDelete = can('production', 'trace', 'delete_work_order');
   const [detail, setDetail] = useState<ProductionLotDetail | null>(null);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -41,6 +42,13 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
   // them right away.  Decoupled from `printCarts` so the user can decline
   // without losing the option to reprint later via the dedicated button.
   const [postAddPrompt, setPostAddPrompt] = useState<SubLot[] | null>(null);
+
+  // Delete-work-order dialog. Operator must type DELETE to confirm; only
+  // available before production starts (no cart scanned into a dryer).
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteText, setDeleteText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteErr, setDeleteErr] = useState('');
 
   const loadDetail = () => {
     if (!lotId) return;
@@ -58,6 +66,25 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
     if (typeof detail.lot.max_seq === 'number') return detail.lot.max_seq;
     return detail.sub_lots.reduce((m, s) => Math.max(m, parseSeq(s.sub_lot_code)), 0);
   }, [detail]);
+
+  // "Not started" = no cart has been scanned into a dryer yet. The RPC enforces
+  // the full invariant (all carts 'created', no groups/samples/inspections); this
+  // is the front-end gate for showing the Delete button.
+  const notStarted = (detail?.lot.scanned_count ?? 0) === 0;
+
+  const handleDelete = async () => {
+    if (!detail || deleteText.trim().toUpperCase() !== 'DELETE') return;
+    setDeleting(true);
+    setDeleteErr('');
+    try {
+      await deleteProductionLot(detail.lot.id);
+      setDeleteOpen(false);
+      onBack();                       // back to the (freshly reloaded) trace list
+    } catch (e) {
+      setDeleteErr(e instanceof Error ? e.message : t('tracePage.deleteFailed'));
+      setDeleting(false);
+    }
+  };
 
   if (!canView) {
     return <PermissionDenied permission="production.trace.view" feature={t('tracePage.featureBatchTrace')} />;
@@ -128,6 +155,16 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
               <Printer size={12} /> {t('tracePage.reprintSticker')}
             </button>
           )}
+          {canDelete && notStarted && (
+            <button
+              type="button"
+              onClick={() => { setDeleteText(''); setDeleteErr(''); setDeleteOpen(true); }}
+              title={t('tracePage.deleteWorkOrderHint')}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded bg-white border border-red-200 text-red-600 hover:bg-red-50"
+            >
+              <Trash2 size={12} /> {t('tracePage.deleteWorkOrder')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -173,6 +210,58 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
           </li>
         ))}
       </ul>
+
+      {deleteOpen && detail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">{t('tracePage.deleteWorkOrder')}</h3>
+                <p className="text-sm text-slate-600 mt-0.5">
+                  {t('tracePage.deleteConfirmBody', { wo: detail.lot.work_order_barcode, count: detail.lot.total_count ?? 0 })}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-2">
+              {t('tracePage.deleteTypePrompt')} <span className="font-mono font-bold text-slate-700">DELETE</span>
+            </p>
+            <input
+              type="text"
+              autoFocus
+              value={deleteText}
+              onChange={(e) => setDeleteText(e.target.value)}
+              placeholder="DELETE"
+              className="w-full h-9 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-red-400 mb-3"
+            />
+
+            {deleteErr && <p className="text-red-600 text-xs mb-3">{deleteErr}</p>}
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setDeleteOpen(false); setDeleteText(''); setDeleteErr(''); }}
+                disabled={deleting}
+                className="px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {t('tracePage.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting || deleteText.trim().toUpperCase() !== 'DELETE'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold bg-red-600 text-white hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                {t('tracePage.deleteWorkOrder')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AddCartsDialog
         open={addOpen}

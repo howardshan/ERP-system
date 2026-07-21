@@ -1125,6 +1125,12 @@
     "printConfirmBody": "Se agregaron {{count}} carro(s). ¿Imprimir etiquetas ahora?",
     "reprintLaterHint": "También puede reimprimir más tarde con el botón Reimprimir etiqueta.",
     "skip": "Omitir",
-    "printNStickers": "Imprimir {{count}} etiqueta(s)"
+    "printNStickers": "Imprimir {{count}} etiqueta(s)",
+    "deleteWorkOrder": "Eliminar orden de trabajo",
+    "deleteWorkOrderHint": "Solo disponible antes de escanear algún carro a un secador",
+    "deleteConfirmBody": "Esto elimina permanentemente la orden {{wo}} y sus {{count}} carro(s). No se puede deshacer.",
+    "deleteTypePrompt": "Escribe para confirmar:",
+    "deleteFailed": "No se pudo eliminar la orden de trabajo.",
+    "cancel": "Cancelar"
   }
 }

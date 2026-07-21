@@ -1125,6 +1125,12 @@
     "printConfirmBody": "Added {{count}} cart(s). Print stickers now?",
     "reprintLaterHint": "You can also reprint later via the Reprint sticker button.",
     "skip": "Skip",
-    "printNStickers": "Print {{count}} sticker(s)"
+    "printNStickers": "Print {{count}} sticker(s)",
+    "deleteWorkOrder": "Delete work order",
+    "deleteWorkOrderHint": "Only available before any cart is scanned into a dryer",
+    "deleteConfirmBody": "This permanently deletes work order {{wo}} and its {{count}} cart(s). This cannot be undone.",
+    "deleteTypePrompt": "Type to confirm:",
+    "deleteFailed": "Could not delete work order.",
+    "cancel": "Cancel"
   }
 }
