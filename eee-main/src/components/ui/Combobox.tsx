@@ -41,14 +41,29 @@ export function Combobox({
     [options, value],
   );
 
+  // Ranked filtering: exact label match FIRST, then label prefix, then label
+  // substring, then hint (name) substring. Ordering here is CORRECTNESS, not
+  // cosmetics: Enter and the default highlight commit filtered[0], and barcode
+  // scanners terminate a scan with Enter — with a plain substring filter kept in
+  // list order, a leading-zero or superset code (e.g. '058202' vs '58202',
+  // '11500N' vs '11500') could sit at index 0 and steal the commit even though
+  // the operator typed the exact code (BR-Q89).
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const src = !q
-      ? options
-      : options.filter((o) =>
-          o.label.toLowerCase().includes(q) ||
-          (o.hint ? o.hint.toLowerCase().includes(q) : false));
-    return src.slice(0, limit);
+    if (!q) return options.slice(0, limit);
+    const rank = (o: ComboOption): number => {
+      const label = o.label.toLowerCase();
+      if (label === q) return 0;
+      if (label.startsWith(q)) return 1;
+      if (label.includes(q)) return 2;
+      return o.hint && o.hint.toLowerCase().includes(q) ? 3 : 4;
+    };
+    return options
+      .map((o, i) => ({ o, r: rank(o), i }))
+      .filter((x) => x.r < 4)
+      .sort((a, b) => a.r - b.r || a.i - b.i)   // stable within each rank
+      .map((x) => x.o)
+      .slice(0, limit);
   }, [options, query, limit]);
 
   // Leaving the field with text still typed but never committed (no Enter / no
