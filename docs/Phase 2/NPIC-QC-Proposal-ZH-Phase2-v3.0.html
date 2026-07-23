@@ -1,0 +1,94 @@
+<!doctype html><html><head><meta charset='utf-8'><style>
+@page { size:Letter; margin:74pt 57pt 62pt 57pt;
+ @top-left { content:"NPIC 第二阶段 — 生产运营系统"; font-size:6.8pt; color:#666; font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; vertical-align:bottom; padding-bottom:14pt; }
+ @top-right { content:string(sec); font-size:6.8pt; color:#666; font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; vertical-align:bottom; padding-bottom:14pt; }
+ @bottom-left { content:"保密 — v3.0"; font-size:6.8pt; color:#666; font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; vertical-align:top; padding-top:12pt; white-space:nowrap; }
+ @bottom-right { content:"Page " counter(page) " of " counter(pages); font-size:6.8pt; color:#666; font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; vertical-align:top; padding-top:12pt; white-space:nowrap; } }
+@page cover { @top-left{content:none} @top-right{content:none} @bottom-right{content:none} }
+html,body { font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; color:#222; font-size:9.8pt; line-height:1.5; margin:0; }
+h2.sec { color:#4a86d8; font-size:13.5pt; font-weight:700; margin:16pt 0 9pt; padding-bottom:5pt; border-bottom:1.6pt solid #4a86d8; string-set:sec content(); }
+h2.sec.first { margin-top:0; }
+h3.sub { color:#4a86d8; font-size:10.5pt; font-weight:700; margin:15pt 0 7pt; }
+.modhead { background:#eef3fb; border-left:3.5pt solid #4a86d8; padding:6pt 10pt; margin:15pt 0 8pt; string-set:sec content(); page-break-after:avoid; }
+.modhead .tag { color:#4a86d8; font-weight:700; } .modhead .nm { font-weight:700; }
+.lbl { font-weight:700; font-size:10pt; margin:11pt 0 4pt; }
+p { margin:0 0 7pt; } p.muted { color:#666; }
+table { width:100%; border-collapse:collapse; margin:3pt 0 6pt; }
+th { background:#4a86d8; color:#fff; font-weight:700; font-size:9.6pt; text-align:left; padding:6pt 9pt; }
+td { font-size:9.6pt; color:#222; padding:6.5pt 9pt; border-bottom:0.6pt solid #e8e8e8; vertical-align:top; }
+ul { margin:3pt 0 7pt; padding-left:16pt; } li { margin:0 0 4pt; }
+.cover { page:cover; }
+.cover .kick { letter-spacing:3pt; color:#4a86d8; font-weight:700; font-size:10pt; margin-top:120pt; }
+.cover h1 { font-size:26pt; font-weight:700; margin:14pt 0 2pt; color:#1a1a1a; }
+.cover .sub { font-size:13pt; color:#555; margin:0 0 40pt; }
+.cover .meta { font-size:10pt; color:#444; line-height:1.9; }
+.pb { page-break-before:always; }
+</style></head><body>
+<div class="cover"><div class="kick">服务提案</div>
+<h1>NPIC 质量管理与运营系统</h1><div class="sub">第二阶段 — 生产运营</div>
+<div class="meta">编制方：Crave &amp; Cook<br>委托方：NPIC<br>日期：2026年6月<br>版本：v3.0</div></div>
+<div class="pb"></div>
+<h2 class="sec first">一、概述</h2>
+<p>本提案阐述了 NPIC 数字化运营平台第二阶段的工作范围。在第一阶段（模块 A–I）成功建立 QC 检测系统的基础上，第二阶段专注于生产车间的数字化，以实时、权限管控的系统取代现有的 Excel 日报和纸质车辆记录，并与 Sage 100 直连以消除人工重复录入。</p>
+<p>第二阶段新增五个模块（A–E）：</p>
+<table><thead><tr><th>模块</th><th>名称</th><th>用途</th></tr></thead><tbody><tr><td>A</td><td>生产 — 主管批量录入</td><td>在特殊情况下，主管批量录入员工产出，替代 Excel 日报</td></tr><tr><td>B</td><td>生产 — 员工站点模式</td><td>员工在机器旁实时逐车录入</td></tr><tr><td>C</td><td>烘房操作</td><td>车辆扫码出入库，与模块 B 的生产记录自动关联</td></tr><tr><td>D</td><td>资料总计与报表</td><td>生产数据汇总、效率报表及数据导出</td></tr><tr><td>E</td><td>Sage 100 集成</td><td>NPIC 系统与 Sage 100 之间的实时双向数据同步</td></tr></tbody></table>
+<h2 class="sec">二、现状与问题</h2>
+<table><thead><tr><th>业务领域</th><th>当前方式</th><th>主要痛点</th></tr></thead><tbody><tr><td>生产追踪</td><td>Excel 日报（2026 Daily Report Forming Production.xlsx）</td><td>手工录入——每位主管每天约需 2 小时录入；容易出错；无实时可见性；效率指标需手动计算；无法追踪车次生产时间</td></tr><tr><td>烘房</td><td>纸质车辆记录</td><td>无法系统追踪车辆链，半车接续跨班记录混乱</td></tr><tr><td>资料汇总</td><td>Excel 手动汇总</td><td>无统一报表视图；提取班次汇总或效率趋势需额外人工整理</td></tr><tr><td>Sage 100 数据录入</td><td>所有生产记录由员工手动逐条录入 Sage 100</td><td>重复录入耗时耗力，转录易出错；生产与系统数据之间存在延迟</td></tr></tbody></table>
+<h2 class="sec">三、系统架构</h2>
+<p>第二阶段基于与第一阶段相同的技术栈构建，并与现有 NPIC 平台直接集成。新模块共享第一阶段已建立的用户认证、条码扫描和数据导出基础设施。</p>
+<h3 class="sub">角色与权限设计</h3>
+<table><thead><tr><th>角色</th><th>可访问模块</th><th>需要 MFA？</th></tr></thead><tbody><tr><td>员工</td><td>模块 B — 站点模式（车辆录入）</td><td>否</td></tr><tr><td>主管</td><td>模块 A、B、C、D — 完整录入、审核与报表</td><td>否（标准操作）</td></tr><tr><td>管理员</td><td>所有模块 + 受限操作（关单）</td><td>是 — Microsoft Authenticator</td></tr><tr><td>系统管理员</td><td>完整系统权限，包括 Sage 100 集成配置</td><td>是 — Microsoft Authenticator</td></tr></tbody></table>
+<h3 class="sub">核心设计原则</h3>
+<ul>
+<li><b>员工模式</b> — 专为生产车间使用设计的轻量界面，日常录入无需 MFA，支持刷卡或输入工号打卡。</li>
+<li><b>主管模式</b> — 完整的批量数据录入能力，界面布局与现有 Excel 表单一致。</li>
+<li><b>受限操作</b> — 关单需 Microsoft Authenticator 验证（继承自第一阶段模块 I）。</li>
+<li><b>按 SKU 配置字段</b> — 必填字段（重量 vs 数量、车辆层数、必填工单字段）按产品 SKU 预先配置，录入时自动生效。</li>
+<li><b>半车关联</b> — 在生产环节（模块 B）完成绑定后，烘房、报表、Sage 100 同步等所有下游模块自动继承该关联，无需重新确认。</li></ul>
+<h2 class="sec">四、模块规格说明</h2>
+<div class="modhead"><span class="tag">模块 A</span>&nbsp;&nbsp;<span class="nm">生产 — 主管批量录入</span></div>
+<p>替代现有 Excel 日报。主管可批量录入某一班次或时段内所有员工和车辆的记录。该模式适用于没有独立条码扫描站的团队。</p>
+<div class="lbl">采集数据</div>
+<ul><li>员工姓名及工号</li><li>机器分配情况</li><li>工单号</li><li>一级单（原材料编号）</li><li>车号、层数及每车数量或重量</li><li>班次时长与总工时</li></ul>
+<div class="lbl">输出</div>
+<ul><li>自动计算各员工效率指标（汇入模块 D 报表）</li><li>记录与工单关联，供模块 E 同步至 Sage 100</li></ul>
+<div class="modhead"><span class="tag">模块 B</span>&nbsp;&nbsp;<span class="nm">生产 — 员工站点模式</span></div>
+<p>面向员工的实时生产录入界面，在机器或产线旁的共享平板 / 终端上使用。日常录入无需 Microsoft Authenticator。</p>
+<div class="lbl">签到 / 签出</div>
+<ul><li>员工在开工前通过输入工号或刷卡签到；同一机器可多名员工同时签到。</li><li>签出时需进行电子签名。</li><li>产线所有员工签名后，本班次自动结束。</li></ul>
+<div class="lbl">车辆录入</div>
+<ul><li>录入第一车时，需输入一级工单号；此后各车自动默认上次输入的工单号，但必须按确认按钮方可继续，手动输入可随时覆盖默认值。</li><li>一辆车可关联多个一级工单号。</li><li>必填字段（重量或数量、层数）按产品 SKU 预配置，自动生效。</li><li>每条记录需录入车号及层数。</li></ul>
+<div class="lbl">半车接续</div>
+<ul><li>录入本班第一车时，员工必须选择以下之一（必填项，不可跳过）：</li><li><b>独立新车</b> — 本班次从头开始的新一车生产。</li><li><b>半车接续</b> — 本车为上一次班次某车的物理接续，系统将当前车号与上一车号关联。烘房、报表及 Sage 100 同步等所有下游模块自动继承该关联，无需在任何其他环节重新确认。</li></ul>
+<div class="lbl">关单 — 受限操作（需 MFA）</div>
+<p>由于实际生产数量通常小于理论 BOM 数量，系统提供关单功能。该操作需要特殊权限和 Microsoft Authenticator 验证。</p>
+<table><thead><tr><th>选项</th><th>说明</th></tr></thead><tbody><tr><td>无剩余</td><td>物料已全部用尽，工单干净关闭，无剩余原材料。</td></tr><tr><td>剩余物料作废</td><td>剩余原材料报废处理，系统自动将未用物料数量平均分配至已完成的各车记录，用于精确物料核算。</td></tr><tr><td>保留剩余物料</td><td>剩余物料留存，供下次生产使用，各车记录无需调整。</td></tr></tbody></table>
+<div class="modhead"><span class="tag">模块 C</span>&nbsp;&nbsp;<span class="nm">烘房操作</span></div>
+<p>记录车辆进出烘房，并与生产记录自动关联。半车绑定关系已在模块 B 中建立，烘房无需重新确认。</p>
+<ul><li><b>扫码入库：</b>操作员扫描车辆条码，系统自动从生产记录中提取该车信息（含半车绑定关系）并记录入库时间戳。</li><li><b>扫码出库：</b>记录车辆离开烘房的时间戳。</li></ul>
+<p class="muted">其余烘房工作流细节（返烘队列集成、时间 / 温度记录等）将在需求确认阶段与 NPIC 团队共同敲定。</p>
+<div class="modhead"><span class="tag">模块 D</span>&nbsp;&nbsp;<span class="nm">资料总计与报表</span></div>
+<p>将模块 A 和模块 B 录入的所有生产数据汇聚成结构化报表和导出文件，替代现有的 Excel 手动汇总流程。</p>
+<div class="lbl">班次与日度报表</div>
+<ul><li>自动生成班次汇总：每班总车数、总产量 / 重量、总工时、在线人数</li><li>按日汇总：全机台、全工单的当日生产情况</li><li>工单完工报表：计划量 vs 实际量、物料核算状态</li></ul>
+<div class="lbl">效率报表</div>
+<ul><li>各员工产出指标（完成车辆数、重量 / 产量、工时），支持任意日期范围筛选</li><li>机台利用率：各产线有效工时 vs 停机时长</li><li>趋势分析：按产品或工单查看周度 / 月度产出对比</li></ul>
+<div class="lbl">数据导出</div>
+<ul><li>所有报表均可按日期范围或产品 SKU 导出</li><li>导出格式：Excel 及 PDF</li><li>复用第一阶段导出框架，保持一致性</li></ul>
+<div class="modhead"><span class="tag">模块 E</span>&nbsp;&nbsp;<span class="nm">Sage 100 集成</span></div>
+<p>NPIC 系统直连 Sage 100 数据库，实现实时双向数据同步，彻底消除工单、库存调整和生产完工数据的手动重复录入。</p>
+<div class="lbl">从 Sage 100 拉取的数据</div>
+<table><thead><tr><th>数据</th><th>在 NPIC 系统中的用途</th></tr></thead><tbody><tr><td>工单（Work Orders）</td><td>自动填充模块 A 和模块 B 的工单号，无需手动输入</td></tr><tr><td>物料主档 / BOM（一级单）</td><td>同步 SKU 配置、产品描述及原材料编号，供全系统使用</td></tr><tr><td>客户订单（Customer POs）</td><td>将生产工单与客户采购订单关联，实现端到端追溯</td></tr><tr><td>库存水位</td><td>开立新工单时实时显示原材料可用数量</td></tr></tbody></table>
+<div class="lbl">推送至 Sage 100 的数据</div>
+<table><thead><tr><th>数据</th><th>触发时机</th></tr></thead><tbody><tr><td>生产完工入库（成品收货）</td><td>模块 B 关单时自动过账至 Sage 100</td></tr><tr><td>原材料耗用</td><td>关单时一级单物料核算结果（实耗数量）同步回 Sage 100 库存</td></tr><tr><td>批次号（Lot Numbers）</td><td>生产批次号同步至 Sage 100，实现全链路追溯</td></tr><tr><td>车辆 / 产量记录</td><td>模块 A/B 确认的最终生产数量同步至 Sage 100</td></tr></tbody></table>
+<div class="lbl">同步设计</div>
+<ul><li><b>实时拉取：</b>用户开立新记录时按需从 Sage 100 拉取工单及物料主档数据，确保始终使用最新信息。</li><li><b>事件触发推送：</b>生产完工和库存调整在关单等关键工作流节点触发，而非定时轮询，最大程度减少数据冲突。</li><li><b>错误处理：</b>推送失败时系统自动排队重试；对于需要人工处理的条目，主管会收到通知提醒。</li></ul>
+<h2 class="sec">五、实施计划</h2>
+<table><thead><tr><th>阶段</th><th>主要工作</th><th>预计周期</th></tr></thead><tbody><tr><td>需求确认</td><td>与 NPIC 团队确认字段定义、SKU 配置、权限矩阵及 Sage 100 数据映射；梳理现有 Excel 模板</td><td>1 周</td></tr><tr><td>开发</td><td>构建模块 A–E，实现角色权限管控；Sage 100 API 集成；与第一阶段认证及导出框架集成</td><td>7–9 周</td></tr><tr><td>内部测试</td><td>使用 NPIC 实际生产数据进行端到端测试；在测试环境验证 Sage 100 数据同步准确性</td><td>2 周</td></tr><tr><td>并行运行</td><td>新系统与现有 Excel 日报同步运行，对比输出并解决差异；验证 Sage 100 数据准确性</td><td>2 周</td></tr><tr><td>培训</td><td>对各模块和各角色分别培训主管和员工；编写各角色操作 SOP</td><td>1 周</td></tr><tr><td>正式上线</td><td>全面切换至数字系统；停用 Excel 日报；终止 Sage 100 手工录入</td><td>—</td></tr></tbody></table>
+<h2 class="sec">六、交付物</h2>
+<ul><li>集成至 NPIC 运营平台的第二阶段模块（A–E）</li><li>基于角色的访问控制：员工 / 主管 / 管理员 / 系统管理员</li><li>受限操作（关单）的 Microsoft Authenticator MFA 验证</li><li>自动生成班次汇总与员工效率报表</li><li>按日期范围或产品的数据导出（Excel 及 PDF）</li><li>Sage 100 双向集成：实时拉取工单，自动过账生产完工及库存数据</li><li>各模块和各角色的培训文档</li></ul>
+<h2 class="sec">七、预期效益</h2>
+<table><thead><tr><th>效益</th><th>影响</th></tr></thead><tbody><tr><td>消除手工 Excel 日报</td><td>每位主管每天节省约 2 小时录入时间；实时呈现生产可见性</td></tr><tr><td>实时车辆级数据</td><td>每车完成即刻生成准确、带时间戳的记录，无需事后补录</td></tr><tr><td>效率指标自动计算</td><td>无需手工计算，即时生成班次汇总和员工个人产出报表</td></tr><tr><td>端到端车辆追溯</td><td>半车绑定跨班贯通；烘房和报表模块自动继承关联，无断链</td></tr><tr><td>消除 Sage 100 双重录入</td><td>工单自动从 Sage 100 拉取；生产完工和物料耗用自动回传</td></tr><tr><td>Sage 100 库存实时准确</td><td>关单即更新 Sage 100 库存，无需批量上传或手动核对</td></tr><tr><td>与第一阶段无缝集成</td><td>QC 检测与生产运营统一平台，共享认证、条码及导出基础设施</td></tr><tr><td>工单级原材料用量精准追踪</td><td>按工单准确归集实际用量，消除跨工单串料失真</td></tr><tr><td>车次产量与时间精准追踪</td><td>实际车数＝登记车数，漏报归零，产量登记准确率 100%</td></tr><tr><td>车次生产后等待时长记录</td><td>积累等待时长数据，为后续流程优化提供依据</td></tr><tr><td>免手工录入工位与工时</td><td>工位与工时自动采集，替代纸面/Excel 手工填报</td></tr><tr><td>员工车次生产效率</td><td>按员工×车次自动准确核算，更精细、客观、实时</td></tr><tr><td>工单级实时生产追踪</td><td>每个工单进度实时可见，支撑更准确的监控与规划</td></tr><tr><td>免手工填写每车记录与统计报表</td><td>产线员工无需再逐车手动填写记录及报表</td></tr></tbody></table>
+<h3 class="sub">详细说明</h3>
+<p><b>7.1 消除手工 Excel 日报</b>　现状：各主管每天手工在 Excel 汇总当班生产、编制日报；系统上线后由现场实时采集自动生成，无需再手动录入。按每位主管每天填报约 <b>2 小时</b>、<b>10 位主管 × 22 个工作日</b>计，每月约节省 <b>440 工时（≈2.5 个全职人力）</b>；日报由「次日可见」变为「实时可见」。</p><p><b>7.2 实时车辆级数据</b>　每车完成即生成带时间戳的记录，无需事后凭记忆补录。事后补录量趋近 <b>0</b>；<b>每车可追溯率 100%</b>，时间戳精确到分钟级。</p><p><b>7.3 工单级原材料用量精准追踪</b>　按<b>每个工单</b>记录实际领用与消耗。现状痛点：一个工单的料常被用到另一个工单上，导致实际用量无法准确归集；系统按工单绑定用料后，每单实际用量可准确核算。消除<b>跨工单串料</b>导致的用量失真，每单实际用量 / 单位产出用料（yield）可准确核算，支撑成本核算与超耗识别。</p><p><b>7.4 车次产量与时间精准追踪</b>　每车实际生产数量 + 开始 / 完成时间点由系统实时采集。现状痛点：存在员工<b>故意漏车 / 瞒报</b>，实际生产车数与登记车数不一致；系统实时计数后两者一致。<b>实际车数 = 登记车数</b>，漏报车次归零、产量登记准确率提升至 100%；可算<b>平均节拍（分钟 / 车）</b>用于产能测算与排产。</p><p><b>7.5 车次生产后等待时长记录</b>　记录每一车<b>生产完成后的等待时长</b>（如等待进入下一环节 / 烘干房），持续积累数据，为后续流程优化、效率提升提供依据。<b>平均等待时长（分钟 / 车）</b>可统计，作为效率改善的量化基线与追踪指标。</p><p><b>7.6 免手工录入工位与工时</b>　员工工位分配与工作时长由系统采集，替代纸面 / Excel 手工填报。此项的工时节省<b>已包含在 7.1 的日报节省中，不单独重复计量</b>；价值在于工时 / 工位数据的完整率与准确率提升（消除漏填、错填）。</p><p><b>7.7 员工车次生产效率</b>　按「员工 × 车次」由系统自动、准确核算生产效率（车 / 班、件 / 工时），比现有方式更精细、更客观、可实时。效率数据颗粒度到「人 × 车」；可比较班组 / 个人<b>效率离散度</b>，支撑绩效评估与人员调配。（现已有客观基线，此项为「更准更细的效率数据」，非从无到有。）</p><p><b>7.8 工单级实时生产追踪</b>　实时追踪<b>每个工单</b>的生产进度 / 实况，计划与生产总监可据实效进行更准确的<b>监控与规划</b>（排产、产能、交期）。工单进度实时可见（覆盖率 100%），从「事后汇总」变为「实时掌握」，支撑更准确的排产与产能决策。</p><p><b>7.9 免手工填写每车记录与统计报表（产线员工）</b>　现状：产线员工需逐车手动填写每车生产记录及统计报表；系统上线后由现场实时采集，员工无需再手动填写。按 <b>1 分钟 / 车 × 6 车 / 班 × 3 班 / 天 × 40 条产线 = 720 分钟 / 天（12 工时 / 天）</b>，<b>22 个工作日</b>计，每月约节省 <b>264 工时（≈1.5 个全职人力）</b>。</p>
+</body></html>
