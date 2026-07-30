@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Printer, X } from 'lucide-react';
@@ -397,6 +397,9 @@ export function CartStickerSheet({
   const pdfB64Ref = useRef<string>('');
   const previewRef = useRef<HTMLIFrameElement>(null);
 
+  // Labels print/preview from the LAST cart to the FIRST cart.
+  const orderedCarts = useMemo(() => [...carts].reverse(), [carts]);
+
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
   const handleBrowserPrint = () => {
@@ -407,10 +410,10 @@ export function CartStickerSheet({
 
   // Build the vector PDF once per prop change — used for both preview and print.
   useEffect(() => {
-    if (carts.length === 0) { setPdfUrl(''); pdfB64Ref.current = ''; return; }
+    if (orderedCarts.length === 0) { setPdfUrl(''); pdfB64Ref.current = ''; return; }
     let url = '';
     try {
-      const doc = buildStickerPdf(carts, workOrderBarcode, skuCode, skuName, getSavedDpi());
+      const doc = buildStickerPdf(orderedCarts, workOrderBarcode, skuCode, skuName, getSavedDpi());
       pdfB64Ref.current = doc.output('datauristring').split('base64,')[1] ?? '';
       url = URL.createObjectURL(doc.output('blob'));
       setPdfUrl(url);
@@ -418,7 +421,7 @@ export function CartStickerSheet({
       setPrintStatus(`❌ ${t('cartStickerSheet.previewFailed')}: ${e instanceof Error ? e.message : String(e)}`);
     }
     return () => { if (url) URL.revokeObjectURL(url); };
-  }, [carts, workOrderBarcode, skuCode, skuName]);
+  }, [orderedCarts, workOrderBarcode, skuCode, skuName]);
 
   const doPrint = async () => {
     if (printing) return;
@@ -431,9 +434,9 @@ export function CartStickerSheet({
       if (isTauri) {
         const dpi = getSavedDpi();
         const { invoke } = await import('@tauri-apps/api/core');
-        for (let i = 0; i < carts.length; i++) {
-          setPrintStatus(t('cartStickerSheet.printingProgress', { current: i + 1, total: carts.length }));
-          const pngBase64 = await renderPrintPng(carts[i], workOrderBarcode, skuCode, skuName, dpi);
+        for (let i = 0; i < orderedCarts.length; i++) {
+          setPrintStatus(t('cartStickerSheet.printingProgress', { current: i + 1, total: orderedCarts.length }));
+          const pngBase64 = await renderPrintPng(orderedCarts[i], workOrderBarcode, skuCode, skuName, dpi);
           await invoke<string>('print_png', { pngBase64, printer });
         }
         setPrintStatus(`✓ ${t('cartStickerSheet.printed', { count: carts.length })}`);
@@ -449,7 +452,7 @@ export function CartStickerSheet({
           // exactly; avoids pdf.js viewport rotation and missing PNG DPI metadata.
           const dpi = getSavedDpi();
           const pngs = await Promise.all(
-            carts.map(c => renderPrintPng(c, workOrderBarcode, skuCode, skuName, dpi)),
+            orderedCarts.map(c => renderPrintPng(c, workOrderBarcode, skuCode, skuName, dpi)),
           );
           await postPrintPngsToBridge(pngs, printer, dpi);
         } else {
