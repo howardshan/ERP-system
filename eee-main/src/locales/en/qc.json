@@ -173,7 +173,12 @@
     "createdMsg": "Dry room created",
     "createFailed": "Create failed",
     "deletedMsg": "Deleted {{count}} dry room(s)",
-    "deleteFailed": "Delete failed"
+    "deleteFailed": "Delete failed",
+    "deleteReasonLabel": "Reason (required)",
+    "deleteReasonPlaceholder": "Why are these work orders being deleted?",
+    "deleteTypePrompt": "Type to confirm:",
+    "bulkDeleteBody": "This permanently deletes {{count}} work order(s) that have not started production. Started ones are skipped. This cannot be undone.",
+    "deletedWithSkips": "Deleted {{deleted}}, skipped {{skipped}} (production already started)."
   },
   "pendingQueue": {
     "invalidAw": "Enter a valid Aw value (0–2)",
@@ -1131,6 +1136,8 @@
     "deleteConfirmBody": "This permanently deletes work order {{wo}} and its {{count}} cart(s). This cannot be undone.",
     "deleteTypePrompt": "Type to confirm:",
     "deleteFailed": "Could not delete work order.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "deleteReasonLabel": "Reason (required)",
+    "deleteReasonPlaceholder": "Why is this work order being deleted?"
   }
 }

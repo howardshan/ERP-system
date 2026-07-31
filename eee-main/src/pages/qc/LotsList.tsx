@@ -33,7 +33,10 @@ export default function LotsList({ onSelectLot }: Props) {
   const [msg, setMsg] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  // M-175: typed-DELETE + required reason dialog (replaces the old double-click).
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkReason, setBulkReason] = useState('');
 
   const load = () => listProductionLots().then(setLots).catch(e => setError(e.message));
 
@@ -93,18 +96,20 @@ export default function LotsList({ onSelectLot }: Props) {
   };
 
   const bulkDelete = async () => {
-    if (!confirmBulkDelete) {
-      setConfirmBulkDelete(true);
-      setTimeout(() => setConfirmBulkDelete(false), 3000);
-      return;
-    }
+    if (bulkText.trim().toUpperCase() !== 'DELETE' || bulkReason.trim() === '') return;
     setBusy(true);
     setError('');
     try {
-      await deleteProductionLots([...selected]);
-      setMsg(t('lotsList.deletedMsg', { count: selected.size }));
+      const res = await deleteProductionLots([...selected], bulkReason.trim());
+      setMsg(
+        res.skipped > 0
+          ? t('lotsList.deletedWithSkips', { deleted: res.deleted, skipped: res.skipped })
+          : t('lotsList.deletedMsg', { count: res.deleted }),
+      );
       setSelected(new Set());
-      setConfirmBulkDelete(false);
+      setBulkOpen(false);
+      setBulkText('');
+      setBulkReason('');
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : t('lotsList.deleteFailed'));
@@ -165,20 +170,61 @@ export default function LotsList({ onSelectLot }: Props) {
         {canDelete && selected.size > 0 && (
           <button
             type="button"
-            onClick={bulkDelete}
+            onClick={() => { setBulkText(''); setBulkReason(''); setBulkOpen(true); }}
             disabled={busy}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors',
-              confirmBulkDelete
-                ? 'bg-red-600 hover:bg-red-500 text-white'
-                : 'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200',
-            )}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-red-50 hover:bg-red-100 text-red-600 border border-red-200"
           >
             <Trash2 size={12} />
-            {confirmBulkDelete ? t('lotsList.confirmDelete', { count: selected.size }) : t('lotsList.delete', { count: selected.size })}
+            {t('lotsList.delete', { count: selected.size })}
           </button>
         )}
       </div>
+
+      {bulkOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">{t('lotsList.delete', { count: selected.size })}</h3>
+                <p className="text-sm text-slate-600 mt-0.5">{t('lotsList.bulkDeleteBody', { count: selected.size })}</p>
+              </div>
+            </div>
+
+            <label className="block text-xs font-semibold text-slate-600 mb-1">{t('lotsList.deleteReasonLabel')}</label>
+            <input
+              type="text"
+              value={bulkReason}
+              onChange={(e) => setBulkReason(e.target.value)}
+              placeholder={t('lotsList.deleteReasonPlaceholder')}
+              className="w-full h-9 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-red-400 mb-3"
+            />
+            <p className="text-xs text-slate-500 mb-2">
+              {t('lotsList.deleteTypePrompt')} <span className="font-mono font-bold text-slate-700">DELETE</span>
+            </p>
+            <input
+              type="text"
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+              placeholder="DELETE"
+              className="w-full h-9 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-red-400 mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => { setBulkOpen(false); setBulkText(''); setBulkReason(''); }} disabled={busy}
+                className="px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50">
+                {t('lotsList.cancel')}
+              </button>
+              <button type="button" onClick={bulkDelete}
+                disabled={busy || bulkText.trim().toUpperCase() !== 'DELETE' || bulkReason.trim() === ''}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold bg-red-600 text-white hover:bg-red-500 disabled:opacity-40">
+                <Trash2 size={13} /> {t('lotsList.delete', { count: selected.size })}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ul className="space-y-2">
         {lots.map((lot) => {

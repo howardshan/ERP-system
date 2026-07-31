@@ -173,7 +173,12 @@
     "createdMsg": "烘房已创建",
     "createFailed": "创建失败",
     "deletedMsg": "已删除 {{count}} 个烘房",
-    "deleteFailed": "删除失败"
+    "deleteFailed": "删除失败",
+    "deleteReasonLabel": "删除原因（必填）",
+    "deleteReasonPlaceholder": "为什么删除这些工单？",
+    "deleteTypePrompt": "输入以确认：",
+    "bulkDeleteBody": "将永久删除 {{count}} 个尚未开始生产的工单；已开始的会被跳过。此操作不可撤销。",
+    "deletedWithSkips": "已删除 {{deleted}} 个，跳过 {{skipped}} 个（已开始生产）。"
   },
   "pendingQueue": {
     "invalidAw": "请输入有效的水活度（Aw）值（0–2）",
@@ -1127,6 +1132,8 @@
     "deleteConfirmBody": "将永久删除工单 {{wo}} 及其 {{count}} 辆料车，此操作不可撤销。",
     "deleteTypePrompt": "输入以确认：",
     "deleteFailed": "无法删除工单。",
-    "cancel": "取消"
+    "cancel": "取消",
+    "deleteReasonLabel": "删除原因（必填）",
+    "deleteReasonPlaceholder": "为什么删除这个工单？"
   }
 }
