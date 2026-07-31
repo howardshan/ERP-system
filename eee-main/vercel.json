@@ -5,6 +5,8 @@
     { "src": "/ppt/(.*)", "dest": "/ppt/$1" },
     { "src": "/proposal", "dest": "/proposal/index.html" },
     { "src": "/proposal/", "dest": "/proposal/index.html" },
+    { "src": "/proposal-phase2", "dest": "/proposal-phase2/index.html" },
+    { "src": "/proposal-phase2/", "dest": "/proposal-phase2/index.html" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
