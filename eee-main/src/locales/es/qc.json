@@ -173,7 +173,12 @@
     "createdMsg": "Sala de secado creada",
     "createFailed": "Error al crear",
     "deletedMsg": "Se eliminaron {{count}} sala(s) de secado",
-    "deleteFailed": "Error al eliminar"
+    "deleteFailed": "Error al eliminar",
+    "deleteReasonLabel": "Motivo (obligatorio)",
+    "deleteReasonPlaceholder": "¿Por qué se eliminan estas órdenes?",
+    "deleteTypePrompt": "Escribe para confirmar:",
+    "bulkDeleteBody": "Esto elimina permanentemente {{count}} orden(es) que no han iniciado producción; las iniciadas se omiten. No se puede deshacer.",
+    "deletedWithSkips": "Eliminadas {{deleted}}, omitidas {{skipped}} (ya iniciaron producción)."
   },
   "pendingQueue": {
     "invalidAw": "Ingrese un valor de Aw válido (0–2)",
@@ -1131,6 +1136,8 @@
     "deleteConfirmBody": "Esto elimina permanentemente la orden {{wo}} y sus {{count}} carro(s). No se puede deshacer.",
     "deleteTypePrompt": "Escribe para confirmar:",
     "deleteFailed": "No se pudo eliminar la orden de trabajo.",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "deleteReasonLabel": "Motivo (obligatorio)",
+    "deleteReasonPlaceholder": "¿Por qué se elimina esta orden de trabajo?"
   }
 }

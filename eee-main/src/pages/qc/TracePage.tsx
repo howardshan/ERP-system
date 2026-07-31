@@ -47,6 +47,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
   // available before production starts (no cart scanned into a dryer).
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteText, setDeleteText] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState('');
 
@@ -73,11 +74,11 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
   const notStarted = (detail?.lot.scanned_count ?? 0) === 0;
 
   const handleDelete = async () => {
-    if (!detail || deleteText.trim().toUpperCase() !== 'DELETE') return;
+    if (!detail || deleteText.trim().toUpperCase() !== 'DELETE' || deleteReason.trim() === '') return;
     setDeleting(true);
     setDeleteErr('');
     try {
-      await deleteProductionLot(detail.lot.id);
+      await deleteProductionLot(detail.lot.id, deleteReason.trim());
       setDeleteOpen(false);
       onBack();                       // back to the (freshly reloaded) trace list
     } catch (e) {
@@ -158,7 +159,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
           {canDelete && notStarted && (
             <button
               type="button"
-              onClick={() => { setDeleteText(''); setDeleteErr(''); setDeleteOpen(true); }}
+              onClick={() => { setDeleteText(''); setDeleteReason(''); setDeleteErr(''); setDeleteOpen(true); }}
               title={t('tracePage.deleteWorkOrderHint')}
               className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded bg-white border border-red-200 text-red-600 hover:bg-red-50"
             >
@@ -226,12 +227,20 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
               </div>
             </div>
 
+            <label className="block text-xs font-semibold text-slate-600 mb-1">{t('tracePage.deleteReasonLabel')}</label>
+            <input
+              type="text"
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder={t('tracePage.deleteReasonPlaceholder')}
+              className="w-full h-9 px-3 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-red-400 mb-3"
+            />
+
             <p className="text-xs text-slate-500 mb-2">
               {t('tracePage.deleteTypePrompt')} <span className="font-mono font-bold text-slate-700">DELETE</span>
             </p>
             <input
               type="text"
-              autoFocus
               value={deleteText}
               onChange={(e) => setDeleteText(e.target.value)}
               placeholder="DELETE"
@@ -243,7 +252,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => { setDeleteOpen(false); setDeleteText(''); setDeleteErr(''); }}
+                onClick={() => { setDeleteOpen(false); setDeleteText(''); setDeleteReason(''); setDeleteErr(''); }}
                 disabled={deleting}
                 className="px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-50"
               >
@@ -252,7 +261,7 @@ export default function TracePage({ lotId, onBack, onOpenHistory }: Props) {
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={deleting || deleteText.trim().toUpperCase() !== 'DELETE'}
+                disabled={deleting || deleteText.trim().toUpperCase() !== 'DELETE' || deleteReason.trim() === ''}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold bg-red-600 text-white hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}

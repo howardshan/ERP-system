@@ -10,7 +10,7 @@
 
 ## 统一视图 `v_system_audit_log`（M-155）
 
-`UNION ALL` 7 张源表，归一为：
+`UNION ALL` 8 张源表，归一为：
 `id / source / module / ts / actor_auth_id / actor_name / action / entity_type / entity_id / summary / detail(jsonb)`
 
 - `id` = `source || ':' || pk::text`（跨 union 唯一）。
@@ -23,6 +23,7 @@
 | qc_product_audit_log | qc | changed_at | actor_name | action | description |
 | auth_audit_log | auth | changed_at | actor_name | action | description |
 | qc_quality_event | qc（`sub_lot_created` → production，见 M-158） | created_at | LEFT JOIN erp_user→full_name | event_type | `qc_quality_event_summary()` |
+| qc_work_order_audit（M-175） | production | created_at | actor_name（快照） | `work_order_delete` | 删除工单 + 车数 + 原因 |
 | prod_downtime_event | production | created_at | created_by(文本) | `downtime` | reason(label) + note |
 | notification_log | notifications | created_at | —（无操作人） | status | subject |
 
