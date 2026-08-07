@@ -2,7 +2,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "routes": [
-    { "src": "/ppt/(.*)", "dest": "/ppt/$1" },
+    { "src": "/ppt/phase2-kickoff", "dest": "/ppt/phase2-kickoff/index.html" },
+    { "src": "/ppt/phase2-kickoff/", "dest": "/ppt/phase2-kickoff/index.html" },
+    { "src": "/ppt/0609", "dest": "/ppt/0609/index.html" },
+    { "src": "/ppt/0609/", "dest": "/ppt/0609/index.html" },
+    { "src": "/ppt/finance-ai", "dest": "/ppt/finance-ai/index.html" },
+    { "src": "/ppt/finance-ai/", "dest": "/ppt/finance-ai/index.html" },
     { "src": "/proposal", "dest": "/proposal/index.html" },
     { "src": "/proposal/", "dest": "/proposal/index.html" },
     { "src": "/proposal-phase2", "dest": "/proposal-phase2/index.html" },
