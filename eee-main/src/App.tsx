@@ -46,15 +46,19 @@ export default function App() {
     && window.location.pathname.replace(/\/+$/, '') === '/tablet';
   if (isTabletRoute) return <TabletApp />;
 
-  // Public proposal pages (Phase 1 & 2) are static HTML in /public and must
-  // never sit behind login/MFA. In production Vercel serves them directly; but
-  // if the SPA is ever reached at the pretty URL (dev server / history
-  // fallback), hand off to the static file so it is never gated by Supabase
-  // auth. The `/index.html` target resolves to the real file in both dev and
-  // prod, so there is no redirect loop.
+  // Public static pages in /public (proposals + PPT decks) must never sit
+  // behind login/MFA. In production Vercel serves them directly; but if the
+  // SPA is ever reached at a pretty URL (dev server / history fallback), hand
+  // off to the static file so it is never gated by Supabase auth.
+  // `/…/index.html` resolves to the real file in both dev and prod.
   if (typeof window !== 'undefined') {
     const p = window.location.pathname.replace(/\/+$/, '');
     if (p === '/proposal' || p === '/proposal-phase2') {
+      window.location.replace(`${p}/index.html`);
+      return null;
+    }
+    // Directory-style /ppt/... URLs → static index.html (never MFA).
+    if ((p === '/ppt' || p.startsWith('/ppt/')) && !/\.html$/i.test(p)) {
       window.location.replace(`${p}/index.html`);
       return null;
     }
