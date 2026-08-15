@@ -150,7 +150,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
 .pc h4  { font-size:3.41vh; font-size:3.41cqh; font-weight:700; color:var(--tx); margin-bottom:.8vh; margin-bottom:.8cqh; }
 .pc p   { font-size:2.64vh; font-size:2.64cqh; color:var(--txm); line-height:1.55; }
 
-.mod-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:1.5%; height:100%; }
+.mod-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:1.5%; height:100%; }
 .mod-card {
   background:#fff; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,.08);
   overflow:hidden; display:flex; flex-direction:column;
@@ -266,7 +266,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
 .prin-card h4 { font-size:3.12vh; font-size:3.12cqh; font-weight:700; color:var(--tx); margin-bottom:.8vh; margin-bottom:.8cqh; }
 .prin-card p { font-size:2.64vh; font-size:2.64cqh; color:var(--txm); line-height:1.55; }
 
-.del-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.8%; height:100%; }
+.del-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.8%; height:100%; }
 .del-item {
   background:#fff; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.07);
   display:flex; align-items:flex-start; gap:2%; padding:3% 3.5%;
@@ -348,9 +348,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
     <div class="eyebrow">NPIC × Crave &amp; Cook, Inc.</div>
     <div class="t1">Phase 2</div>
     <div class="t2">Production Operations</div>
-    <div class="sub">Replace Excel daily log · Real-time cart entry · Sage 100 bi-directional sync</div>
+    <div class="sub">Replace Excel daily log · Real-time cart entry · Blending plans · Sage 100 bi-directional sync</div>
     <div class="dl"></div>
-    <div class="dt">Proposal v3.0 &nbsp;·&nbsp; August 2026</div>
+    <div class="dt">Proposal v3.1 &nbsp;·&nbsp; Kickoff Deck v2.0 &nbsp;·&nbsp; August 2026</div>
   </div>
 </div>
 
@@ -373,11 +373,12 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
       <div class="ag-card">
         <div class="ag-hd am">02 · Scope &amp; Modules</div>
         <div class="ag-body">
-          <h3>Five core modules A–E</h3>
+          <h3>Six core modules A–F</h3>
           <ul>
             <li class="am">Supervisor batch / Employee station</li>
             <li class="am">Dry room / Reporting</li>
             <li class="am">Sage 100 bi-directional sync</li>
+            <li class="am">Powder blending (new)</li>
           </ul>
         </div>
         <div class="ag-ft am">Confirm scope</div>
@@ -536,6 +537,14 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
         </div>
         <div class="mod-body"><p>Real-time bi-directional sync — eliminate work-order and completion double-entry.</p></div>
         <div class="mod-ft">System Bridge</div>
+      </div>
+      <div class="mod-card">
+        <div class="mod-top" style="background:var(--teal)">
+          <div class="mod-letter">F</div>
+          <div class="mod-name">Powder Blending</div>
+        </div>
+        <div class="mod-body"><p>Formula-driven blending plans and pick lists across two powder inventories.</p></div>
+        <div class="mod-ft">Material Control</div>
       </div>
     </div>
   </div>
@@ -710,6 +719,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
           <div class="sage-row"><div class="sage-key">Item Master / BOM</div><div class="sage-val">Sync SKUs, descriptions, raw material codes</div></div>
           <div class="sage-row"><div class="sage-key">Customer POs</div><div class="sage-val">Link WOs to customer POs for end-to-end trace</div></div>
           <div class="sage-row"><div class="sage-key">Inventory Levels</div><div class="sage-val">Show real-time raw material availability when opening a WO</div></div>
+          <div class="sage-row"><div class="sage-key">Powder Stock / Receipts</div><div class="sage-val">Warehouse powder balances and every new receipt — the basis for blending plans</div></div>
         </div>
       </div>
       <div class="sage-col">
@@ -719,6 +729,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
           <div class="sage-row"><div class="sage-key">Raw Material Usage</div><div class="sage-val">Reconciled consumption posted back to inventory</div></div>
           <div class="sage-row"><div class="sage-key">Lot Numbers</div><div class="sage-val">Production lots synced for full-chain traceability</div></div>
           <div class="sage-row"><div class="sage-key">Cart / Output Qty</div><div class="sage-val">Final confirmed production quantities from A/B</div></div>
+          <div class="sage-row"><div class="sage-key">Blending Consumption</div><div class="sage-val">Actual usage filed in Module F written back via the BOM</div></div>
         </div>
       </div>
     </div>
@@ -726,24 +737,81 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
 </div>
 
 <div class="slide" id="s13" style="background:var(--light)">
-  <div class="tbar"><h2>Roles &amp; Design Principles</h2></div>
-  <div class="body" style="display:flex; flex-direction:column; gap:2%;">
+  <div class="tbar"><h2>Role &amp; Access Matrix</h2></div>
+  <div class="body">
     <table class="rtbl">
       <thead>
         <tr><th style="width:18%">Role</th><th style="width:52%">Access</th><th>MFA</th></tr>
       </thead>
       <tbody>
         <tr><td><b>Employee</b></td><td>Module B — Station Mode (cart entry)</td><td><span class="pill no">No</span></td></tr>
-        <tr><td><b>Supervisor</b></td><td>Modules A, B, C, D — entry, review, reports</td><td><span class="pill no">No</span> (standard ops)</td></tr>
+        <tr><td><b>Supervisor</b></td><td>Modules A, B, C, D — entry, review, reports; Module F — blending plans</td><td><span class="pill no">No</span> (standard ops)</td></tr>
+        <tr><td><b>Raw Material Warehouse</b></td><td>Module F — pick list issue confirmation &amp; stock deduction</td><td><span class="pill no">No</span></td></tr>
+        <tr><td><b>Blending Room</b></td><td>Module F — pick list review &amp; actual-usage entry</td><td><span class="pill no">No</span></td></tr>
         <tr><td><b>Manager</b></td><td>All modules + restricted actions (close WO)</td><td><span class="pill yes">Yes</span> Authenticator</td></tr>
         <tr><td><b>Admin</b></td><td>Full system incl. Sage 100 integration config</td><td><span class="pill yes">Yes</span> Authenticator</td></tr>
       </tbody>
     </table>
-    <div class="prin" style="flex:1; min-height:0;">
+  </div>
+</div>
+
+<!-- 12b MODULE F -->
+<div class="slide" id="s12b" style="background:var(--light)">
+  <div class="tbar"><h2>Module F — Powder Blending (new)</h2></div>
+  <div class="body">
+    <div class="ml">
+      <div class="ml-l">
+        <div class="mtag">
+          <div class="mbadge" style="background:var(--teal)">F</div>
+          <div class="mname">Powder Blending</div>
+        </div>
+        <p class="mdesc">Replaces today's <b>manual estimation in Sage 100</b>: quantities expand from the SKU formula, and every transfer and consumption is recorded across both powder inventories.</p>
+        <ul class="mlist">
+          <li>Blending formula per SKU (share % + version control)</li>
+          <li>Planned weight per primary WO expands each powder qty</li>
+          <li>Blending room stock first; only the shortfall from the warehouse</li>
+          <li>Shortfall lots assigned by FIFO, printed on the document</li>
+        </ul>
+        <div class="panel" style="margin-top:2%">
+          <h4>Establishing both powder inventories</h4>
+          <ul>
+            <li><b>Warehouse</b> — built from Sage 100; balances and receipts <b>continuously linked</b></li>
+            <li><b>Blending room</b> — not in Sage today; <b>ledgered here for the first time</b>, usage written back via BOM</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ml-r">
+        <div class="panel">
+          <h4>Pick list — two versions</h4>
+          <ul>
+            <li><b>Warehouse copy</b> — only powders to issue, with qty and FIFO lots</li>
+            <li><b>Blending room copy</b> — full material list, both sources labeled</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h4>Two separate postings</h4>
+          <ul>
+            <li><b>Issue (transfer)</b> — on "Issued", warehouse is deducted and the same qty moves into the blending room</li>
+            <li><b>Blend (consumption)</b> — actual usage entry deducts from blending room stock</li>
+          </ul>
+        </div>
+        <div class="sbox am">Under plan → remainder stays in the blending room. Over plan → a new pick list is required; no direct over-issue. Actual usage is written back to Sage 100 via the BOM.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 13b DESIGN PRINCIPLES -->
+<div class="slide" id="s13b" style="background:var(--light)">
+  <div class="tbar"><h2>Key Design Principles</h2></div>
+  <div class="body">
+    <div class="prin" style="height:100%; grid-template-columns:repeat(3,1fr);">
       <div class="prin-card"><div class="prin-num">01</div><div><h4>Lightweight employee mode</h4><p>Floor-first UI; no MFA for daily entry; badge or ID sign-in.</p></div></div>
       <div class="prin-card"><div class="prin-num">02</div><div><h4>Supervisor UI mirrors Excel</h4><p>Batch-entry layout stays familiar to current forms.</p></div></div>
       <div class="prin-card"><div class="prin-num">03</div><div><h4>SKU-configured fields</h4><p>Weight vs qty, layers, required WO fields applied per product.</p></div></div>
       <div class="prin-card"><div class="prin-num">04</div><div><h4>Bind half-cart once</h4><p>Production binds once; dry room / reports / Sage inherit.</p></div></div>
+      <div class="prin-card"><div class="prin-num">05</div><div><h4>Two-tier powder inventory</h4><p>Issuing is a <b>transfer</b>; only actual-usage entry is <b>consumption</b>.</p></div></div>
+      <div class="prin-card"><div class="prin-num">06</div><div><h4>FIFO lots on pick lists</h4><p>Shortfall lots assigned automatically; lot numbers printed on the document.</p></div></div>
     </div>
   </div>
 </div>
@@ -801,14 +869,15 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
   <div class="tbar"><h2>Deliverables</h2></div>
   <div class="body">
     <div class="del-grid">
-      <div class="del-item"><div class="del-icon">1</div><div><h4>Phase 2 Modules A–E</h4><p>Integrated into the existing NPIC operations platform</p></div></div>
-      <div class="del-item"><div class="del-icon">2</div><div><h4>Role-based Access</h4><p>Employee / Supervisor / Manager / Admin</p></div></div>
+      <div class="del-item"><div class="del-icon">1</div><div><h4>Phase 2 Modules A–F</h4><p>Integrated into the existing NPIC operations platform</p></div></div>
+      <div class="del-item"><div class="del-icon">2</div><div><h4>Role-based Access</h4><p>Employee / Supervisor / Warehouse / Blending / Manager</p></div></div>
       <div class="del-item"><div class="del-icon">3</div><div><h4>Close-WO MFA Gate</h4><p>Microsoft Authenticator for restricted actions</p></div></div>
       <div class="del-item"><div class="del-icon">4</div><div><h4>Shift &amp; Productivity Reports</h4><p>Auto-generated with filters and trends</p></div></div>
       <div class="del-item"><div class="del-icon">5</div><div><h4>Data Export</h4><p>Excel &amp; PDF by date range or product</p></div></div>
       <div class="del-item"><div class="del-icon">6</div><div><h4>Sage 100 Bi-directional Sync</h4><p>Real-time WO pull; auto-post completions &amp; inventory</p></div></div>
       <div class="del-item"><div class="del-icon">7</div><div><h4>Training Docs</h4><p>SOPs for each module and role</p></div></div>
       <div class="del-item"><div class="del-icon">8</div><div><h4>Parallel-Run Support</h4><p>Excel reconciliation before cutover</p></div></div>
+      <div class="del-item"><div class="del-icon">9</div><div><h4>Powder Blending</h4><p>SKU formulas, blending plans, two-version pick lists, two-tier ledger</p></div></div>
     </div>
   </div>
 </div>
@@ -839,6 +908,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
             <li>Per-cart traceability → 100%</li>
             <li>Eliminate cross-WO material mix-ups</li>
             <li>Sage inventory updates on WO close</li>
+            <li>Blending by formula, not by estimate</li>
+            <li>Both powder inventories fully traced</li>
           </ul>
         </div>
       </div>
@@ -859,6 +930,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
             <li>Permission matrix (who can close WOs)</li>
             <li>Sage 100 data mapping &amp; access path</li>
             <li>Dry-room redry / temp-humidity scope boundary</li>
+            <li><b>Per-SKU blending formula data &amp; owner</b></li>
+            <li><b>Blending unit of measure; handling when both stocks fall short</b></li>
             <li>Pilot line(s) and parallel-run window</li>
           </ol>
         </div>
@@ -867,7 +940,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
         <div class="next-hd" style="background:var(--teal)">This Week's Actions</div>
         <div class="next-bd">
           <ol>
-            <li>Confirm Proposal v3.0 scope with no ambiguity</li>
+            <li>Confirm Proposal v3.1 scope with no ambiguity</li>
             <li>Schedule requirements workshop (1 week)</li>
             <li>Provide Sage 100 staging / API contact</li>
             <li>Share current Excel daily-report samples &amp; SOPs</li>
