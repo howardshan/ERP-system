@@ -1,0 +1,194 @@
+<!doctype html><html><head><meta charset='utf-8'><style>
+@page { size:Letter; margin:74pt 57pt 62pt 57pt;
+ @top-left { content:"NPIC Fase 2 — Sistema de Operaciones de Producción"; font-size:6.8pt; color:#666; font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; vertical-align:bottom; padding-bottom:14pt; }
+ @top-right { content:string(sec); font-size:6.8pt; color:#666; font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; vertical-align:bottom; padding-bottom:14pt; }
+ @bottom-left { content:"Confidencial — v3.1"; font-size:6.8pt; color:#666; font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; vertical-align:top; padding-top:12pt; white-space:nowrap; }
+ @bottom-right { content:"Página " counter(page) " de " counter(pages); font-size:6.8pt; color:#666; font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; vertical-align:top; padding-top:12pt; white-space:nowrap; } }
+@page cover { @top-left{content:none} @top-right{content:none} @bottom-right{content:none} }
+html,body { font-family:"Hiragino Sans GB","Helvetica Neue",Arial,sans-serif; color:#222; font-size:9.8pt; line-height:1.5; margin:0; }
+h2.sec { color:#4a86d8; font-size:13.5pt; font-weight:700; margin:16pt 0 9pt; padding-bottom:5pt; border-bottom:1.6pt solid #4a86d8; string-set:sec content(); }
+h2.sec.first { margin-top:0; }
+h3.sub { color:#4a86d8; font-size:10.5pt; font-weight:700; margin:15pt 0 7pt; }
+.modhead { background:#eef3fb; border-left:3.5pt solid #4a86d8; padding:6pt 10pt; margin:15pt 0 8pt; string-set:sec content(); page-break-after:avoid; }
+.modhead .tag { color:#4a86d8; font-weight:700; } .modhead .nm { font-weight:700; }
+.lbl { font-weight:700; font-size:10pt; margin:11pt 0 4pt; }
+p { margin:0 0 7pt; } p.muted { color:#666; }
+table { width:100%; border-collapse:collapse; margin:3pt 0 6pt; }
+th { background:#4a86d8; color:#fff; font-weight:700; font-size:9.6pt; text-align:left; padding:6pt 9pt; }
+td { font-size:9.6pt; color:#222; padding:6.5pt 9pt; border-bottom:0.6pt solid #e8e8e8; vertical-align:top; }
+ul { margin:3pt 0 7pt; padding-left:16pt; } li { margin:0 0 4pt; }
+.cover { page:cover; }
+.cover .kick { letter-spacing:3pt; color:#4a86d8; font-weight:700; font-size:10pt; margin-top:120pt; }
+.cover h1 { font-size:26pt; font-weight:700; margin:14pt 0 2pt; color:#1a1a1a; }
+.cover .sub { font-size:13pt; color:#555; margin:0 0 40pt; }
+.cover .meta { font-size:10pt; color:#444; line-height:1.9; }
+.pb { page-break-before:always; }
+</style></head><body>
+<div class="cover">
+  <div class="kick">PROPUESTA DE SERVICIO</div>
+  <h1>Sistema de Calidad y Operaciones NPIC</h1>
+  <div class="sub">Fase 2 — Operaciones de Producción</div>
+  <div class="meta">
+    Preparado por: Crave &amp; Cook<br>
+    Preparado para: NPIC<br>
+    Fecha: Julio 2026<br>
+    Versión: v3.1
+  </div>
+</div>
+
+<div class="pb"></div>
+<h2 class="sec first">1. Resumen general</h2>
+<p>Esta propuesta describe el alcance de la Fase 2 de la plataforma digital de operaciones de NPIC. Sobre la base del sistema de inspección de calidad establecido en la Fase 1 (Módulos A–I), la Fase 2 se centra en digitalizar el piso de producción —reemplazando el registro diario en Excel y los registros de carros en papel por un sistema en tiempo real y controlado por roles—, integrándose directamente con Sage 100 para eliminar la doble captura manual.</p>
+<p>La Fase 2 introduce seis módulos (A–F):</p>
+<table><thead><tr><th>Módulo</th><th>Nombre</th><th>Propósito</th></tr></thead><tbody><tr><td>A</td><td>Producción — Captura del supervisor</td><td>Registro por lotes de la producción de los empleados por parte de los supervisores, reemplazando el reporte diario en Excel</td></tr><tr><td>B</td><td>Producción — Modo estación del empleado</td><td>Captura carro por carro en tiempo real por los empleados en la máquina, con registro de entrada/salida</td></tr><tr><td>C</td><td>Operaciones del cuarto de secado</td><td>Escaneo de entrada/salida de carros vinculado a los registros de producción del Módulo B</td></tr><tr><td>D</td><td>Resumen de datos y reportes</td><td>Reportes de turno agregados, indicadores de eficiencia y exportación de datos</td></tr><tr><td>E</td><td>Integración con Sage 100</td><td>Sincronización bidireccional en tiempo real entre el sistema NPIC y Sage 100</td></tr><tr><td>F</td><td>Gestión de mezcla de polvos</td><td>Planes de mezcla y vales de surtido generados a partir de la fórmula del SKU, con inventario de polvo en dos niveles: almacén de materia prima y sala de mezclado</td></tr></tbody></table>
+
+<h2 class="sec">2. Estado actual y desafíos</h2>
+<table><thead><tr><th>Área</th><th>Método actual</th><th>Desafíos clave</th></tr></thead><tbody><tr><td>Seguimiento de producción</td><td>Reporte diario en Excel (2026 Daily Report Forming Production.xlsx)</td><td>Captura manual — cada supervisor dedica aproximadamente 2 horas al día a la captura; propenso a errores; sin visibilidad en tiempo real; indicadores de eficiencia calculados a mano</td></tr><tr><td>Cuarto de secado</td><td>Registros de carros en papel</td><td>Sin visibilidad sistemática de la cadena de carros; las continuaciones de medio carro son difíciles de rastrear entre turnos</td></tr><tr><td>Reportes y análisis</td><td>Compilación manual desde Excel</td><td>Sin vista consolidada; extraer resúmenes de turno o tendencias de productividad requiere trabajo manual adicional</td></tr><tr><td>Captura de datos en Sage 100</td><td>Todos los registros de producción se recapturan manualmente en Sage 100 por el personal</td><td>Doble captura que consume tiempo; errores de transcripción; retrasos entre la producción real y los registros del sistema</td></tr><tr><td>Mezcla de polvos</td><td>Las cantidades a mezclar se estiman hoy manualmente en Sage 100; del lado de la sala de mezclado no existe un registro de inventario de polvo independiente</td><td>Sage 100 no desglosa fórmulas, por lo que la consistencia de la proporción depende de la experiencia individual; ese nivel de inventario no existe en ningún sistema, así que el polvo pierde trazabilidad contable en cuanto sale del almacén de materia prima y las salidas y el consumo real no pueden documentarse; la diferencia entre lo planeado y lo realmente usado no puede atribuirse, dejando la merma sin análisis</td></tr></tbody></table>
+
+<h2 class="sec">3. Arquitectura del sistema</h2>
+<p>La Fase 2 se construye sobre la misma base tecnológica que la Fase 1 y se integra directamente en la plataforma NPIC existente. Los nuevos módulos comparten la misma autenticación de usuarios, el escaneo de código de barras y la infraestructura de exportación.</p>
+<h3 class="sub">Diseño de roles y acceso</h3>
+<table><thead><tr><th>Rol</th><th>Módulos accesibles</th><th>¿MFA requerido?</th></tr></thead><tbody><tr><td>Empleado</td><td>Módulo B — Modo estación (entrada/salida, captura de carros)</td><td>No</td></tr><tr><td>Supervisor</td><td>Módulos A, B, C, D — captura, revisión y reportes completos; Módulo F — generación y consulta de planes de mezcla</td><td>No (operaciones estándar)</td></tr><tr><td>Almacén de materia prima</td><td>Módulo F — confirmación de surtido y descuento de inventario</td><td>No</td></tr><tr><td>Sala de mezclado</td><td>Módulo F — consulta del vale y captura de la cantidad realmente usada</td><td>No</td></tr><tr><td>Gerente</td><td>Todos los módulos + acciones restringidas (cierre de orden de trabajo)</td><td>Sí — Microsoft Authenticator</td></tr><tr><td>Administrador</td><td>Acceso total al sistema, incluida la configuración de la integración con Sage 100</td><td>Sí — Microsoft Authenticator</td></tr></tbody></table>
+<h3 class="sub">Principios de diseño clave</h3>
+<ul>
+<li><b>Modo empleado</b> — Interfaz ligera para el piso de producción. Inicio de sesión por escaneo de gafete o ID de empleado. No requiere MFA para la captura diaria.</li>
+<li><b>Modo supervisor</b> — Captura por lotes completa que replica el formato del formulario de Excel existente.</li>
+<li><b>Acciones privilegiadas</b> — El cierre de órdenes de trabajo requiere verificación con Microsoft Authenticator (heredado de la Fase 1, Módulo I).</li>
+<li><b>Campos configurables por SKU</b> — Los campos requeridos (peso vs. cantidad, capas de charola del carro, campos de la orden de trabajo) se preconfiguran por SKU de producto.</li>
+<li><b>Enlace de medio carro</b> — Las continuaciones físicas de carro se vinculan en la etapa de producción (Módulo B); todos los módulos posteriores heredan la asociación automáticamente.</li>
+<li><b>Inventario de polvo en dos niveles</b> — El polvo se registra por separado en el almacén de materia prima y en la sala de mezclado. El surtido desde el almacén es una <b>transferencia</b>; solo la captura de la cantidad realmente usada por la sala de mezclado cuenta como <b>consumo</b>. Ambos movimientos se registran por separado, cada uno respaldado por su propio documento.</li>
+</ul>
+
+<h2 class="sec">4. Especificaciones de módulos</h2>
+<div class="modhead"><span class="tag">Módulo A</span> &nbsp;<span class="nm">Producción — Captura del supervisor</span></div>
+<p>Reemplaza el reporte diario en Excel existente. Los supervisores capturan registros por lotes de todos los trabajadores y carros de un turno o periodo determinado. Este modo lo usan los equipos que no cuentan con estaciones individuales de escaneo de código de barras.</p>
+<div class="lbl">Datos capturados</div>
+<ul>
+<li>Nombres e ID de empleados</li>
+<li>Asignaciones de máquina</li>
+<li>Números de orden de trabajo (工单号)</li>
+<li>Códigos de material primario — 一级单 (identificadores de materia prima)</li>
+<li>Números de carro, capas de charola y cantidad o peso por carro</li>
+<li>Horas de turno y tiempo total de trabajo</li>
+</ul>
+<div class="lbl">Salidas</div>
+<ul>
+<li>Indicadores de productividad por empleado calculados automáticamente (alimentan los reportes del Módulo D)</li>
+<li>Registros vinculados a órdenes de trabajo para la sincronización con Sage 100 vía el Módulo E</li>
+</ul>
+
+<div class="modhead"><span class="tag">Módulo B</span> &nbsp;<span class="nm">Producción — Modo estación del empleado</span></div>
+<p>Interfaz optimizada, orientada al empleado, para el registro de producción en tiempo real a nivel de máquina o línea. Diseñada para tabletas o terminales compartidas en el piso de producción. No requiere MFA para la captura estándar.</p>
+<div class="lbl">Entrada / salida</div>
+<ul>
+<li>Los empleados inician sesión antes del turno ingresando su ID de empleado o escaneando su gafete. Varios empleados pueden iniciar sesión simultáneamente en la misma máquina.</li>
+<li>Se requiere una firma digital al cierre de sesión.</li>
+<li>El turno se cierra cuando todos los empleados asignados a esa línea han cerrado sesión.</li>
+</ul>
+<div class="lbl">Captura de carros</div>
+<ul>
+<li>En el primer carro, el empleado ingresa el/los número(s) de orden de trabajo primaria. Los carros siguientes se llenan automáticamente a partir del último registro —debe presionarse un botón de confirmación antes de continuar; la captura manual puede sobrescribir el valor por defecto en cualquier momento.</li>
+<li>Un carro puede asociarse a varias órdenes de trabajo primarias.</li>
+<li>Los campos requeridos (peso o cantidad, capas de charola) se preconfiguran por SKU de producto.</li>
+<li>Se registran el número de carro y el número de capas de charola en cada captura.</li>
+</ul>
+<div class="lbl">Continuación de medio carro</div>
+<ul>
+<li>Para el primer carro de una sesión, el empleado debe seleccionar una de las siguientes opciones —obligatorio, no se puede omitir:</li>
+<li><b>Carro independiente</b> — una corrida de producción nueva e independiente.</li>
+<li><b>Medio carro (continuación)</b> — una continuación física del carro de una sesión anterior. El sistema vincula este carro con el número del carro previo. Todos los módulos posteriores (cuarto de secado, reportes, sincronización con Sage 100) heredan esta asociación automáticamente —sin necesidad de volver a seleccionarla en ningún otro punto del flujo.</li>
+</ul>
+<div class="lbl">Cierre de orden de trabajo — Restringido (requiere MFA)</div>
+<p>Dado que la producción real suele ser menor que la cantidad teórica del BOM, se provee una función de cierre de orden de trabajo. Esta acción requiere permiso especial y verificación con Microsoft Authenticator.</p>
+<table><thead><tr><th>Opción</th><th>Descripción</th></tr></thead><tbody><tr><td>Sin remanente</td><td>Todo el material se consumió por completo. La orden de trabajo cierra limpiamente.</td></tr><tr><td>Remanente a merma</td><td>El material sobrante se da de baja. El sistema distribuye automáticamente la cantidad no utilizada de forma uniforme entre los carros terminados para un costeo de material exacto.</td></tr><tr><td>Retener remanente</td><td>El material sobrante se reserva para una corrida futura. Sin ajuste a los registros de carros.</td></tr></tbody></table>
+
+<div class="modhead"><span class="tag">Módulo C</span> &nbsp;<span class="nm">Operaciones del cuarto de secado</span></div>
+<p>Da seguimiento a los carros a través del cuarto de secado con enlace al registro de producción. No se requiere volver a seleccionar el medio carro —la asociación establecida en el Módulo B se mantiene automáticamente.</p>
+<ul>
+<li><b>Escaneo de entrada:</b> el operador escanea el código de barras del carro al ingresar. El sistema recupera automáticamente el registro de producción del carro (incluido cualquier enlace de medio carro) a partir del código de barras y registra la marca de tiempo de entrada.</li>
+<li><b>Escaneo de salida:</b> registra la marca de tiempo de salida cuando el carro abandona el cuarto de secado.</li>
+</ul>
+<p style="color:#666;">Los detalles adicionales del flujo del cuarto de secado (cola de resecado, registro de tiempo/temperatura) se confirmarán con el equipo de NPIC durante la etapa de requerimientos.</p>
+
+<div class="modhead"><span class="tag">Módulo D</span> &nbsp;<span class="nm">Resumen de datos y reportes</span></div>
+<p>Agrega todos los datos de producción registrados en los Módulos A y B en reportes y exportaciones estructurados, reemplazando la compilación manual que hoy se hace a partir del archivo de Excel.</p>
+<div class="lbl">Reportes de turno y diarios</div>
+<ul>
+<li>Resumen de turno generado automáticamente: total de carros, cantidad/peso total, horas de trabajo y número de personas por turno</li>
+<li>Resumen diario de producción de todas las máquinas y órdenes de trabajo para una fecha dada</li>
+<li>Reporte de cumplimiento por orden de trabajo: cantidades planeadas vs. reales, estado de conciliación de material</li>
+</ul>
+<div class="lbl">Reportes de productividad</div>
+<ul>
+<li>Producción por empleado (carros terminados, peso/cantidad producida, horas trabajadas) en cualquier rango de fechas</li>
+<li>Utilización de máquina: horas activas vs. tiempo muerto por línea</li>
+<li>Vista de tendencia: producción semana a semana o mes a mes por producto u orden de trabajo</li>
+</ul>
+<div class="lbl">Exportación de datos</div>
+<ul>
+<li>Todos los reportes exportables por rango de fechas o SKU de producto</li>
+<li>Formatos de exportación: Excel y PDF</li>
+<li>Aprovecha el marco de exportación de la Fase 1 para mantener consistencia</li>
+</ul>
+
+<div class="modhead"><span class="tag">Módulo E</span> &nbsp;<span class="nm">Integración con Sage 100</span></div>
+<p>Conecta el sistema NPIC directamente con la base de datos de Sage 100 para el intercambio de datos en tiempo real —eliminando la recaptura manual de órdenes de trabajo, ajustes de inventario y cierres de producción entre ambos sistemas.</p>
+<div class="lbl">Datos extraídos de Sage 100</div>
+<table><thead><tr><th>Dato</th><th>Uso en el sistema NPIC</th></tr></thead><tbody><tr><td>Órdenes de trabajo (工单)</td><td>Llenado automático de los números de orden de trabajo en los Módulos A y B —sin captura manual</td></tr><tr><td>Maestro de artículos / BOM (一级单)</td><td>Sincroniza las configuraciones de SKU, descripciones de producto y códigos de materia prima usados en todo el sistema</td></tr><tr><td>Órdenes de compra de clientes</td><td>Vincula las órdenes de trabajo con las órdenes de compra de clientes para trazabilidad de extremo a extremo</td></tr><tr><td>Niveles de inventario</td><td>Muestra la disponibilidad de materia prima en tiempo real al abrir una nueva orden de trabajo</td></tr><tr><td>Saldos de polvo y cada nueva entrada de recepción</td><td>Sirven de base de inventario para los planes de mezcla del Módulo F; cada nueva recepción de materia prima registrada en Sage 100 se sincroniza al sistema NPIC para que los planes reflejen siempre el inventario vigente</td></tr></tbody></table>
+<div class="lbl">Datos enviados a Sage 100</div>
+<table><thead><tr><th>Dato</th><th>Disparador</th></tr></thead><tbody><tr><td>Cierres de producción (recepción de producto terminado)</td><td>Se registra automáticamente al cerrar una orden de trabajo en el Módulo B</td></tr><tr><td>Consumo de materia prima</td><td>Las cantidades de material consumidas (de la conciliación de 一级单 al cierre) se registran en el inventario de Sage 100</td></tr><tr><td>Números de lote</td><td>Las asignaciones de lote de producción se sincronizan con Sage 100 para trazabilidad de extremo a extremo</td></tr><tr><td>Registros de carro / cantidad</td><td>Las cantidades finales de producción de los Módulos A/B se registran en Sage 100 conforme se confirman</td></tr><tr><td>Consumo real de mezcla (vía BOM)</td><td>Una vez que la sala de mezclado captura la cantidad realmente usada en el Módulo F, el consumo de cada polvo se escribe de vuelta en Sage 100 a través del BOM</td></tr></tbody></table>
+<div class="lbl">Diseño de sincronización</div>
+<ul>
+<li><b>Extracción en tiempo real:</b> los datos de órdenes de trabajo y del maestro de artículos se obtienen de Sage 100 bajo demanda cuando un usuario abre un nuevo registro, garantizando el uso de los datos más recientes.</li>
+<li><b>Envío por disparador:</b> los cierres de producción y los ajustes de inventario se registran en Sage 100 en hitos definidos del flujo (cierre de orden de trabajo) —no por sondeo periódico—, minimizando conflictos.</li>
+<li><b>Manejo de errores:</b> si un envío a Sage 100 falla, el sistema pone el registro en cola y reintenta automáticamente. Se notifica a los supervisores cualquier elemento que requiera resolución manual.</li>
+</ul>
+
+<div class="modhead"><span class="tag">Módulo F</span>&nbsp;&nbsp;<span class="nm">Gestión de mezcla de polvos</span></div>
+<p>Sustituye la estimación manual que hoy se hace en Sage 100 por un plan de mezcla generado por el sistema. Al abrir una orden de trabajo, el sistema desglosa la cantidad de cada polvo a partir de la fórmula del SKU, emite los vales de surtido al almacén de materia prima y a la sala de mezclado, y registra cada transferencia y cada consumo en ambos inventarios de polvo.</p>
+<div class="lbl">Creación de los dos inventarios de polvo</div>
+<p>El Módulo F se apoya en dos registros de inventario de polvo creados en el sistema. Se diferencian en el origen de sus datos y en su vínculo con Sage 100:</p>
+<table><thead><tr><th>Inventario</th><th>Cómo se crea</th><th>Vínculo con Sage 100</th></tr></thead><tbody>
+<tr><td>Polvo del almacén de materia prima</td><td>Se crea tomando Sage 100 como fuente: saldos iniciales y maestro de artículos importados desde Sage 100</td><td><b>Vínculo continuo</b>: los saldos y <b>cada nueva entrada de recepción</b> se sincronizan desde Sage 100 al sistema NPIC para que los planes de mezcla reflejen siempre el inventario vigente; los descuentos por surtido de vales se reflejan de vuelta en Sage 100</td></tr>
+<tr><td>Polvo de la sala de mezclado</td><td><b>De nueva creación</b> en el sistema: este nivel de inventario no existe hoy en Sage 100 y se registra aquí por primera vez</td><td>Saldo inicial capturado por conteo físico; después aumenta por las <b>transferencias</b> del almacén y disminuye por el <b>consumo real</b>; las cantidades consumidas se escriben de vuelta en Sage 100 a través del BOM</td></tr>
+</tbody></table>
+<p class="muted">El momento de registro de ambos niveles (sincronizar con Sage 100 al surtir, o una sola escritura de vuelta al terminar la mezcla) se definirá con NPIC y con el responsable de Sage 100 durante la etapa de cierre de requerimientos.</p>
+<div class="lbl">Fórmula de mezcla por SKU</div>
+<ul><li>Se mantiene una fórmula de mezcla por SKU de producto. Cada renglón registra un polvo y su porcentaje de participación, con control de versiones y de vigencia.</li>
+<li>La fórmula es la única base de cálculo del plan de mezcla. Su mantenimiento requiere un permiso específico y los planes ya emitidos no se ven afectados por cambios posteriores a la fórmula.</li></ul>
+<div class="lbl">Generación del plan de mezcla</div>
+<ul><li>Se captura un <b>peso planeado</b> para cada orden de trabajo primaria al crear la orden. El sistema desglosa la cantidad requerida de cada polvo según la fórmula del SKU.</li>
+<li>El sistema verifica ambos inventarios de polvo —el <b>almacén de materia prima</b> y la <b>sala de mezclado</b>— y construye el plan bajo la regla: <b>consumir primero las existencias de la sala de mezclado y tomar del almacén únicamente el faltante</b>.</li>
+<li>El faltante que se toma del almacén se asigna a lotes automáticamente por <b>primeras entradas, primeras salidas (PEPS/FIFO)</b>. Los números de lote y las cantidades por lote se imprimen directamente en el documento, sin que el operador del almacén tenga que decidir en piso.</li></ul>
+<div class="lbl">Vale de surtido — dos versiones</div>
+<p>El primer paso del plan de mezcla es el vale de surtido. Un mismo plan genera dos documentos con contenido distinto, uno por cada destinatario:</p>
+<table><thead><tr><th>Destinatario</th><th>Contenido del documento</th></tr></thead><tbody><tr><td>Almacén de materia prima</td><td>Únicamente los polvos que deben surtirse desde el almacén, con cantidades y lotes asignados por PEPS</td></tr><tr><td>Sala de mezclado</td><td>La lista completa de material de la mezcla: la parte surtida por el almacén y la parte tomada de las existencias propias de la sala, señaladas por separado</td></tr></tbody></table>
+<div class="lbl">Surtido y transferencia de inventario</div>
+<ul><li>Cuando el responsable del almacén confirma <b>Surtido</b>, el sistema realiza ambos registros a la vez: el almacén de materia prima se <b>descuenta</b> por la cantidad surtida y esa misma cantidad se <b>transfiere</b> al inventario de la sala de mezclado.</li>
+<li>El polvo trasladado a la sala de mezclado permanece en inventario y todavía no se cuenta como consumido. La sala no necesita confirmar la recepción por separado, para no agregar pasos en piso.</li></ul>
+<div class="lbl">Captura de la cantidad realmente usada</div>
+<ul><li>Terminada la mezcla, la sala de mezclado captura la <b>cantidad realmente usada</b> de cada polvo en una página dedicada. El sistema descuenta esa cantidad del inventario de la sala: este registro es el consumo real.</li>
+<li><b>Real menor al plan:</b> el polvo sobrante permanece en el inventario de la sala de mezclado y puede usarse directamente en una orden posterior, sin documento de devolución.</li>
+<li><b>Real mayor al plan:</b> no se permite el sobreconsumo directo. Debe emitirse un vale de surtido adicional, de modo que todo movimiento de inventario quede respaldado por un documento.</li>
+<li>El consumo real se escribe de vuelta en Sage 100 a través del BOM (ver Módulo E) y se compara renglón por renglón contra el plan, generando un registro de diferencias de mezcla.</li></ul>
+<p class="muted">Las unidades de medida, el manejo cuando ambos inventarios juntos siguen siendo insuficientes (bloquear la creación de la orden o marcar el faltante y continuar) y el formato de impresión del vale se definirán con el equipo de NPIC durante la etapa de cierre de requerimientos.</p>
+<h2 class="sec">5. Plan de implementación</h2>
+<table><thead><tr><th>Etapa</th><th>Actividades</th><th>Duración</th></tr></thead><tbody><tr><td>Cierre de requerimientos</td><td>Confirmar definiciones de campos, configuraciones de SKU, matriz de permisos y mapeo de datos de Sage 100 con el equipo de NPIC; revisar la plantilla de Excel existente; cargar las fórmulas de mezcla por SKU y confirmar el criterio del inventario de polvo en dos niveles</td><td>1 semana</td></tr><tr><td>Desarrollo</td><td>Construir los Módulos A–F con acceso basado en roles; integración con la API de Sage 100; conexión con el marco de autenticación y exportación de la Fase 1</td><td>7–9 semanas</td></tr><tr><td>Pruebas internas</td><td>Pruebas de extremo a extremo con datos reales de producción de NPIC; validación de la sincronización con Sage 100 en ambiente de pruebas</td><td>2 semanas</td></tr><tr><td>Operación en paralelo</td><td>Operar el nuevo sistema junto con el registro en Excel existente; comparar resultados y resolver diferencias; validar la exactitud de los datos de Sage 100</td><td>2 semanas</td></tr><tr><td>Capacitación</td><td>Capacitar a supervisores y empleados en los Módulos A–D; documentar los SOP de cada rol</td><td>1 semana</td></tr><tr><td>Puesta en marcha</td><td>Cambio total; retiro del reporte diario en Excel; se descontinúa la captura manual en Sage 100</td><td>—</td></tr></tbody></table>
+
+<h2 class="sec">6. Entregables</h2>
+<ul>
+<li>Módulos de la Fase 2 (A–F) integrados en la plataforma de operaciones NPIC existente</li>
+<li>Control de acceso basado en roles: Empleado / Supervisor / Almacén de materia prima / Sala de mezclado / Gerente / Administrador</li>
+<li>Verificación MFA con Microsoft Authenticator para el cierre de órdenes de trabajo</li>
+<li>Resúmenes de turno y reportes de productividad por empleado generados automáticamente</li>
+<li>Exportación de datos por rango de fechas o producto (Excel y PDF)</li>
+<li>Integración bidireccional con Sage 100: extracción en tiempo real de órdenes de trabajo e inventario de materia prima; registro automático de cierres de producción, inventario y consumo de mezcla</li>
+<li>Gestión de mezcla de polvos: mantenimiento de fórmulas por SKU, generación automática de planes de mezcla, vales de surtido en dos versiones, captura de la cantidad realmente usada; creación de los dos registros de inventario de polvo — almacén de materia prima (vinculado de forma continua a Sage 100) y sala de mezclado (de nueva creación en el sistema)</li>
+<li>Documentación de capacitación para cada módulo y rol</li>
+</ul>
+
+<h2 class="sec">7. Beneficios esperados</h2>
+<table><thead><tr><th>Beneficio</th><th>Impacto</th></tr></thead><tbody><tr><td>Eliminar el reporte diario manual en Excel</td><td>~2 horas de captura por supervisor ahorradas al día; visibilidad de producción en tiempo real</td></tr><tr><td>Datos en tiempo real a nivel de carro</td><td>Registros exactos y con marca de tiempo desde el piso de producción en cuanto se completa cada carro</td></tr><tr><td>Cálculo automático de indicadores de eficiencia</td><td>Sin cálculo manual; resúmenes de turno y reportes de producción por empleado generados al instante</td></tr><tr><td>Trazabilidad de carros de extremo a extremo</td><td>El enlace de medio carro vincula los registros entre turnos; el cuarto de secado y los reportes heredan la asociación automáticamente</td></tr><tr><td>Eliminar la doble captura en Sage 100</td><td>Las órdenes de trabajo se llenan automáticamente desde Sage 100; los cierres de producción y el consumo de material se registran de vuelta automáticamente</td></tr><tr><td>Inventario exacto en tiempo real en Sage 100</td><td>El inventario de Sage 100 se actualiza al momento del cierre de producción, sin carga por lotes ni conciliación manual al final del día</td></tr><tr><td>Integración sin fisuras con la Fase 1</td><td>Plataforma única para inspección de calidad y operaciones de producción; autenticación, código de barras e infraestructura de exportación compartidos</td></tr><tr><td>Seguimiento del uso de materia prima por orden de trabajo</td><td>El consumo real se atribuye con exactitud por orden de trabajo; se elimina la distorsión por mezcla de material entre órdenes</td></tr><tr><td>Seguimiento exacto de cantidad y tiempos por carro</td><td>Carros reales = carros registrados; se elimina el subreporte; 100% de exactitud en el registro de producción</td></tr><tr><td>Registro del tiempo de espera tras la producción</td><td>Los datos de tiempo de espera acumulados sirven de base para optimizar el proceso a futuro</td></tr><tr><td>Sin captura manual de estación y horas de trabajo</td><td>La estación y las horas se capturan automáticamente, reemplazando la captura manual en papel/Excel</td></tr><tr><td>Productividad del empleado por carro</td><td>Se calcula de forma automática y exacta por empleado × carro; más detallado, objetivo y en tiempo real</td></tr><tr><td>Seguimiento de producción en tiempo real por orden de trabajo</td><td>El avance de cada orden es visible en tiempo real, apoyando un monitoreo y una planeación más precisos</td></tr><tr><td>Sin llenado manual de registros y reportes por carro</td><td>Los operadores de línea ya no llenan manualmente los registros y reportes de cada carro</td></tr><tr><td>Cantidades de mezcla calculadas por fórmula</td><td>Se elimina la estimación manual; el sistema garantiza la consistencia de la proporción y reduce errores de material y sobredosificación</td></tr><tr><td>Visibilidad de ambos inventarios de polvo</td><td>El polvo del almacén y el de la sala de mezclado son consultables en tiempo real; el surtido es transferencia y la mezcla es consumo — todo movimiento queda registrado</td></tr><tr><td>Diferencias de mezcla atribuibles</td><td>El consumo real de polvo se compara renglón por renglón contra el plan de cada orden, apoyando el control de merma y la optimización de fórmulas</td></tr></tbody></table>
+<h3 class="sub">Explicaciones detalladas</h3>
+<p><b>7.1 Eliminar el reporte diario manual en Excel.</b> Hoy, cada supervisor consolida manualmente en Excel la producción del turno y elabora un reporte diario. Con el sistema en operación, el reporte se genera automáticamente a partir de la captura en tiempo real en piso, sin captura manual. A razón de aproximadamente <b>2 horas/día</b> por supervisor, con <b>10 supervisores × 22 días hábiles</b>, se ahorran cerca de <b>440 horas-hombre/mes (≈2.5 FTE)</b>; el reporte diario pasa de «disponible al día siguiente» a «disponible en tiempo real».</p><p><b>7.2 Datos en tiempo real a nivel de carro.</b> Cada carro genera un registro con marca de tiempo en cuanto se completa, sin reconstrucción posterior de memoria. La captura posterior se aproxima a <b>0</b>; la <b>trazabilidad por carro alcanza el 100%</b>, con marcas de tiempo con precisión al minuto.</p><p><b>7.3 Seguimiento del uso de materia prima por orden de trabajo.</b> La entrega y el consumo reales se registran <b>por cada orden de trabajo</b>. Problema actual: con frecuencia el material de una orden se usa en otra, por lo que el consumo real no puede atribuirse con exactitud. Al vincular el material a la orden de trabajo se elimina la distorsión causada por la <b>mezcla de material entre órdenes</b>, permitiendo calcular con exactitud el consumo real / rendimiento (yield) de cada orden, lo que respalda el costeo y la detección de sobreconsumo.</p><p><b>7.4 Seguimiento exacto de cantidad y tiempos por carro.</b> La cantidad real producida de cada carro y sus marcas de tiempo de inicio/fin se capturan en tiempo real. Problema actual: los empleados pueden <b>omitir o subreportar carros deliberadamente</b>, por lo que la cantidad realmente producida no coincide con la registrada. Con el conteo en tiempo real ambas coinciden. <b>Carros reales = carros registrados</b>, el subreporte baja a cero, la exactitud del registro de producción sube al 100% y puede derivarse un <b>tiempo takt promedio (minutos/carro)</b> para estimar capacidad y programar.</p><p><b>7.5 Registro del tiempo de espera tras la producción.</b> Se registra el <b>tiempo de espera después de que cada carro termina su producción</b> (por ejemplo, la espera para pasar a la siguiente etapa / al cuarto de secado), acumulando datos que sirven de base para la optimización del proceso y la mejora de la eficiencia a futuro. El <b>tiempo de espera promedio (minutos/carro)</b> puede medirse y usarse como línea base cuantificada y métrica de seguimiento para la mejora.</p><p><b>7.6 Sin captura manual de estación y horas de trabajo.</b> La asignación de estación y las horas de trabajo las captura el sistema, reemplazando la captura manual en papel/Excel. El ahorro de horas de este punto <b>ya está incluido en el ahorro del reporte diario de 7.1 y no se contabiliza dos veces</b>; el valor está en la mayor integridad y exactitud de los datos de horas/estación (eliminando faltantes y errores de captura).</p><p><b>7.7 Productividad del empleado por carro.</b> La productividad se calcula de forma automática y exacta por <b>empleado × carro</b> (carros/turno, piezas/hora-hombre); más detallada, objetiva y en tiempo real que el método actual. La granularidad de los datos llega a «persona × carro»; puede compararse la <b>dispersión de productividad</b> entre equipos/individuos, apoyando la evaluación de desempeño y las decisiones de asignación de personal. (Ya existe una línea base objetiva; este punto hace los datos más exactos y más detallados, no algo creado desde cero.)</p><p><b>7.8 Seguimiento de producción en tiempo real por orden de trabajo.</b> Se sigue en tiempo real el avance/estado de producción de <b>cada orden de trabajo</b>, de modo que los directores de planeación y de producción puedan <b>monitorear y planear con mayor precisión</b> con base en el desempeño real (programación, capacidad, fechas de entrega). El avance de la orden es visible en tiempo real (100% de cobertura), pasando de una «consolidación posterior» a un «control en tiempo real».</p><p><b>7.9 Sin llenado manual de registros y reportes por carro (operadores de línea).</b> Hoy, los operadores de línea deben llenar manualmente el registro de producción y los reportes estadísticos de cada carro; con el sistema en operación, los datos se capturan en tiempo real en piso y los operadores ya no llenan nada manualmente. A razón de <b>1 minuto/carro × 6 carros/turno × 3 turnos/día × 40 líneas de producción = 720 minutos/día (12 horas-hombre/día)</b>, con <b>22 días hábiles</b>, se ahorran cerca de <b>264 horas-hombre/mes (≈1.5 FTE)</b>.</p><p><b>7.10 Digitalización de la mezcla de polvos.</b> Hoy las cantidades a mezclar se estiman manualmente en Sage 100, que no desglosa fórmulas, y del lado de la sala de mezclado no existe un registro de inventario de polvo independiente: el polvo pierde trazabilidad contable en cuanto sale del almacén de materia prima. Con el sistema en operación, las cantidades se desglosan automáticamente desde la fórmula del SKU sobre el peso planeado; los vales de surtido se emiten en dos versiones con lotes asignados por PEPS; y el surtido (transferencia) y la mezcla (consumo) se registran por separado. La consistencia de la proporción deja de depender de la experiencia individual; mejora la <b>correspondencia entre registro y existencia física</b> en ambos inventarios de polvo, con cada salida y cada consumo trazables a una orden de trabajo y a un lote específicos; y el <b>consumo real frente al planeado</b> puede compararse renglón por renglón por orden, estableciendo una línea base de merma que sustenta la optimización de fórmulas y la detección de sobreconsumo.</p>
+</body></html>

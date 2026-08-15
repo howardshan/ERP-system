@@ -155,7 +155,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
 .pc p   { font-size:2.74vh; font-size:2.74cqh; color:var(--txm); line-height:1.55; }
 
 /* Module grid */
-.mod-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:1.5%; height:100%; }
+.mod-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:1.5%; height:100%; }
 .mod-card {
   background:#fff; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,.08);
   overflow:hidden; display:flex; flex-direction:column;
@@ -280,7 +280,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
 .prin-card p { font-size:2.74vh; font-size:2.74cqh; color:var(--txm); line-height:1.55; }
 
 /* Deliverables */
-.del-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.8%; height:100%; }
+.del-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.8%; height:100%; }
 .del-item {
   background:#fff; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.07);
   display:flex; align-items:flex-start; gap:2%; padding:3% 3.5%;
@@ -371,9 +371,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
     <div class="eyebrow">NPIC × Crave &amp; Cook, Inc.</div>
     <div class="t1">第二阶段</div>
     <div class="t2">生产运营系统</div>
-    <div class="sub">取代 Excel 日报 · 实时车辆录入 · Sage 100 双向集成</div>
+    <div class="sub">取代 Excel 日报 · 实时车辆录入 · 配粉计划 · Sage 100 双向集成</div>
     <div class="dl"></div>
-    <div class="dt">Proposal v3.0 &nbsp;·&nbsp; August 2026</div>
+    <div class="dt">Proposal v3.1 &nbsp;·&nbsp; Kickoff Deck v2.0 &nbsp;·&nbsp; August 2026</div>
   </div>
 </div>
 
@@ -397,11 +397,12 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
       <div class="ag-card">
         <div class="ag-hd am">02 · 范围与模块</div>
         <div class="ag-body">
-          <h3>五个核心模块 A–E</h3>
+          <h3>六个核心模块 A–F</h3>
           <ul>
             <li class="am">主管批量录入 / 员工站点</li>
             <li class="am">烘房操作 / 资料报表</li>
             <li class="am">Sage 100 双向集成</li>
+            <li class="am">配粉管理（新增）</li>
           </ul>
         </div>
         <div class="ag-ft am">确认范围</div>
@@ -565,6 +566,14 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
         </div>
         <div class="mod-body"><p>与 Sage 100 实时双向同步，消除工单与完工双重录入。</p></div>
         <div class="mod-ft">系统打通</div>
+      </div>
+      <div class="mod-card">
+        <div class="mod-top" style="background:var(--teal)">
+          <div class="mod-letter">F</div>
+          <div class="mod-name">配粉管理</div>
+        </div>
+        <div class="mod-body"><p>按 SKU 配方自动生成配粉计划与取粉单，管理两级粉料库存。</p></div>
+        <div class="mod-ft">物料管控</div>
       </div>
     </div>
   </div>
@@ -744,6 +753,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
           <div class="sage-row"><div class="sage-key">物料主档 / BOM</div><div class="sage-val">同步 SKU、产品描述、原材料编号</div></div>
           <div class="sage-row"><div class="sage-key">客户订单 PO</div><div class="sage-val">工单与客户采购订单关联，端到端追溯</div></div>
           <div class="sage-row"><div class="sage-key">库存水位</div><div class="sage-val">开立新工单时实时显示原材料可用数量</div></div>
+          <div class="sage-row"><div class="sage-key">粉料库存 / 入库</div><div class="sage-val">原材料库粉料余额与每笔新入库同步，作为配粉计划核对依据</div></div>
         </div>
       </div>
       <div class="sage-col">
@@ -753,7 +763,54 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
           <div class="sage-row"><div class="sage-key">原材料耗用</div><div class="sage-val">关单时一级单物料核算结果回传库存</div></div>
           <div class="sage-row"><div class="sage-key">批次号 Lot</div><div class="sage-val">生产批次号同步，全链路追溯</div></div>
           <div class="sage-row"><div class="sage-key">车辆 / 产量</div><div class="sage-val">A / B 确认的最终生产数量同步</div></div>
+          <div class="sage-row"><div class="sage-key">配粉实耗</div><div class="sage-val">模块 F 回填实际用量后按 BOM 回写各粉料消耗</div></div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 12b MODULE F -->
+<div class="slide" id="s12b" style="background:var(--light)">
+  <div class="tbar"><h2>模块 F — 配粉管理（新增）</h2></div>
+  <div class="body">
+    <div class="ml">
+      <div class="ml-l">
+        <div class="mtag">
+          <div class="mbadge" style="background:var(--teal)">F</div>
+          <div class="mname">配粉管理</div>
+        </div>
+        <p class="mdesc">取代现在<b>在 Sage 100 中人工估算</b>的做法：按 SKU 配方自动展开配粉用量，取粉单下发原材料库与配粉车间，全程记录两级粉料库存的转移与消耗。</p>
+        <ul class="mlist">
+          <li>按 SKU 维护粉料配方（占比 + 版本与生效控制）</li>
+          <li>每个一级工单录入计划重量，自动展开各粉料用量</li>
+          <li>先用配粉车间现有库存，缺口才从原材料库领取</li>
+          <li>原材料库缺口按 FIFO 自动指定批次，单据直出批次号</li>
+        </ul>
+        <div class="panel" style="margin-top:2%">
+          <h4>两级粉料库存的建立</h4>
+          <ul>
+            <li><b>原材料库</b> — 以 Sage 100 为源建账，余额与每笔入库<b>持续联动</b></li>
+            <li><b>配粉车间</b> — Sage 中原本没有这级库存，由本系统<b>首次建账</b>；实耗按 BOM 回写 Sage</li>
+          </ul>
+        </div>
+      </div>
+      <div class="ml-r">
+        <div class="panel">
+          <h4>取粉单 — 双联下发</h4>
+          <ul>
+            <li><b>原材料库版</b> — 仅列需出库的粉料、数量与 FIFO 批次</li>
+            <li><b>配粉车间版</b> — 全量用料，两个来源分别标注</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h4>库存两次过账</h4>
+          <ul>
+            <li><b>发料（转移）</b> — 仓管确认「已发料」，原材料库扣减、同量转入配粉车间</li>
+            <li><b>配粉（消耗）</b> — 车间回填实际用量，从配粉车间库存扣减</li>
+          </ul>
+        </div>
+        <div class="sbox am">实际少于计划 → 余量留配粉车间；超过计划 → 须另开取粉单补料，不允许直接超扣。实耗按 BOM 回写 Sage 100。</div>
       </div>
     </div>
   </div>
@@ -761,24 +818,35 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
 
 <!-- 13 ROLES & PRINCIPLES -->
 <div class="slide" id="s13" style="background:var(--light)">
-  <div class="tbar"><h2>角色权限与核心设计原则</h2></div>
-  <div class="body" style="display:flex; flex-direction:column; gap:2%;">
+  <div class="tbar"><h2>角色权限矩阵</h2></div>
+  <div class="body">
     <table class="rtbl">
       <thead>
         <tr><th style="width:16%">角色</th><th style="width:52%">可访问模块</th><th>MFA</th></tr>
       </thead>
       <tbody>
         <tr><td><b>员工</b></td><td>模块 B — 站点模式（车辆录入）</td><td><span class="pill no">否</span></td></tr>
-        <tr><td><b>主管</b></td><td>模块 A、B、C、D — 完整录入、审核与报表</td><td><span class="pill no">否</span>（标准操作）</td></tr>
+        <tr><td><b>主管</b></td><td>模块 A、B、C、D — 完整录入、审核与报表；模块 F — 配粉计划</td><td><span class="pill no">否</span>（标准操作）</td></tr>
+        <tr><td><b>原材料库仓管</b></td><td>模块 F — 取粉单发料确认与库存扣减</td><td><span class="pill no">否</span></td></tr>
+        <tr><td><b>配粉车间</b></td><td>模块 F — 取粉单查看与实际用量回填</td><td><span class="pill no">否</span></td></tr>
         <tr><td><b>管理员</b></td><td>所有模块 + 受限操作（关单）</td><td><span class="pill yes">是</span> Authenticator</td></tr>
         <tr><td><b>系统管理员</b></td><td>完整系统权限，含 Sage 100 集成配置</td><td><span class="pill yes">是</span> Authenticator</td></tr>
       </tbody>
     </table>
-    <div class="prin" style="flex:1; min-height:0;">
+  </div>
+</div>
+
+<!-- 13b DESIGN PRINCIPLES -->
+<div class="slide" id="s13b" style="background:var(--light)">
+  <div class="tbar"><h2>核心设计原则</h2></div>
+  <div class="body">
+    <div class="prin" style="height:100%; grid-template-columns:repeat(3,1fr);">
       <div class="prin-card"><div class="prin-num">01</div><div><h4>员工模式轻量</h4><p>专为车间设计，日常录入无需 MFA，支持刷卡或工号打卡。</p></div></div>
       <div class="prin-card"><div class="prin-num">02</div><div><h4>主管模式对齐 Excel</h4><p>批量录入界面布局与现有 Excel 表单一致。</p></div></div>
       <div class="prin-card"><div class="prin-num">03</div><div><h4>按 SKU 配置字段</h4><p>重量 vs 数量、层数、必填工单字段按产品自动生效。</p></div></div>
       <div class="prin-card"><div class="prin-num">04</div><div><h4>半车一次绑定</h4><p>生产环节绑定后，下游烘房 / 报表 / Sage 自动继承。</p></div></div>
+      <div class="prin-card"><div class="prin-num">05</div><div><h4>配粉两级库存</h4><p>发料是<b>转移</b>，回填实际用量才是<b>消耗</b>，两笔分别过账。</p></div></div>
+      <div class="prin-card"><div class="prin-num">06</div><div><h4>取粉按 FIFO 出批次</h4><p>缺口部分自动指定批次，单据直出批次号，仓管无需现场判断。</p></div></div>
     </div>
   </div>
 </div>
@@ -839,14 +907,15 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
   <div class="tbar"><h2>交付物清单</h2></div>
   <div class="body">
     <div class="del-grid">
-      <div class="del-item"><div class="del-icon">1</div><div><h4>Phase 2 模块 A–E</h4><p>集成至现有 NPIC 运营平台</p></div></div>
-      <div class="del-item"><div class="del-icon">2</div><div><h4>角色访问控制</h4><p>员工 / 主管 / 管理员 / 系统管理员</p></div></div>
+      <div class="del-item"><div class="del-icon">1</div><div><h4>Phase 2 模块 A–F</h4><p>集成至现有 NPIC 运营平台</p></div></div>
+      <div class="del-item"><div class="del-icon">2</div><div><h4>角色访问控制</h4><p>员工 / 主管 / 原材料库 / 配粉车间 / 管理员</p></div></div>
       <div class="del-item"><div class="del-icon">3</div><div><h4>关单 MFA 验证</h4><p>Microsoft Authenticator 门禁</p></div></div>
       <div class="del-item"><div class="del-icon">4</div><div><h4>班次与效率报表</h4><p>自动生成，支持筛选与对比</p></div></div>
       <div class="del-item"><div class="del-icon">5</div><div><h4>数据导出</h4><p>按日期 / 产品导出 Excel 及 PDF</p></div></div>
       <div class="del-item"><div class="del-icon">6</div><div><h4>Sage 100 双向集成</h4><p>实时拉取工单，自动过账完工与库存</p></div></div>
       <div class="del-item"><div class="del-icon">7</div><div><h4>培训文档</h4><p>各模块、各角色操作 SOP</p></div></div>
       <div class="del-item"><div class="del-icon">8</div><div><h4>并行运行支持</h4><p>上线前与 Excel 对照验证</p></div></div>
+      <div class="del-item"><div class="del-icon">9</div><div><h4>配粉管理</h4><p>SKU 配方、配粉计划、双联取粉单、两级库存台账</p></div></div>
     </div>
   </div>
 </div>
@@ -878,6 +947,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
             <li>每车可追溯率 → 100%</li>
             <li>消除跨工单串料失真</li>
             <li>Sage 库存关单即更新</li>
+            <li>配粉量由配方算，不再靠估</li>
+            <li>两级粉料库存全程留痕</li>
           </ul>
         </div>
       </div>
@@ -899,6 +970,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
             <li>角色权限矩阵（谁可关单）</li>
             <li>Sage 100 数据映射与访问方式</li>
             <li>烘房返烘 / 温湿度等扩展需求边界</li>
+            <li><b>各 SKU 粉料配方数据与维护责任人</b></li>
+            <li><b>配粉计量单位、两处库存不足时的处理</b></li>
             <li>试点产线与并行运行窗口</li>
           </ol>
         </div>
@@ -907,7 +980,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0a0a0a; font-
         <div class="next-hd" style="background:var(--teal)">本周行动项</div>
         <div class="next-bd">
           <ol>
-            <li>双方确认 Proposal v3.0 范围无歧义</li>
+            <li>双方确认 Proposal v3.1 范围无歧义</li>
             <li>安排需求确认工作坊（1 周）</li>
             <li>提供 Sage 100 测试环境 / 接口联系人</li>
             <li>收集现行 Excel 日报样例与 SOP</li>
