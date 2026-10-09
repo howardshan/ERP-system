@@ -41,22 +41,55 @@ export function Combobox({
     [options, value],
   );
 
+  // Ranked filtering: exact label match FIRST, then label prefix, then label
+  // substring, then hint (name) substring. Ordering here is CORRECTNESS, not
+  // cosmetics: Enter and the default highlight commit filtered[0], and barcode
+  // scanners terminate a scan with Enter — with a plain substring filter kept in
+  // list order, a leading-zero or superset code (e.g. '058202' vs '58202',
+  // '11500N' vs '11500') could sit at index 0 and steal the commit even though
+  // the operator typed the exact code (BR-Q89).
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const src = !q
-      ? options
-      : options.filter((o) =>
-          o.label.toLowerCase().includes(q) ||
-          (o.hint ? o.hint.toLowerCase().includes(q) : false));
-    return src.slice(0, limit);
+    if (!q) return options.slice(0, limit);
+    const rank = (o: ComboOption): number => {
+      const label = o.label.toLowerCase();
+      if (label === q) return 0;
+      if (label.startsWith(q)) return 1;
+      if (label.includes(q)) return 2;
+      return o.hint && o.hint.toLowerCase().includes(q) ? 3 : 4;
+    };
+    return options
+      .map((o, i) => ({ o, r: rank(o), i }))
+      .filter((x) => x.r < 4)
+      .sort((a, b) => a.r - b.r || a.i - b.i)   // stable within each rank
+      .map((x) => x.o)
+      .slice(0, limit);
   }, [options, query, limit]);
 
-  // Close + reset the typed query when clicking outside.
+  // Leaving the field with text still typed but never committed (no Enter / no
+  // click on a row) must NOT silently keep the previous value — that let an
+  // operator type a valid code, click away, and unknowingly submit the old
+  // selection. So on blur/outside-click: if the typed text exactly matches an
+  // option's label, commit it; if something was typed but matches nothing, clear
+  // the selection so required-field validation catches it. An empty query (just
+  // opened and clicked away) leaves the current selection untouched.
+  const commitOrReset = () => {
+    const q = query.trim();
+    if (q) {
+      const exact = options.find((o) => o.label.toLowerCase() === q.toLowerCase());
+      onChange(exact ? exact.value : '');
+    }
+    setOpen(false);
+    setQuery('');
+  };
+  // The document listener is registered once, so read the latest impl via a ref.
+  const commitRef = useRef(commitOrReset);
+  commitRef.current = commitOrReset;
+
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery('');
+        commitRef.current();
       }
     };
     document.addEventListener('mousedown', onDoc);
@@ -96,6 +129,10 @@ export function Combobox({
     } else if (e.key === 'Escape') {
       setOpen(false);
       setQuery('');
+    } else if (e.key === 'Tab') {
+      // Tabbing away is a blur too — commit an exact typed match or drop a stale
+      // selection, same as an outside click. Don't preventDefault: let focus move.
+      commitOrReset();
     }
   };
 

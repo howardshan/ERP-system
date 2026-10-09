@@ -865,6 +865,21 @@ export async function productionLotDetail(lotId: string): Promise<ProductionLotD
   return rpc<ProductionLotDetail>('qc_production_lot_detail', { p_lot_id: lotId });
 }
 
+// M-174: delete a work order that hasn't started production. The RPC enforces the
+// not-started invariant (all carts still 'created', no groups/samples/inspections)
+// and cascades the carts + removes the empty pre-created quarantine warehouse lot.
+export interface DeleteLotResult {
+  deleted: boolean;
+  work_order_barcode: string;
+  lot_number: string;
+  carts_deleted: number;
+  warehouse_lot_deleted: boolean;
+}
+// M-175: reason is required and an audit row is written server-side.
+export async function deleteProductionLot(lotId: string, reason: string): Promise<DeleteLotResult> {
+  return rpc<DeleteLotResult>('qc_delete_production_lot', { p_production_lot_id: lotId, p_reason: reason });
+}
+
 // ── Production batch creation (creates 1 Dry Room + N Sub-lots in one go) ─────
 //
 // Production is a temporary creation wizard until a real Production module
@@ -937,10 +952,18 @@ export async function listSubLotsByDryer(dryerNumber: number): Promise<SubLot[]>
   return rpc<SubLot[]>('qc_list_sub_lots_by_dryer', { p_dryer_number: dryerNumber });
 }
 
-export async function deleteProductionLots(ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
-  const { error } = await supabase.from('qc_production_lot').delete().in('id', ids);
-  if (error) throw new Error(error.message);
+// M-175: bulk delete now goes through the audited SECURITY DEFINER RPC (direct
+// client DELETE on qc_production_lot is blocked by RLS). Reason is required; each
+// lot is guarded by the not-started rule and audited. Returns per-lot outcome so
+// the caller can report how many were deleted vs. skipped (already started).
+export interface BulkDeleteLotsResult {
+  deleted: number;
+  skipped: number;
+  results: Array<{ production_lot_id: string; work_order_barcode?: string; deleted: boolean; reason?: string }>;
+}
+export async function deleteProductionLots(ids: string[], reason: string): Promise<BulkDeleteLotsResult> {
+  if (ids.length === 0) return { deleted: 0, skipped: 0, results: [] };
+  return rpc<BulkDeleteLotsResult>('qc_delete_production_lots', { p_ids: ids, p_reason: reason });
 }
 
 // ── Sub-lots ──────────────────────────────────────────────────────────────────
