@@ -817,7 +817,13 @@
     "needsAttentionHelp3a": "A ",
     "needsAttentionHelp3b": " border marks a passed item ready to release.",
     "entriesCount": "{{count}} entries",
-    "noResultsYet": "No results need attention right now."
+    "noResultsYet": "No results need attention right now.",
+    "dateLabel": "Date",
+    "backToToday": "Today",
+    "viewingPastDate": "Viewing {{date}} — pass/fail counts and Needs attention are for that day (unresolved items can still be retested or disposed). Drying and testing cards always show live status.",
+    "passedOnLabel": "Passed {{date}} ({{pct}}%)",
+    "failedOn": "Failed {{date}}",
+    "noResultsForDate": "Nothing from {{date}} still needs attention."
   },
   "releaseDialog": {
     "title": "Release to Inventory",

@@ -1751,13 +1751,21 @@ export interface NeedsAttentionItem {
 }
 
 export interface QcOverview {
+  /** Plant-local (America/Chicago) today, YYYY-MM-DD. */
   today: string;
+  /** M-172: the day the passed/failed stats + needs_attention refer to. */
+  date?: string;
   stats: QcOverviewStats;
   needs_attention: NeedsAttentionItem[];
 }
 
-export async function getQcOverview(): Promise<QcOverview> {
-  return rpc<QcOverview>('qc_overview');
+/**
+ * M-172: `date` (YYYY-MM-DD, plant-local) scopes passed/failed counts and the
+ * Needs-attention list to that day; live drying/testing cards stay "now".
+ * Omit for today.
+ */
+export async function getQcOverview(date?: string): Promise<QcOverview> {
+  return rpc<QcOverview>('qc_overview', { p_date: date ?? null });
 }
 
 // ── Release errors (S4) ──────────────────────────────────────────────────────

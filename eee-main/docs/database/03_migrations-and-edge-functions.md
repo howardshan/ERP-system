@@ -2739,7 +2739,8 @@ UPDATE pkg_outbound SET cart_count = cart_count WHERE id = outbound_id;
 | M-169 | 20260715000001_qc_autorelease_on_pass.sql · 检测通过即**自动放行**(BR-Q87):`qc_drying_sub_lot` 加触发器 `qc_autorelease_on_pass`(status→passed 且旧值非 passed 时 `PERFORM qc_release_passed_sub_lot(id, NULL)`,passed→closed 不过 ERP),覆盖 champion 传播的兄弟车;不再需要手动 Release。顺带删掉旧 1 参 `qc_release_passed_sub_lot(uuid)` 重载 |
 | M-170 | 20260715000002_qc_show_all_readings.sql · 仪表盘/列表显示**全部检测读数**(不止 Aw):`qc_today_inspection_item` / `qc_overview`(needs_attention)/ `qc_recent_failed_inspections` / `qc_recent_passed_inspections` 各加 `readings`=`_qc_flatten_readings(values_json)`;`qc_analysis_recovery_detail` 加 `next_readings`(下一次检测的全部读数,group 分支合成单条 Aw)。`aw` 保留兼容。前端新增 `lib/qcReadings.ts.formatReadings`,QcHome/AdminDashboard/AnalysisPage 改为渲染全部读数(如「MC% 14 · Aw 0.6」) |
 | M-171 | 20260715000003_qc_dry_room_board_by_day.sql · 烘房看板重构(BR-Q86 修订):`qc_dry_room_board()` 改为**一天一页**(`page_date=GREATEST(out_date, today)`,过去不成页);**out_date 用实际出烘日**(等结果车递延到今天页但 out 日期保留实际,不再变成今天);行按 产品×工单×出烘日×**烘干房号**分组(同批分散不同房拆多行);行字段 `product_name/sku_code/work_order/out_date/dry_room/dryer_number/waiting/pass/fail`。前端 `DryRoomBoard.tsx` 改为按天翻页、行数超限翻子页、Product/SKU 为前两列、计数列名加 (Qty)、新增 Dry room # 列 |
-| **M-172** | _(下一个)_ |
+| M-172 | 20261009000001_qc_overview_by_date.sql · **QC Home 日期选择**(BR-Q88):`qc_overview()` → `qc_overview(p_date date DEFAULT NULL)`(先 DROP 旧零参签名,避免重载歧义;`qc_notification_*` 里的 `qc_overview()` 调用仍解析到新函数)。所选日驱动 `passed_today/failed_today/failed_today_open/pass_rate_pct` 与 `needs_attention` 窗口 `[day_start, day_end)`(可操作过滤不变,故过去日期只显示仍待处理的条目);烘干/检测实时卡与 `expected_finish_today` 始终按当前/今天。日界改为**工厂本地日 America/Chicago**(原为 UTC 日,修订 BR-Q57)。返回新增 `date` 字段,`today` 改为 Chicago 今天。**原因**:昨天 fail 未处置的车过了午夜即从 Needs attention 消失,无法再选 Retest/Dispose。前端 `qcApi.getQcOverview(date?)` + `QcHome.tsx` 日期选择器 |
+| **M-173** | _(下一个)_ |
 
 | 编号 | 目录 |
 |------|------|

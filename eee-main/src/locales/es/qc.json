@@ -815,7 +815,13 @@
     "needsAttentionHelp3a": "Un borde ",
     "needsAttentionHelp3b": " marca un artículo aprobado listo para liberar.",
     "entriesCount": "{{count}} entradas",
-    "noResultsYet": "No hay resultados que requieran atención en este momento."
+    "noResultsYet": "No hay resultados que requieran atención en este momento.",
+    "dateLabel": "Fecha",
+    "backToToday": "Hoy",
+    "viewingPastDate": "Viendo {{date}}: los conteos de aprobados/rechazados y \"Requiere atención\" corresponden a ese día (los pendientes aún se pueden volver a probar o disponer). Las tarjetas de secado y pruebas siempre muestran el estado en vivo.",
+    "passedOnLabel": "Aprobados {{date}} ({{pct}}%)",
+    "failedOn": "Rechazados {{date}}",
+    "noResultsForDate": "No hay resultados de {{date}} que requieran atención."
   },
   "releaseDialog": {
     "title": "Liberar a inventario",

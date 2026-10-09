@@ -813,7 +813,13 @@
     "needsAttentionHelp3a": "",
     "needsAttentionHelp3b": "边框标记表示已合格、可放行的项目。",
     "entriesCount": "{{count}} 条",
-    "noResultsYet": "目前没有需要关注的结果。"
+    "noResultsYet": "目前没有需要关注的结果。",
+    "dateLabel": "日期",
+    "backToToday": "回到今天",
+    "viewingPastDate": "正在查看 {{date}} —— 合格/不合格数与「需关注」列表为该日数据(未处理的不合格车仍可选择重测或处置)。烘干与检测卡片始终显示实时状态。",
+    "passedOnLabel": "{{date}} 合格({{pct}}%)",
+    "failedOn": "{{date}} 不合格",
+    "noResultsForDate": "{{date}} 没有仍需关注的结果。"
   },
   "releaseDialog": {
     "title": "放行到库存",
