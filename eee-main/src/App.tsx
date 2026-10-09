@@ -53,7 +53,7 @@ export default function App() {
   // `/…/index.html` resolves to the real file in both dev and prod.
   if (typeof window !== 'undefined') {
     const p = window.location.pathname.replace(/\/+$/, '');
-    if (p === '/proposal' || p === '/proposal-phase2') {
+    if (p === '/proposal' || p === '/proposal-phase2' || p === '/phase2-demo1') {
       window.location.replace(`${p}/index.html`);
       return null;
     }

@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Flame, Hourglass, FlaskConical, ListChecks,
   CheckCircle2, XCircle, Thermometer, Clock,
-  ChevronRight, ChevronDown, RefreshCw, TrendingUp, X, Package,
+  ChevronRight, ChevronDown, RefreshCw, TrendingUp, X, Package, CalendarDays,
 } from 'lucide-react';
 import {
   getQcOverview,
@@ -49,6 +49,12 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
     dispositionPerms.redry || dispositionPerms.room_temp ||
     dispositionPerms.retest || dispositionPerms.scrap;
 
+  // M-172: selected plant-local day. Scopes passed/failed counts and the
+  // Needs-attention list so yesterday's unresolved fails can still be
+  // retested / disposed from here. Live drying/testing cards ignore it.
+  const [date, setDate] = useState(dallasToday());
+  const today = dallasToday();
+  const isToday = date === today;
   const [overview, setOverview] = useState<QcOverview | null>(null);
   const [forecast, setForecast] = useState<PassRateForecastItem[]>([]);
   const [error, setError] = useState('');
@@ -68,14 +74,20 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
     sku_code: string; sku_name: string; days: number; carts: PkgCart[];
   } | null>(null);
 
+  // Ignore responses from a superseded request (e.g. date changed mid-flight).
+  const loadSeq = useRef(0);
+
   const load = async () => {
+    const seq = ++loadSeq.current;
     setRefreshing(true);
     try {
       const [d, fc, inv] = await Promise.all([
-        getQcOverview(),
+        getQcOverview(date),
         dashboardPassRateForecast().catch(() => [] as PassRateForecastItem[]),
         getInventorySummary().catch(() => [] as PkgInventorySku[]),
       ]);
+      if (seq !== loadSeq.current) return;
+      setError('');
       setOverview(d);
       setForecast(fc);
       setInventory(inv);
@@ -89,7 +101,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
     load();
     const t = setInterval(load, 15_000);
     return () => clearInterval(t);
-  }, []);
+  }, [date]);
 
   /** Immediately remove an item from needs_attention, then refresh in background. */
   const removeAttentionItem = (inspectionId: string) => {
@@ -146,16 +158,44 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
             {t('qcHome.subtitle', { date: overview?.today ?? '—' })}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          disabled={refreshing}
-          className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700 disabled:opacity-50"
-        >
-          <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
-          {t('qcHome.refresh')}
-        </button>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+            <CalendarDays size={12} className="text-slate-500" />
+            {t('qcHome.dateLabel')}
+            <input
+              type="date"
+              value={date}
+              max={today}
+              onChange={e => { if (e.target.value) { setMsg(''); setDate(e.target.value); } }}
+              className="border border-slate-200 rounded px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </label>
+          {!isToday && (
+            <button
+              type="button"
+              onClick={() => setDate(today)}
+              className="text-xs font-bold px-2.5 py-1.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700"
+            >
+              {t('qcHome.backToToday')}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={load}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded border border-slate-200 hover:border-blue-400 hover:text-blue-700 text-slate-700 disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+            {t('qcHome.refresh')}
+          </button>
+        </div>
       </div>
+
+      {!isToday && (
+        <p className="text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded-lg mt-3 text-xs flex items-center gap-2">
+          <CalendarDays size={13} /> {t('qcHome.viewingPastDate', { date })}
+        </p>
+      )}
 
       {msg && <p className="text-emerald-700 bg-emerald-50 p-2 rounded-lg mt-3 text-sm flex items-center gap-2">
         <CheckCircle2 size={14} /> {msg}
@@ -228,7 +268,9 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                 }}
               />
               <StatCard
-                label={t('qcHome.passedTodayLabel', { pct: overview.stats.pass_rate_pct ?? '—' })}
+                label={isToday
+                  ? t('qcHome.passedTodayLabel', { pct: overview.stats.pass_rate_pct ?? '—' })
+                  : t('qcHome.passedOnLabel', { date, pct: overview.stats.pass_rate_pct ?? '—' })}
                 value={overview.stats.passed_today}
                 icon={CheckCircle2} accent="emerald"
                 onClick={() => {
@@ -248,7 +290,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
                 }}
               />
               <StatCard
-                label={t('qcHome.failedToday')}
+                label={isToday ? t('qcHome.failedToday') : t('qcHome.failedOn', { date })}
                 value={overview.stats.failed_today}
                 icon={XCircle} accent="red"
                 onClick={() => {
@@ -389,7 +431,7 @@ export default function QcHome({ onNavigate, onOpenSubLot, onOpenHistory }: Prop
 
           {overview.needs_attention.length === 0 ? (
             <div className="bg-white border rounded-xl p-8 text-center text-sm text-slate-500">
-              {t('qcHome.noResultsYet')}
+              {isToday ? t('qcHome.noResultsYet') : t('qcHome.noResultsForDate', { date })}
             </div>
           ) : (
             <ul className="space-y-2">
